@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:printing/printing.dart';
 
 import '../../core/constants/colors.dart';
 import '../../features/database/database_service.dart';
@@ -11,6 +12,7 @@ import '../../../models/region_model.dart';
 import '../../../models/school_sale_model.dart';
 import '../../../models/target_model.dart';
 import '../../../models/user_model.dart';
+import '../../../services/outreach_report_service.dart';
 import 'utils/csv_download_stub.dart'
     if (dart.library.html) 'utils/csv_download_web.dart'
     if (dart.library.io) 'utils/csv_download_io.dart'
@@ -44,6 +46,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
   bool _isLoading = true;
   String? _error;
+  bool _isExportingPdf = false;
 
   @override
   void initState() {
@@ -492,6 +495,41 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
     }
   }
 
+  Future<void> _exportPdf() async {
+    setState(() => _isExportingPdf = true);
+    try {
+      final reportService = OutreachReportService();
+      final pdfBytes = await reportService.generateOutreachPdf(
+        agents: _agents,
+        regions: _regions,
+        schools: _schools,
+        visits: _visits,
+        activities: _activities,
+        debts: _debts,
+        orders: _orders,
+        orderItems: _orderItems,
+        sales: _sales,
+        targets: _targets,
+        selectedRegionId: _selectedRegionId,
+        selectedAgentId: _selectedAgentId,
+      );
+
+      final fileName = 'schools_outreach_report_${_formatDate(DateTime.now())}.pdf';
+      await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PDF exported: $fileName')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export PDF: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isExportingPdf = false);
+    }
+  }
+
   String _csvEscape(String value) {
     final escaped = value.replaceAll('"', '""');
     return '"$escaped"';
@@ -507,6 +545,13 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: _isExportingPdf
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.picture_as_pdf),
+            onPressed: _isExportingPdf ? null : _exportPdf,
+            tooltip: 'Export PDF',
+          ),
           IconButton(
             icon: const Icon(Icons.download),
             onPressed: _exportCsv,

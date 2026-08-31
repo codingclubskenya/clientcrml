@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -302,6 +305,89 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     }
   }
 
+  Future<void> _exportAnalyticsPdf() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final pdf = pw.Document();
+      final generatedAt = DateTime.now();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageTheme: pw.PageTheme(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.all(24)),
+          build: (context) {
+            return [
+              pw.Text('Analytics Report', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              pw.Text('Generated: ${_formatDateTime(generatedAt)}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+              pw.SizedBox(height: 16),
+              _buildAnalyticsPdfSummary(),
+              pw.SizedBox(height: 16),
+              _buildAnalyticsPdfLeaderboards(),
+            ];
+          },
+        ),
+      );
+
+      final fileName = 'analytics_report_${_formatDateTime(DateTime.now())}.pdf';
+      await Printing.sharePdf(bytes: await pdf.save(), filename: fileName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF exported: $fileName')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export PDF: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  pw.Widget _buildAnalyticsPdfSummary() {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300),
+      columnWidths: const {0: pw.FlexColumnWidth(1), 1: pw.FlexColumnWidth(1)},
+      children: [
+        _pdfRow('Total Users', '$_totalUsers'),
+        _pdfRow('Total Schools', '$_totalSchools'),
+        _pdfRow('Approved Revenue', 'KES $_approvedRevenue'),
+        _pdfRow('Pipeline Sales', 'KES $_pipelineSales'),
+        _pdfRow('Open Tasks', '$_openTasks'),
+        _pdfRow('In Progress Tasks', '$_inProgressTasks'),
+        _pdfRow('Closed Tasks', '$_closedTasks'),
+        _pdfRow('Google Schools', '$_googleSchools'),
+        _pdfRow('Manual Schools', '$_manualSchools'),
+      ],
+    );
+  }
+
+  pw.Widget _buildAnalyticsPdfLeaderboards() {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Top Revenue Reps', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        ..._topRevenueReps.take(5).map((s) => pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 2), child: pw.Text('${s.name}: KES ${s.value.toStringAsFixed(0)}'))),
+        pw.SizedBox(height: 8),
+        pw.Text('Top Visit Reps', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        ..._topVisitReps.take(5).map((s) => pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 2), child: pw.Text('${s.name}: ${s.value.toInt()} visits'))),
+      ],
+    );
+  }
+
+  pw.TableRow _pdfRow(String label, String value) {
+    return pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+      children: [
+        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(label, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(value, style: pw.TextStyle(fontSize: 10))),
+      ],
+    );
+  }
+
+  String _formatDateTime(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -313,6 +399,11 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         title: const Text('Analytics'),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Export PDF',
+            onPressed: _exportAnalyticsPdf,
+            icon: const Icon(Icons.picture_as_pdf),
+          ),
           IconButton(
             tooltip: 'Update Data',
             onPressed: _fetchAnalyticsData,

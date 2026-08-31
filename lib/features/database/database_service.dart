@@ -165,6 +165,101 @@ class DatabaseService {
     }
   }
 
+  Future<List<String>> getDistinctTargetScopes() async {
+    return const ['regional', 'agent', 'business_advisor', 'sales_rep'];
+  }
+
+  Future<List<String>> getDistinctTargetTypes() async {
+    return const [
+      'product_sales',
+      'customer_visits',
+      'collections',
+      'new_customers',
+      'sample_distribution',
+      'consignment',
+    ];
+  }
+
+  Future<List<String>> getDistinctTargetPeriods() async {
+    return const ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'ytd'];
+  }
+
+  Future<List<String>> getDistinctSubRegions() async {
+    try {
+      final data = await _supabase
+          .from('targets')
+          .select('sub_region')
+          .not('sub_region', 'is', null);
+      return (data as List)
+          .map((item) => item['sub_region']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting sub regions: $e');
+      return <String>[];
+    }
+  }
+
+  Future<List<Map<String, String>>>
+      getAssignableUsersByRoles(List<int> roles) async {
+    try {
+      final data = await _supabase
+          .from('users')
+          .select('id, full_name, email, role');
+      final roleSet = roles.toSet();
+      return (data as List)
+          .where((item) => roleSet.contains((item['role'] as int?) ?? 5))
+          .map((item) => {
+                'id': item['id']?.toString() ?? '',
+                'label':
+                    '${item['full_name']?.toString() ?? item['email']?.toString() ?? 'Unknown'} (${_roleLabel(item['role'] ?? 5)})',
+                'role': item['role']?.toString() ?? '5',
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting assignable users: $e');
+      return <Map<String, String>>[];
+    }
+  }
+
+  Future<List<Map<String, String>>> getRegionOptions() async {
+    try {
+      final data = await _supabase
+          .from('regions')
+          .select('id, region, sub_region')
+          .order('region')
+          .order('sub_region');
+      return (data as List)
+          .map((item) => {
+                'id': item['id']?.toString() ?? '',
+                'label':
+                    '${item['region']} - ${item['sub_region']}',
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting region options: $e');
+      return <Map<String, String>>[];
+    }
+  }
+
+  static String _roleLabel(int role) {
+    switch (role) {
+      case 1:
+        return 'Admin';
+      case 2:
+        return 'Manager';
+      case 3:
+        return 'BAS';
+      case 4:
+        return 'Agent';
+      case 5:
+        return 'Sales Rep';
+      default:
+        return 'User';
+    }
+  }
+
   Future<RegionModel?> getRegion(String id) async {
     try {
       final data = await _supabase
@@ -892,6 +987,24 @@ class DatabaseService {
       return (response as List).length;
     }
 
+    Future<int> sumRows(
+      String table,
+      String dateColumn, {
+      required String valueColumn,
+    }) async {
+      var query = _supabase.from(table).select('id, $valueColumn');
+      if (agentId != null) {
+        query = query.eq('agent_id', agentId);
+      }
+      query = query.gte(dateColumn, startIso).lte(dateColumn, nowIso);
+      final response = await query;
+      return (response as List).fold<int>(0, (sum, row) {
+        final value = row[valueColumn];
+        if (value is num) return sum + value.toInt();
+        return sum;
+      });
+    }
+
     Future<int> countVisitedSchools() async {
       var query = _supabase.from('school_visits').select('school_id');
       if (agentId != null) {
@@ -920,6 +1033,16 @@ class DatabaseService {
       status: 'won',
       statusColumn: 'sale_status',
     );
+    final samples = await sumRows(
+      'school_sample_distributions',
+      'distributed_at',
+      valueColumn: 'quantity',
+    );
+    final sampleReturns = await sumRows(
+      'school_sample_distributions',
+      'distributed_at',
+      valueColumn: 'returned_qty',
+    );
     final visitedSchools = await countVisitedSchools();
     final percent =
         visits == 0 ? 0 : ((visits / targetValue) * 100).clamp(0, 100).round();
@@ -932,6 +1055,8 @@ class DatabaseService {
       'orders': orders,
       'wonSales': wonSales,
       'visitedSchools': visitedSchools,
+      'samples': samples,
+      'sampleReturns': sampleReturns,
     };
   }
 
@@ -961,57 +1086,136 @@ class DatabaseService {
       return (response as List).length;
     }
 
-    Future<Set<String>> visitedSchoolIdsFromVisits() async {
+    String classifySchoolType(Map<String, dynamic> school) {
+      final buffer =
+          [
+                school['dealer_type'],
+                school['shop_category'],
+                school['school_level'],
+                school['partner_subtype'],
+                school['name'],
+              ]
+              .where((value) => value != null)
+              .map((value) => value.toString().toLowerCase())
+              .join(' ');
+
+      if (buffer.contains('bookshop') ||
+          buffer.contains('book shop') ||
+          buffer.contains('bookstore') ||
+          buffer.contains('book store')) {
+        return 'bookshop';
+      }
+
+      if (buffer.contains('institution') ||
+          buffer.contains('distributor') ||
+          buffer.contains('dealer') ||
+          buffer.contains('retail') ||
+          buffer.contains('stockist')) {
+        return 'institution';
+      }
+
+      return 'school';
+    }
+
+    final visitsFuture = (() async {
       final response = await _supabase
           .from('school_visits')
           .select('school_id')
           .eq('agent_id', agentId)
           .gte('visited_at', startIso)
           .lte('visited_at', nowIso);
-      return (response as List)
-          .map((row) => row['school_id']?.toString())
-          .whereType<String>()
-          .where((id) => id.isNotEmpty)
-          .toSet();
-    }
-
-    // Onboarding activity lives in the schools table (captured_by /
-    // captured_at). Grounds people primarily onboard, so without this their
-    // historical data would be missing from the performance view.
-    // Fetch the onboarded schools once and derive both metrics from it.
-    Future<List<String>> onboardedSchoolIdList() async {
+      return List<Map<String, dynamic>>.from(response as List<dynamic>);
+    })();
+    final onboardedFuture = (() async {
       final response = await _supabase
           .from('schools')
-          .select('id')
+          .select(
+            'id, dealer_type, shop_category, school_level, partner_subtype, name',
+          )
           .eq('captured_by', agentId)
           .gte('captured_at', startIso)
           .lte('captured_at', nowIso);
-      return (response as List)
-          .map((row) => row['id']?.toString())
-          .whereType<String>()
-          .where((id) => id.isNotEmpty)
-          .toList();
+      return List<Map<String, dynamic>>.from(response as List<dynamic>);
+    })();
+
+    final results = await Future.wait<dynamic>([
+      visitsFuture,
+      onboardedFuture,
+      countRows(
+        'orders',
+        'created_at',
+        status: 'paid',
+        statusColumn: 'status',
+      ),
+      countRows(
+        'school_sales',
+        'created_at',
+        status: 'won',
+        statusColumn: 'sale_status',
+      ),
+    ]);
+
+    final visitRows =
+        List<Map<String, dynamic>>.from(results[0] as List<dynamic>);
+    final onboardedSchools =
+        List<Map<String, dynamic>>.from(results[1] as List<dynamic>);
+    final orders = results[2] as int;
+    final wonSales = results[3] as int;
+
+    final schoolIds =
+        visitRows
+            .map((row) => row['school_id']?.toString())
+            .whereType<String>()
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+    final onboardedIds =
+        onboardedSchools
+            .map((row) => row['id']?.toString())
+            .whereType<String>()
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+    final allIds = {...schoolIds, ...onboardedIds}.toList();
+
+    final counts = <String, int>{'school': 0, 'institution': 0, 'bookshop': 0};
+    final visitedSchools = <String>{...schoolIds, ...onboardedIds}.length;
+
+    if (allIds.isNotEmpty) {
+      final schoolTypeRows =
+          (await _supabase
+                  .from('schools')
+                  .select('id, dealer_type, shop_category, school_level, partner_subtype, name')
+                  .inFilter('id', allIds))
+              as List<dynamic>;
+      final schoolTypeById = <String, String>{};
+      for (final row in schoolTypeRows) {
+        final school = Map<String, dynamic>.from(row as Map);
+        final id = school['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        schoolTypeById[id] = classifySchoolType(school);
+      }
+
+      for (final row in visitRows) {
+        final schoolId = row['school_id']?.toString() ?? '';
+        final type = schoolTypeById[schoolId];
+        if (type != null) {
+          counts[type] = counts[type]! + 1;
+        }
+      }
+
+      for (final id in onboardedIds) {
+        final type = schoolTypeById[id];
+        if (type != null) {
+          counts[type] = counts[type]! + 1;
+        }
+      }
     }
 
-    final onboardedIds = await onboardedSchoolIdList();
-    final onboardedVisits = onboardedIds.length;
-    final visits =
-        (await countRows('school_visits', 'visited_at')) + onboardedVisits;
-    final orders = await countRows(
-      'orders',
-      'created_at',
-      status: 'paid',
-      statusColumn: 'status',
-    );
-    final wonSales = await countRows(
-      'school_sales',
-      'created_at',
-      status: 'won',
-      statusColumn: 'sale_status',
-    );
-    final visitedFromVisits = await visitedSchoolIdsFromVisits();
-    final visitedSchools =
-        <String>{...visitedFromVisits, ...onboardedIds}.length;
+    final visits = visitRows.length + onboardedIds.length;
+    final schools = counts['school'] ?? 0;
+    final institutions = counts['institution'] ?? 0;
+    final bookshops = counts['bookshop'] ?? 0;
     final percent =
         visits == 0 ? 0 : ((visits / dailyTarget) * 100).clamp(0, 100).round();
 
@@ -1023,6 +1227,11 @@ class DatabaseService {
       'orders': orders,
       'wonSales': wonSales,
       'visitedSchools': visitedSchools,
+      'schools': schools,
+      'institutions': institutions,
+      'bookshops': bookshops,
+      'pipeline': 0,
+      'daysWorked': 0,
     };
   }
 

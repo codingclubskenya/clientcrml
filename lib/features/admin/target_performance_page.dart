@@ -10,6 +10,59 @@ import '../../models/region_model.dart';
 import '../../models/user_model.dart';
 import '../database/database_service.dart';
 
+class _PerformanceRow {
+  final UserModel user;
+  final Map<String, Map<String, int>> productTargets;
+  final Map<String, int> visitTargets;
+  final Map<String, int> collectionTargets;
+  final Map<String, int> customerTargets;
+  final Map<String, int> sampleTargets;
+  final Map<String, int> consignmentTargets;
+  final Map<String, int> actualProducts;
+  final Map<String, int> actualVisits;
+  final Map<String, int> actualCollections;
+  final Map<String, int> actualCustomers;
+  final Map<String, int> actualSamples;
+  final Map<String, int> actualSampleReturns;
+  final Map<String, int> actualConsignments;
+  final Map<String, double> percentages;
+  final Map<String, int> actualSchools;
+  final Map<String, int> actualInstitutions;
+  final Map<String, int> actualBookshops;
+  final Map<String, int> pipeline;
+  final Map<String, int> daysWorked;
+
+  _PerformanceRow({
+    required this.user,
+    required this.productTargets,
+    required this.visitTargets,
+    required this.collectionTargets,
+    required this.customerTargets,
+    required this.sampleTargets,
+    required this.consignmentTargets,
+    required this.actualProducts,
+    required this.actualVisits,
+    required this.actualCollections,
+    required this.actualCustomers,
+    required this.actualSamples,
+    required this.actualSampleReturns,
+    required this.actualConsignments,
+    required this.percentages,
+    required this.actualSchools,
+    required this.actualInstitutions,
+    required this.actualBookshops,
+    required this.pipeline,
+    required this.daysWorked,
+  });
+}
+
+class _CardMetric {
+  final String label;
+  final String value;
+
+  const _CardMetric({required this.label, required this.value});
+}
+
 class TargetPerformancePage extends StatefulWidget {
   const TargetPerformancePage({super.key});
 
@@ -17,21 +70,44 @@ class TargetPerformancePage extends StatefulWidget {
   State<TargetPerformancePage> createState() => _TargetPerformancePageState();
 }
 
-class _TargetPerformancePageState extends State<TargetPerformancePage> with SingleTickerProviderStateMixin {
+class _TargetPerformancePageState extends State<TargetPerformancePage>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = true;
   int _currentUserRole = 5;
   String? _currentUserId;
   String _selectedScope = 'regional';
-  String? _selectedRegionId;
-  String? _selectedSubRegion;
-  String? _selectedAssigneeId;
   late TabController _tabController;
   List<RegionModel> _regions = [];
   List<UserModel> _agents = [];
   List<UserModel> _businessAdvisors = [];
   List<UserModel> _salesReps = [];
   List<_PerformanceRow> _rows = [];
+
+  // Dynamic Filter State
+  List<String> _scopeOptions = [];
+  List<String> _targetPeriodOptions = [];
+  List<Map<String, String>> _regionOptions = [];
+  List<Map<String, String>> _assigneeOptions = [];
+  String? _selectedTargetPeriod;
+  String? _selectedRegionOptionId;
+  String? _selectedAssigneeOptionId;
+  DateTime _startDate = DateTime(2026, 1, 22);
+  DateTime _endDate = DateTime(2026, 7, 13);
+  String _sortBy = 'All';
+
+  String? _defaultScopeForRole(int role) {
+    switch (role) {
+      case 3:
+        return 'business_advisor';
+      case 4:
+        return 'agent';
+      case 5:
+        return 'sales_rep';
+      default:
+        return null;
+    }
+  }
 
   @override
   void initState() {
@@ -60,7 +136,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       }
 
       if (_currentUserRole > 2) {
-        _selectedScope = 'individual';
+        _selectedScope = _defaultScopeForRole(_currentUserRole) ?? 'regional';
       }
 
       final regions = await _dbService.getAllRegions();
@@ -69,12 +145,24 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       final businessAdvisors = users.where((u) => u.role == 3).toList();
       final salesReps = users.where((u) => u.role == 5).toList();
 
+      final scopeOptions = await _dbService.getDistinctTargetScopes();
+      final targetPeriodOptions = await _dbService.getDistinctTargetPeriods();
+      final regionOptions = await _dbService.getRegionOptions();
+      final assigneeOptions =
+          _currentUserRole <= 2
+              ? await _dbService.getAssignableUsersByRoles(const [3, 4, 5])
+              : await _dbService.getAssignableUsersByRoles([_currentUserRole]);
+
       if (!mounted) return;
       setState(() {
         _regions = regions;
         _agents = agents;
         _businessAdvisors = businessAdvisors;
         _salesReps = salesReps;
+        _scopeOptions = scopeOptions;
+        _targetPeriodOptions = targetPeriodOptions;
+        _regionOptions = regionOptions;
+        _assigneeOptions = assigneeOptions;
         _isLoading = false;
       });
 
@@ -83,20 +171,35 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading performance: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error loading performance: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
   Future<List<TargetModel>> _loadTargets() async {
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
       var query = Supabase.instance.client.from('targets').select();
-      if (_currentUserRole > 2 && currentUser != null) {
-        query = query.or('assigned_to.eq.${currentUser.id},assigned_to.is.null');
+
+      if (_selectedScope.isNotEmpty) {
+        query = query.eq('scope', _selectedScope);
       }
+      if (_selectedTargetPeriod case final value?) {
+        query = query.eq('target_period', value);
+      }
+      if (_selectedRegionOptionId case final value?) {
+        query = query.eq('region_id', value);
+      }
+      if (_selectedAssigneeOptionId case final value?) {
+        query = query.eq('assigned_to', value);
+      }
+
       final data = await query.order('created_at', ascending: false);
-      return (data as List).map((item) => TargetModel.fromMap(Map<String, dynamic>.from(item))).toList();
+      return (data as List)
+          .map((item) => TargetModel.fromMap(Map<String, dynamic>.from(item)))
+          .toList();
     } catch (e) {
       debugPrint('Error loading targets: $e');
       return <TargetModel>[];
@@ -108,10 +211,9 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
     try {
       final targets = await _loadTargets();
       final assignees = _getAssigneeList();
-      final rows = <_PerformanceRow>[];
-      for (final user in assignees) {
-        rows.add(await _buildRow(user, targets));
-      }
+      final rows = await Future.wait(
+        assignees.map((user) => _buildRow(user, targets)),
+      );
       if (!mounted) return;
       setState(() => _rows = rows);
       _isLoading = false;
@@ -119,33 +221,62 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading performance: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error loading performance: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
   List<UserModel> _getAssigneeList() {
     if (_currentUserRole > 2) {
-      for (final list in [_agents, _businessAdvisors, _salesReps]) {
-        for (final u in list) {
-          if (u.id == _currentUserId) return [u];
-        }
+      switch (_selectedScope) {
+        case 'agent':
+          return _agents;
+        case 'business_advisor':
+          return _businessAdvisors;
+        case 'sales_rep':
+          return _salesReps;
+        case 'individual':
+          for (final list in [_agents, _businessAdvisors, _salesReps]) {
+            for (final u in list) {
+              if (u.id == _selectedAssigneeOptionId) return [u];
+            }
+          }
+          return _roleAssignees();
+        default:
+          return _roleAssignees();
       }
-      return <UserModel>[];
     }
     switch (_selectedScope) {
       case 'regional':
+        if (_selectedRegionOptionId != null) {
+          return _agents
+              .where((a) => a.regionId == _selectedRegionOptionId)
+              .toList();
+        }
         return _agents;
       case 'agent':
-        return _selectedAssigneeId == null ? <UserModel>[] : _agents.where((a) => a.id == _selectedAssigneeId).toList();
+        return _selectedAssigneeOptionId == null
+            ? _agents
+            : _agents.where((a) => a.id == _selectedAssigneeOptionId).toList();
       case 'business_advisor':
-        return _selectedAssigneeId == null ? <UserModel>[] : _businessAdvisors.where((a) => a.id == _selectedAssigneeId).toList();
+        return _selectedAssigneeOptionId == null
+            ? _businessAdvisors
+            : _businessAdvisors
+                .where((a) => a.id == _selectedAssigneeOptionId)
+                .toList();
       case 'sales_rep':
-        return _selectedAssigneeId == null ? <UserModel>[] : _salesReps.where((a) => a.id == _selectedAssigneeId).toList();
+        return _selectedAssigneeOptionId == null
+            ? _salesReps
+            : _salesReps
+                .where((a) => a.id == _selectedAssigneeOptionId)
+                .toList();
       case 'individual':
         for (final list in [_agents, _businessAdvisors, _salesReps]) {
           for (final u in list) {
-            if (u.id == _selectedAssigneeId) return [u];
+            if (u.id == _selectedAssigneeOptionId) return [u];
           }
         }
         return <UserModel>[];
@@ -154,27 +285,84 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
     }
   }
 
-  bool _targetMatches(TargetModel target) {
-    if (_currentUserRole > 2) {
-      return target.assignedTo == _currentUserId || target.assignedTo == null;
+  List<UserModel> _roleAssignees() {
+    switch (_currentUserRole) {
+      case 3:
+        return _businessAdvisors;
+      case 4:
+        return _agents;
+      case 5:
+        return _salesReps;
+      default:
+        return <UserModel>[];
     }
-    if (target.scope != _selectedScope) return false;
-    if (_selectedScope == 'regional') {
-      final regionMatch = _selectedRegionId == null || target.regionId == _selectedRegionId;
-      final subMatch = _selectedSubRegion == null || target.subRegion == _selectedSubRegion;
-      return regionMatch && subMatch;
-    }
-    return target.assignedTo == _selectedAssigneeId || target.assignedTo == null;
   }
 
-  Future<_PerformanceRow> _buildRow(UserModel user, List<TargetModel> targets) async {
-    final relevantTargets = targets.where(_targetMatches).toList();
-
+  void _applyPeriodDateRange(String? period) {
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final startOfWeek = startOfDay.subtract(Duration(days: startOfDay.weekday - 1));
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final startOfYear = DateTime(now.year, 1, 1);
+    DateTime start;
+    DateTime end;
+    switch (period) {
+      case 'daily':
+        start = DateTime(now.year, now.month, now.day);
+        end = start;
+        break;
+      case 'weekly':
+        start = now.subtract(const Duration(days: 6));
+        end = now;
+        break;
+      case 'monthly':
+        start = DateTime(now.year, now.month, 1);
+        end = now;
+        break;
+      case 'quarterly':
+        final quarter = ((now.month - 1) / 3).floor();
+        start = DateTime(now.year, quarter * 3 + 1, 1);
+        end = now;
+        break;
+      case 'yearly':
+        start = DateTime(now.year, 1, 1);
+        end = now;
+        break;
+      case 'ytd':
+        start = DateTime(now.year, 1, 1);
+        end = now;
+        break;
+      default:
+        return;
+    }
+    setState(() {
+      _startDate = start;
+      _endDate = end;
+    });
+  }
+
+  bool _targetMatches(TargetModel target, UserModel user) {
+    if (_selectedScope == 'regional') {
+      final regionMatch =
+          _selectedRegionOptionId == null ||
+          target.regionId == _selectedRegionOptionId;
+      return target.scope == 'regional' && regionMatch;
+    }
+
+    if (target.scope != _selectedScope) return false;
+
+    if (_selectedAssigneeOptionId != null) {
+      return target.assignedTo == _selectedAssigneeOptionId;
+    }
+
+    return target.assignedTo == null || target.assignedTo == user.id;
+  }
+
+  Future<_PerformanceRow> _buildRow(
+    UserModel user,
+    List<TargetModel> targets,
+  ) async {
+    final relevantTargets =
+        targets.where((target) => _targetMatches(target, user)).toList();
+
+    final selectedStart = _startDate;
+    final selectedEnd = _endDate;
 
     final productTargets = <String, Map<String, int>>{};
     final visitTargets = <String, int>{};
@@ -194,76 +382,141 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
           };
           break;
         case 'customer_visits':
-          visitTargets[target.targetPeriod] = ((data['schools'] as int?) ?? 0) + ((data['institutions'] as int?) ?? 0) + ((data['bookshops'] as int?) ?? 0);
+          visitTargets[target.targetPeriod] =
+              ((data['schools'] as int?) ?? 0) +
+              ((data['institutions'] as int?) ?? 0) +
+              ((data['bookshops'] as int?) ?? 0);
           break;
         case 'collections':
-          collectionTargets[target.targetPeriod] = (data['amount'] as int?) ?? 0;
+          collectionTargets[target.targetPeriod] =
+              (data['amount'] as int?) ?? 0;
           break;
         case 'new_customers':
           customerTargets[target.targetPeriod] = (data['count'] as int?) ?? 0;
           break;
         case 'sample_distribution':
-          sampleTargets[target.targetPeriod] = ((data['exercise_book_samples'] as int?) ?? 0) + ((data['pen_samples'] as int?) ?? 0);
+          sampleTargets[target.targetPeriod] =
+              ((data['exercise_book_samples'] as int?) ?? 0) +
+              ((data['pen_samples'] as int?) ?? 0);
           break;
         case 'consignment':
-          consignmentTargets['max_active'] = (data['max_active_consignments'] as int?) ?? 0;
-          consignmentTargets['max_overdue'] = (data['max_overdue_consignments'] as int?) ?? 0;
-          consignmentTargets['max_value'] = (data['max_consignment_value'] as int?) ?? 0;
+          consignmentTargets['max_active'] =
+              (data['max_active_consignments'] as int?) ?? 0;
+          consignmentTargets['max_overdue'] =
+              (data['max_overdue_consignments'] as int?) ?? 0;
+          consignmentTargets['max_value'] =
+              (data['max_consignment_value'] as int?) ?? 0;
           break;
       }
     }
 
-    final dayMetrics = await _dbService.getIndividualPerformance(agentId: user.id, start: startOfDay, end: startOfDay.add(const Duration(days: 1)));
-    final weekMetrics = await _dbService.getIndividualPerformance(agentId: user.id, start: startOfWeek, end: startOfWeek.add(const Duration(days: 7)));
-    final monthMetrics = await _dbService.getIndividualPerformance(agentId: user.id, start: startOfMonth, end: DateTime(now.year, now.month + 1, 1));
-    final yearMetrics = await _dbService.getIndividualPerformance(agentId: user.id, start: startOfYear, end: DateTime(now.year + 1, 1, 1));
+    final rangeMetrics = await _dbService.getIndividualPerformance(
+      agentId: user.id,
+      start: selectedStart,
+      end: selectedEnd,
+    );
 
     final actualProducts = <String, int>{
-      'daily': dayMetrics['wonSales'] ?? 0,
-      'weekly': weekMetrics['wonSales'] ?? 0,
-      'monthly': monthMetrics['wonSales'] ?? 0,
-      'ytd': yearMetrics['wonSales'] ?? 0,
+      'range': rangeMetrics['wonSales'] ?? 0,
+      'daily': rangeMetrics['wonSales'] ?? 0,
+      'weekly': rangeMetrics['wonSales'] ?? 0,
+      'monthly': rangeMetrics['wonSales'] ?? 0,
+      'ytd': rangeMetrics['wonSales'] ?? 0,
     };
 
     final actualVisits = <String, int>{
-      'daily': dayMetrics['visits'] ?? 0,
-      'weekly': weekMetrics['visits'] ?? 0,
-      'monthly': monthMetrics['visits'] ?? 0,
-      'ytd': yearMetrics['visits'] ?? 0,
+      'range': rangeMetrics['visits'] ?? 0,
+      'daily': rangeMetrics['visits'] ?? 0,
+      'weekly': rangeMetrics['visits'] ?? 0,
+      'monthly': rangeMetrics['visits'] ?? 0,
+      'ytd': rangeMetrics['visits'] ?? 0,
     };
 
     final actualCollections = <String, int>{
-      'daily': dayMetrics['orders'] ?? 0,
-      'weekly': weekMetrics['orders'] ?? 0,
-      'monthly': monthMetrics['orders'] ?? 0,
-      'ytd': yearMetrics['orders'] ?? 0,
+      'range': rangeMetrics['orders'] ?? 0,
+      'daily': rangeMetrics['orders'] ?? 0,
+      'weekly': rangeMetrics['orders'] ?? 0,
+      'monthly': rangeMetrics['orders'] ?? 0,
+      'ytd': rangeMetrics['orders'] ?? 0,
     };
 
     final actualCustomers = <String, int>{
-      'daily': dayMetrics['visitedSchools'] ?? 0,
-      'weekly': weekMetrics['visitedSchools'] ?? 0,
-      'monthly': monthMetrics['visitedSchools'] ?? 0,
-      'ytd': yearMetrics['visitedSchools'] ?? 0,
+      'range': rangeMetrics['visitedSchools'] ?? 0,
+      'daily': rangeMetrics['visitedSchools'] ?? 0,
+      'weekly': rangeMetrics['visitedSchools'] ?? 0,
+      'monthly': rangeMetrics['visitedSchools'] ?? 0,
+      'ytd': rangeMetrics['visitedSchools'] ?? 0,
     };
 
     final actualSamples = <String, int>{
-      'daily': 0,
-      'weekly': 0,
-      'monthly': 0,
-      'ytd': 0,
+      'range': rangeMetrics['samples'] ?? 0,
+      'daily': rangeMetrics['samples'] ?? 0,
+      'weekly': rangeMetrics['samples'] ?? 0,
+      'monthly': rangeMetrics['samples'] ?? 0,
+      'ytd': rangeMetrics['samples'] ?? 0,
+    };
+
+    final actualSampleReturns = <String, int>{
+      'range': rangeMetrics['sampleReturns'] ?? 0,
+      'daily': rangeMetrics['sampleReturns'] ?? 0,
+      'weekly': rangeMetrics['sampleReturns'] ?? 0,
+      'monthly': rangeMetrics['sampleReturns'] ?? 0,
+      'ytd': rangeMetrics['sampleReturns'] ?? 0,
     };
 
     final actualConsignments = <String, int>{
+      'range': 0,
       'max_active': 0,
       'max_overdue': 0,
       'max_value': 0,
+    };
+
+    final actualSchools = <String, int>{
+      'range': rangeMetrics['schools'] ?? 0,
+      'daily': rangeMetrics['schools'] ?? 0,
+      'weekly': rangeMetrics['schools'] ?? 0,
+      'monthly': rangeMetrics['schools'] ?? 0,
+      'ytd': rangeMetrics['schools'] ?? 0,
+    };
+
+    final actualInstitutions = <String, int>{
+      'range': rangeMetrics['institutions'] ?? 0,
+      'daily': rangeMetrics['institutions'] ?? 0,
+      'weekly': rangeMetrics['institutions'] ?? 0,
+      'monthly': rangeMetrics['institutions'] ?? 0,
+      'ytd': rangeMetrics['institutions'] ?? 0,
+    };
+
+    final actualBookshops = <String, int>{
+      'range': rangeMetrics['bookshops'] ?? 0,
+      'daily': rangeMetrics['bookshops'] ?? 0,
+      'weekly': rangeMetrics['bookshops'] ?? 0,
+      'monthly': rangeMetrics['bookshops'] ?? 0,
+      'ytd': rangeMetrics['bookshops'] ?? 0,
+    };
+
+    final pipeline = <String, int>{
+      'range': rangeMetrics['pipeline'] ?? 0,
+      'daily': rangeMetrics['pipeline'] ?? 0,
+      'weekly': rangeMetrics['pipeline'] ?? 0,
+      'monthly': rangeMetrics['pipeline'] ?? 0,
+      'ytd': rangeMetrics['pipeline'] ?? 0,
+    };
+
+    final daysWorked = <String, int>{
+      'range': rangeMetrics['daysWorked'] ?? 0,
+      'daily': rangeMetrics['daysWorked'] ?? 0,
+      'weekly': rangeMetrics['daysWorked'] ?? 0,
+      'monthly': rangeMetrics['daysWorked'] ?? 0,
+      'ytd': rangeMetrics['daysWorked'] ?? 0,
     };
 
     final percentages = <String, double>{};
     for (final period in ['daily', 'weekly', 'monthly', 'ytd']) {
       final productTarget = productTargets[period];
       final productActual = actualProducts[period] ?? 0;
-      final productTargetValue = productTarget?.values.fold(0, (s, v) => s + v) ?? 0;
+      final productTargetValue =
+          productTarget?.values.fold(0, (s, v) => s + v) ?? 0;
       percentages['$period-products'] = _pct(productActual, productTargetValue);
 
       final visitTarget = visitTargets[period] ?? 0;
@@ -272,7 +525,10 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
 
       final collectionTarget = collectionTargets[period] ?? 0;
       final collectionActual = actualCollections[period] ?? 0;
-      percentages['$period-collections'] = _pct(collectionActual, collectionTarget);
+      percentages['$period-collections'] = _pct(
+        collectionActual,
+        collectionTarget,
+      );
 
       final customerTarget = customerTargets[period] ?? 0;
       final customerActual = actualCustomers[period] ?? 0;
@@ -296,8 +552,14 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       actualCollections: actualCollections,
       actualCustomers: actualCustomers,
       actualSamples: actualSamples,
+      actualSampleReturns: actualSampleReturns,
       actualConsignments: actualConsignments,
       percentages: percentages,
+      actualSchools: actualSchools,
+      actualInstitutions: actualInstitutions,
+      actualBookshops: actualBookshops,
+      pipeline: pipeline,
+      daysWorked: daysWorked,
     );
   }
 
@@ -307,355 +569,879 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
     return raw > 100.0 ? 100.0 : (raw < 0.0 ? 0.0 : raw);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Performance'),
-        backgroundColor: AppColors.primaryDark,
-        foregroundColor: AppColors.surfaceWhite,
-        actions: [
-          if (_currentUserRole <= 2)
-            IconButton(
-              icon: const Icon(Icons.smart_toy),
-              onPressed: _showAiAssistant,
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadPerformance,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildFilterCard(),
-                _buildTabs(),
-                Expanded(child: _buildContent()),
-              ],
-            ),
+  String _selectedPeriodKey() {
+    final start = DateTime(_startDate.year, _startDate.month, _startDate.day);
+    final end = DateTime(_endDate.year, _endDate.month, _endDate.day);
+    final spanDays = end.difference(start).inDays.abs() + 1;
+
+    const buckets = <String, int>{
+      'daily': 1,
+      'weekly': 7,
+      'monthly': 30,
+      'ytd': 365,
+    };
+
+    var bestKey = 'monthly';
+    var bestDistance = 1 << 30;
+    buckets.forEach((key, bucketDays) {
+      final distance = (spanDays - bucketDays).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestKey = key;
+      }
+    });
+
+    return bestKey;
+  }
+
+  int _periodValue(Map<String, int> values, String periodKey) {
+    return values['range'] ??
+        values[periodKey] ??
+        values['monthly'] ??
+        values['weekly'] ??
+        values['daily'] ??
+        values['ytd'] ??
+        0;
+  }
+
+  String _formatCount(int value) {
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
     );
   }
 
-  Widget _buildFilterCard() {
-    final isCompact = MediaQuery.of(context).size.width < 600;
-    final isManager = _currentUserRole <= 2;
+  List<_CardMetric> _buildPersonMetrics(_PerformanceRow row, String periodKey) {
+    final schoolsVisited = _periodValue(row.actualSchools, periodKey);
+    final bookshopsVisited = _periodValue(row.actualBookshops, periodKey);
+    final institutionsVisited = _periodValue(row.actualInstitutions, periodKey);
+    final pipeline = _periodValue(row.pipeline, periodKey);
+    final samples = _periodValue(row.actualSamples, periodKey);
+    final sampleReturns = _periodValue(row.actualSampleReturns, periodKey);
+    final daysWorked = _periodValue(row.daysWorked, periodKey);
 
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 12, vertical: isCompact ? 8 : 12),
-      padding: EdgeInsets.all(isCompact ? 12 : 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return [
+      _CardMetric(label: 'Schools Visited', value: '$schoolsVisited'),
+      _CardMetric(label: 'Bookshops Visited', value: '$bookshopsVisited'),
+      _CardMetric(label: 'Institutions Visited', value: '$institutionsVisited'),
+      _CardMetric(label: 'Pipeline', value: '$pipeline'),
+      _CardMetric(label: 'Samples Distributed', value: '$samples'),
+      _CardMetric(label: 'Samples Returned', value: '$sampleReturns'),
+      _CardMetric(label: 'Days Worked', value: '$daysWorked'),
+    ];
+  }
+
+  String _roleLabel(int role) {
+    switch (role) {
+      case 1:
+        return 'Admin';
+      case 2:
+        return 'Manager';
+      case 3:
+        return 'Business Advisor';
+      case 4:
+        return 'Agent';
+      case 5:
+        return 'Sales Rep';
+      default:
+        return 'User';
+    }
+  }
+
+  String _buildPerformanceContext() {
+    final periodKey = _selectedPeriodKey();
+    final regionLabel =
+        _selectedRegionOptionId == null
+            ? 'All Regions'
+            : (_regionOptions.firstWhere(
+                  (r) => r['id'] == _selectedRegionOptionId,
+                  orElse: () => {'label': _selectedRegionOptionId!},
+                )['label'] ??
+                _selectedRegionOptionId);
+    final assigneeLabel =
+        _selectedAssigneeOptionId == null
+            ? 'All Assignees'
+            : (_assigneeOptions.firstWhere(
+                  (a) => a['id'] == _selectedAssigneeOptionId,
+                  orElse: () => {'label': _selectedAssigneeOptionId!},
+                )['label'] ??
+                _selectedAssigneeOptionId);
+    return 'Filters: scope=$_selectedScope, region=$regionLabel, assignee=$assigneeLabel, targetPeriod=$_selectedTargetPeriod, dateRange=${_startDate.toIso8601String()} to ${_endDate.toIso8601String()}, period=$periodKey. '
+        'Performance: ${_rows.map((r) => '${r.user.fullName ?? r.user.email}: Sales=${_periodValue(r.actualProducts, periodKey)}, Visits=${_periodValue(r.actualVisits, periodKey)}, Schools=${_periodValue(r.actualCustomers, periodKey)}').join(' | ')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.track_changes, size: 20, color: AppColors.primaryDark),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isManager ? 'Performance Overview' : 'My Performance',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: isCompact ? 14 : 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              _buildHeader(),
+              const SizedBox(height: 16),
+              _buildFilterBar(screenWidth),
+              const SizedBox(height: 20),
+              _buildReportDateBanner(),
+              const SizedBox(height: 16),
+              if (!_isLoading) _buildReportSummary(),
+              const SizedBox(height: 16),
+              _isLoading
+                  ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                  : _buildPerformanceGrid(screenWidth),
             ],
           ),
-          SizedBox(height: isCompact ? 10 : 12),
-          if (isManager) ...[
-            DropdownButtonFormField<String>(
-              value: _selectedScope,
-              decoration: const InputDecoration(
-                labelText: 'Scope',
-                border: OutlineInputBorder(),
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  // Header matching the "EOD Reports" Top Bar
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'EOD Reports',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
               ),
-              items: const [
-                DropdownMenuItem(value: 'regional', child: Text('Regional')),
-                DropdownMenuItem(value: 'agent', child: Text('Agent')),
-                DropdownMenuItem(value: 'business_advisor', child: Text('Business Advisor')),
-                DropdownMenuItem(value: 'sales_rep', child: Text('Sales Rep')),
-                DropdownMenuItem(value: 'individual', child: Text('Individual')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _selectedScope = value;
-                  _selectedRegionId = null;
-                  _selectedSubRegion = null;
-                  _selectedAssigneeId = null;
-                });
-                _loadPerformance();
-              },
             ),
-            SizedBox(height: isCompact ? 8 : 12),
-            if (_selectedScope == 'regional')
-              DropdownButtonFormField<String>(
-                value: _selectedRegionId,
-                decoration: const InputDecoration(
-                  labelText: 'Region',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                items: _regions.map((r) => DropdownMenuItem(value: r.id, child: Text(r.region))).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedRegionId = value;
-                    _selectedSubRegion = null;
-                  });
-                  _loadPerformance();
-                },
-              )
-            else
-              DropdownButtonFormField<String>(
-                value: _selectedAssigneeId,
-                decoration: InputDecoration(
-                  labelText: _selectedScope == 'agent'
-                      ? 'Agent'
-                      : _selectedScope == 'business_advisor'
-                          ? 'Business Advisor'
-                          : _selectedScope == 'sales_rep'
-                              ? 'Sales Rep'
-                              : 'Individual',
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                items: [
-                  const DropdownMenuItem<String>(value: null, child: Text('Select...')),
-                  ...(_selectedScope == 'agent'
-                          ? _agents
-                          : _selectedScope == 'business_advisor'
-                              ? _businessAdvisors
-                              : _selectedScope == 'sales_rep'
-                                  ? _salesReps
-                                  : [..._agents, ..._businessAdvisors, ..._salesReps])
-                      .map((u) => DropdownMenuItem(value: u.id, child: Text(u.fullName ?? u.email))),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedAssigneeId = value);
-                  _loadPerformance();
-                },
+            SizedBox(height: 2),
+            Text(
+              'End of day team performance summary',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            if (_currentUserRole <= 2)
+              IconButton(
+                icon: const Icon(Icons.smart_toy, color: AppColors.primaryDark),
+                onPressed: _showAiAssistant,
               ),
-            if (_selectedScope == 'regional' && _selectedRegionId != null) ...[
-              SizedBox(height: isCompact ? 8 : 12),
-              DropdownButtonFormField<String>(
-                value: _selectedSubRegion,
-                decoration: const InputDecoration(
-                  labelText: 'Sub Region',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Color(0xFF64748B)),
+              onPressed: _loadPerformance,
+            ),
+            OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.download_outlined,
+                size: 16,
+                color: Color(0xFF334155),
+              ),
+              label: const Text(
+                'Export',
+                style: TextStyle(color: Color(0xFF334155), fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                items: _regions
-                    .where((r) => r.id == _selectedRegionId && r.subRegion.trim().isNotEmpty)
-                    .map((r) => DropdownMenuItem(value: r.subRegion.trim(), child: Text(r.subRegion.trim())))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() => _selectedSubRegion = value);
-                  _loadPerformance();
-                },
-              ),
-            ],
-          ] else ...[
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: isCompact ? 8 : 10),
-              decoration: BoxDecoration(
-                color: AppColors.primaryDark.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.person_outline, size: 18, color: AppColors.primaryDark),
-                  const SizedBox(width: 8),
-                  Text(
-                    _currentUserId != null
-                        ? 'Viewing your performance'
-                        : 'Sign in to view performance',
-                    style: TextStyle(fontSize: isCompact ? 13 : 14, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
-                  ),
-                ],
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabs() {
-    final isCompact = MediaQuery.of(context).size.width < 600;
-    return Container(
-      color: Colors.white,
-      child: TabBar(
-        controller: _tabController,
-        isScrollable: true,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey.shade700,
-        indicatorColor: AppColors.primaryGreen,
-        indicator: BoxDecoration(
-          color: AppColors.primaryGreen,
-          borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
         ),
-        labelPadding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: isCompact ? 10 : 12),
-        tabs: const [
-          Tab(text: 'Products'),
-          Tab(text: 'Visits'),
-          Tab(text: 'Collections'),
-          Tab(text: 'Customers'),
-          Tab(text: 'Samples'),
-          Tab(text: 'Consignments'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildTab('product'),
-        _buildTab('visit'),
-        _buildTab('collection'),
-        _buildTab('customer'),
-        _buildTab('sample'),
-        _buildTab('consignment'),
       ],
     );
   }
 
-  Widget _buildTab(String category) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: _rows.isEmpty
-          ? const Center(child: Text('No performance data found.'))
-          : Column(
-              children: _rows.map((row) {
-                final isCompact = MediaQuery.of(context).size.width < 600;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      title: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: isCompact ? 16 : 20,
-                            backgroundColor: AppColors.primaryDark.withValues(alpha: 0.1),
-                            child: Text(
-                              (row.user.fullName ?? 'U')[0].toUpperCase(),
-                              style: TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold, fontSize: isCompact ? 13 : 16),
-                            ),
-                          ),
-                          SizedBox(width: isCompact ? 8 : 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(row.user.fullName ?? row.user.email, style: TextStyle(fontWeight: FontWeight.w700, fontSize: isCompact ? 14 : 16)),
-                                Text(_roleLabel(row.user.role), style: TextStyle(fontSize: isCompact ? 11 : 12, color: Colors.grey.shade600)),
-                              ],
-                            ),
-                          ),
-                        ],
+  // Horizontal Filters Container Box
+  Widget _buildFilterBar(double screenWidth) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filters',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              bool isWide = constraints.maxWidth > 800;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _buildDropdownField(
+                    'Scope',
+                    _selectedScope,
+                    _scopeOptions,
+                    (v) {
+                      if (v != null) {
+                        setState(() {
+                          _selectedScope = v;
+                          if (v == 'regional') {
+                            _selectedAssigneeOptionId = null;
+                          } else {
+                            _selectedRegionOptionId = null;
+                          }
+                        });
+                      }
+                    },
+                    width: isWide ? 130 : double.infinity,
+                    displayBuilder: (value) {
+                      switch (value) {
+                        case 'regional':
+                          return 'Regional';
+                        case 'agent':
+                          return 'Agent';
+                        case 'business_advisor':
+                          return 'Business Advisor';
+                        case 'sales_rep':
+                          return 'Sales Rep';
+                        default:
+                          return value;
+                      }
+                    },
+                  ),
+                  if (_selectedScope == 'regional') ...[
+                    _buildDropdownField(
+                      'Region',
+                      _selectedRegionOptionId ?? '',
+                      List<String>.from(
+                        [''] + _regionOptions.map((r) => r['id']!).toList(),
                       ),
-                      children: _buildDetails(row, category),
+                      (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedRegionOptionId = v.isEmpty ? null : v;
+                          });
+                        }
+                      },
+                      width: isWide ? 140 : double.infinity,
+                      displayBuilder: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'All Regions';
+                        final match = _regionOptions.firstWhere(
+                          (r) => r['id'] == value,
+                          orElse: () => {'label': value},
+                        );
+                        return match['label'] ?? value;
+                      },
+                    ),
+                  ],
+                  if (_selectedScope != 'regional')
+                    _buildDropdownField(
+                      'Assignee',
+                      _selectedAssigneeOptionId ?? '',
+                      List<String>.from(
+                        [''] + _assigneeOptions.map((a) => a['id']!).toList(),
+                      ),
+                      (v) {
+                        if (v != null) {
+                          setState(
+                            () =>
+                                _selectedAssigneeOptionId =
+                                    v.isEmpty ? null : v,
+                          );
+                        }
+                      },
+                      width: isWide ? 170 : double.infinity,
+                      displayBuilder: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'All Assignees';
+                        final match = _assigneeOptions.firstWhere(
+                          (a) => a['id'] == value,
+                          orElse: () => {'label': value},
+                        );
+                        return match['label'] ?? value;
+                      },
+                    ),
+                    _buildDropdownField(
+                      'Target Period',
+                      _selectedTargetPeriod ?? '',
+                      List<String>.from([''] + _targetPeriodOptions),
+                      (v) {
+                        if (v != null) {
+                          setState(
+                            () => _selectedTargetPeriod = v.isEmpty ? null : v,
+                          );
+                          _applyPeriodDateRange(v.isEmpty ? null : v);
+                        }
+                      },
+                      width: isWide ? 130 : double.infinity,
+                      displayBuilder: (value) {
+                        if (value.isEmpty) return 'All Periods';
+                        return '${value[0].toUpperCase()}${value.substring(1)}';
+                      },
+                    ),
+                    _buildDateField('Start Date', _startDate, (date) {
+                      if (date != null) setState(() => _startDate = date);
+                    }, width: isWide ? 130 : double.infinity),
+                    _buildDateField('End Date', _endDate, (date) {
+                      if (date != null) setState(() => _endDate = date);
+                    }, width: isWide ? 130 : double.infinity),
+                      _buildDropdownField(
+                        'Sort By',
+                        _sortBy,
+                        ['All', 'School', 'Institution', 'Bookshop'],
+                        (v) {
+                          if (v != null) setState(() => _sortBy = v);
+                        },
+                        width: isWide ? 130 : double.infinity,
+                      ),
+                    SizedBox(
+                      width: isWide ? 110 : double.infinity,
+                      height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: _loadPerformance,
+                      icon: const Icon(
+                        Icons.search,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Get Report',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0284C7),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
-  List<Widget> _buildDetails(_PerformanceRow row, String category) {
-    final tiles = <Widget>[];
-
-    switch (category) {
-      case 'product':
-        for (final period in ['daily', 'weekly', 'monthly', 'ytd']) {
-          final target = row.productTargets[period];
-          final actual = row.actualProducts[period] ?? 0;
-          final percent = row.percentages['$period-products'] ?? 0.0;
-          tiles.add(_buildTile('$period Products', target ?? const {}, actual, percent, 'units'));
-        }
-        break;
-      case 'visit':
-        for (final period in ['daily', 'weekly', 'monthly', 'ytd']) {
-          final target = row.visitTargets[period];
-          final actual = row.actualVisits[period] ?? 0;
-          final percent = row.percentages['$period-visits'] ?? 0.0;
-          tiles.add(_buildTile('$period Visits', target != null ? {'total': target} : const {}, actual, percent, 'visits'));
-        }
-        break;
-      case 'collection':
-        for (final period in ['daily', 'weekly', 'monthly']) {
-          final target = row.collectionTargets[period];
-          final actual = row.actualCollections[period] ?? 0;
-          final percent = row.percentages['$period-collections'] ?? 0.0;
-          tiles.add(_buildTile('$period Collections', target != null ? {'amount': target} : const {}, actual, percent, 'KES'));
-        }
-        break;
-      case 'customer':
-        for (final period in ['daily', 'weekly', 'monthly']) {
-          final target = row.customerTargets[period];
-          final actual = row.actualCustomers[period] ?? 0;
-          final percent = row.percentages['$period-customers'] ?? 0.0;
-          tiles.add(_buildTile('$period New Customers', target != null ? {'count': target} : const {}, actual, percent, 'customers'));
-        }
-        break;
-      case 'sample':
-        for (final period in ['weekly', 'monthly']) {
-          final target = row.sampleTargets[period];
-          final actual = row.actualSamples[period] ?? 0;
-          final percent = row.percentages['$period-samples'] ?? 0.0;
-          tiles.add(_buildTile('$period Samples', target != null ? {'total': target} : const {}, actual, percent, 'items'));
-        }
-        break;
-      case 'consignment':
-        tiles.add(_buildTile('Max Active Consignments', row.consignmentTargets['max_active'] != null ? {'limit': row.consignmentTargets['max_active']!} : const {}, row.actualConsignments['max_active'] ?? 0, 0.0, 'consignments'));
-        tiles.add(_buildTile('Max Overdue Consignments', row.consignmentTargets['max_overdue'] != null ? {'limit': row.consignmentTargets['max_overdue']!} : const {}, row.actualConsignments['max_overdue'] ?? 0, 0.0, 'consignments'));
-        tiles.add(_buildTile('Max Consignment Value', row.consignmentTargets['max_value'] != null ? {'limit': row.consignmentTargets['max_value']!} : const {}, row.actualConsignments['max_value'] ?? 0, 0.0, 'KES'));
-        break;
-    }
-
-    return tiles;
+  Widget _buildDropdownField(
+    String label,
+    String value,
+    List<String> items,
+    ValueChanged<String?> onChanged, {
+    required double width,
+    String Function(String value)? displayBuilder,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                items:
+                    items
+                        .map(
+                          (String i) => DropdownMenuItem(
+                            value: i,
+                            child: Text(
+                              displayBuilder != null ? displayBuilder(i) : i,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildTile(String title, Map<String, int> target, int actualValue, double percent, String unit) {
-    final targetValue = target.values.fold(0, (sum, v) => sum + v);
-    final color = percent >= 80 ? Colors.green : percent >= 50 ? Colors.orange : Colors.red;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+  Widget _buildDateField(
+    String label,
+    DateTime date,
+    ValueChanged<DateTime?> onSelected, {
+    required double width,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: date,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2030),
+              );
+              onSelected(picked);
+            },
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 14,
+                    color: Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "${_monthName(date.month).substring(0, 3)} ${date.day}, ${date.year}",
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return months[month - 1];
+  }
+
+  Widget _buildReportDateBanner() {
+    final regionLabel =
+        _selectedRegionOptionId == null
+            ? 'All Regions'
+            : (_regionOptions.firstWhere(
+                  (r) => r['id'] == _selectedRegionOptionId,
+                  orElse: () => {'label': _selectedRegionOptionId!},
+                )['label'] ??
+                _selectedRegionOptionId);
+    final assigneeLabel =
+        _selectedAssigneeOptionId == null
+            ? 'All Assignees'
+            : (_assigneeOptions.firstWhere(
+                  (a) => a['id'] == _selectedAssigneeOptionId,
+                  orElse: () => {'label': _selectedAssigneeOptionId!},
+                )['label'] ??
+                _selectedAssigneeOptionId);
+    final targetPeriodLabel = _selectedTargetPeriod ?? 'All Periods';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2FE),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF7DD3FC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Report: $_selectedScope${_selectedTargetPeriod != null ? " | $targetPeriodLabel" : ""}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$regionLabel | $assigneeLabel | ${_monthName(_startDate.month)} ${_startDate.day}, ${_startDate.year} - ${_monthName(_endDate.month)} ${_endDate.day}, ${_endDate.year}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportSummary() {
+    if (_rows.isEmpty) return const SizedBox.shrink();
+    final periodKey = _selectedPeriodKey();
+
+    final totalAssignees = _rows.length;
+    final totalTargets = _rows.fold<int>(0, (sum, r) {
+      return sum +
+          r.productTargets.values.fold<int>(
+            0,
+            (s, v) => s + v.values.fold<int>(0, (ss, vv) => ss + vv),
+          ) +
+          r.visitTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.collectionTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.customerTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.sampleTargets.values.fold<int>(0, (s, v) => s + v);
+    });
+    final totalActualSales = _rows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualProducts, periodKey),
+    );
+    final totalActualVisits = _rows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualVisits, periodKey),
+    );
+    final totalActualCustomers = _rows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualCustomers, periodKey),
+    );
+    final bestPerformer =
+        _rows.isEmpty
+            ? null
+            : _rows.reduce(
+              (a, b) =>
+                  _periodValue(a.actualProducts, periodKey) >=
+                          _periodValue(b.actualProducts, periodKey)
+                      ? a
+                      : b,
+            );
+    final avgSales =
+        totalAssignees > 0 ? (totalActualSales / totalAssignees).round() : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Report Summary',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final items = [
+                {'label': 'Assignees', 'value': '$totalAssignees'},
+                {'label': 'Targets Matched', 'value': '$totalTargets'},
+                {
+                  'label': 'Total Sales',
+                  'value': _formatCount(totalActualSales),
+                },
+                {
+                  'label': 'Total Visits',
+                  'value': _formatCount(totalActualVisits),
+                },
+                {
+                  'label': 'Schools Visited',
+                  'value': _formatCount(totalActualCustomers),
+                },
+                {'label': 'Avg Sales', 'value': _formatCount(avgSales)},
+                if (bestPerformer != null)
+                  {
+                    'label': 'Top Performer',
+                    'value':
+                        bestPerformer.user.fullName ?? bestPerformer.user.email,
+                  },
+              ];
+              final crossAxisCount =
+                  constraints.maxWidth > 800
+                      ? 4
+                      : (constraints.maxWidth > 500 ? 3 : 2);
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 2.5,
+                children:
+                    items.map((item) {
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              item['label']!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item['value']!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Multi-column cards grid layout
+  Widget _buildPerformanceGrid(double screenWidth) {
+    if (_rows.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(30),
+          child: Text('No performance data found.'),
+        ),
+      );
+    }
+
+    var sortedRows = List<_PerformanceRow>.from(_rows);
+    final periodKey = _selectedPeriodKey();
+    if (_sortBy == 'All') {
+      sortedRows.sort(
+        (a, b) => _periodValue(
+          b.actualVisits,
+          periodKey,
+        ).compareTo(_periodValue(a.actualVisits, periodKey)),
+      );
+    } else if (_sortBy == 'School') {
+      sortedRows.sort(
+        (a, b) => _periodValue(
+          b.actualSchools,
+          periodKey,
+        ).compareTo(_periodValue(a.actualSchools, periodKey)),
+      );
+    } else if (_sortBy == 'Institution') {
+      sortedRows.sort(
+        (a, b) => _periodValue(
+          b.actualInstitutions,
+          periodKey,
+        ).compareTo(_periodValue(a.actualInstitutions, periodKey)),
+      );
+    } else if (_sortBy == 'Bookshop') {
+      sortedRows.sort(
+        (a, b) => _periodValue(
+          b.actualBookshops,
+          periodKey,
+        ).compareTo(_periodValue(a.actualBookshops, periodKey)),
+      );
+    }
+
+    int crossAxisCount = screenWidth > 1200 ? 3 : (screenWidth > 768 ? 2 : 1);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.72,
+      ),
+      itemCount: sortedRows.length,
+      itemBuilder: (context, index) {
+        return _buildPersonCard(sortedRows[index], index + 1);
+      },
+    );
+  }
+
+  // Individual Team Member Card matching exact reference design
+  Widget _buildPersonCard(_PerformanceRow row, int rank) {
+    final periodKey = _selectedPeriodKey();
+    final totalSales = _periodValue(row.actualProducts, periodKey);
+    final metrics = _buildPersonMetrics(row, periodKey);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text('Target: $targetValue $unit | Actual: $actualValue $unit', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Expanded(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: const Color(0xFF0284C7),
+                        child: Text(
+                          '$rank',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          row.user.fullName ?? row.user.email,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Total Sales',
+                      style: TextStyle(fontSize: 9, color: Color(0xFF64748B)),
+                    ),
+                    Text(
+                      _formatCount(totalSales),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '${percent.round()}%',
-              style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Expanded(
+            child: ListView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: metrics.length,
+              itemBuilder: (context, idx) {
+                final isZebra = idx % 2 == 1;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  color: isZebra ? const Color(0xFFF8FAFC) : Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        metrics[idx].label,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      Text(
+                        metrics[idx].value,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -679,7 +1465,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
                 children: [
                   const Icon(Icons.smart_toy, color: AppColors.primaryDark),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('AI Assistant')),
+                  const Expanded(child: Text('AI Assistant')),
                 ],
               ),
               content: SizedBox(
@@ -694,17 +1480,25 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
                           final msg = messages[index];
                           final isUser = msg['role'] == 'user';
                           return Align(
-                            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment:
+                                isUser
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 4),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isUser ? AppColors.primaryDark : Colors.grey.shade200,
+                                color:
+                                    isUser
+                                        ? AppColors.primaryDark
+                                        : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 msg['content'] ?? '',
-                                style: TextStyle(color: isUser ? Colors.white : Colors.black87),
+                                style: TextStyle(
+                                  color: isUser ? Colors.white : Colors.black87,
+                                ),
                               ),
                             ),
                           );
@@ -731,9 +1525,15 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
                         ),
                         onSubmitted: (value) {
                           if (value.trim().isEmpty || isWaiting) return;
-                          _sendAiMessage(controller, messages, setState, contextSummary, (v) {
-                            setState(() => isWaiting = v);
-                          }).then((_) {
+                          _sendAiMessage(
+                            controller,
+                            messages,
+                            setState,
+                            contextSummary,
+                            (v) {
+                              setState(() => isWaiting = v);
+                            },
+                          ).then((_) {
                             controller.clear();
                           });
                         },
@@ -742,16 +1542,23 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.send),
-                      onPressed: isWaiting
-                          ? null
-                          : () {
-                              if (controller.text.trim().isEmpty) return;
-                              _sendAiMessage(controller, messages, setState, contextSummary, (v) {
-                                setState(() => isWaiting = v);
-                              }).then((_) {
-                                controller.clear();
-                              });
-                            },
+                      onPressed:
+                          isWaiting
+                              ? null
+                              : () {
+                                if (controller.text.trim().isEmpty) return;
+                                _sendAiMessage(
+                                  controller,
+                                  messages,
+                                  setState,
+                                  contextSummary,
+                                  (v) {
+                                    setState(() => isWaiting = v);
+                                  },
+                                ).then((_) {
+                                  controller.clear();
+                                });
+                              },
                     ),
                   ],
                 ),
@@ -783,7 +1590,10 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
         Uri.parse(ApiConfig.aiChatUrl()),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'messages': messages.map((m) => {'role': m['role'], 'content': m['content']}).toList(),
+          'messages':
+              messages
+                  .map((m) => {'role': m['role'], 'content': m['content']})
+                  .toList(),
           'context': contextSummary,
         }),
       );
@@ -791,13 +1601,18 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       setWaiting(false);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final assistantMessage = data['choices']?[0]?['message']?['content'] ?? 'Sorry, I could not generate a response.';
+        final assistantMessage =
+            data['choices']?[0]?['message']?['content'] ??
+            'Sorry, I could not generate a response.';
         setState(() {
           messages.add({'role': 'assistant', 'content': assistantMessage});
         });
       } else {
         setState(() {
-          messages.add({'role': 'assistant', 'content': 'Error: ${response.statusCode}'});
+          messages.add({
+            'role': 'assistant',
+            'content': 'Error: ${response.statusCode}',
+          });
         });
       }
     } catch (e) {
@@ -807,80 +1622,4 @@ class _TargetPerformancePageState extends State<TargetPerformancePage> with Sing
       });
     }
   }
-
-  String _buildPerformanceContext() {
-    final buffer = StringBuffer();
-    buffer.writeln('Current Scope: $_selectedScope');
-    if (_selectedScope == 'regional' && _selectedRegionId != null) {
-      final region = _regions.firstWhere((r) => r.id == _selectedRegionId, orElse: () => _regions.first);
-      buffer.writeln('Region: ${region.region}');
-      if (_selectedSubRegion != null) {
-        buffer.writeln('Sub Region: $_selectedSubRegion');
-      }
-    }
-    if (_selectedAssigneeId != null) {
-      final assignee = _getAssigneeList().firstWhere((u) => u.id == _selectedAssigneeId, orElse: () => _getAssigneeList().first);
-      buffer.writeln('Assignee: ${assignee.fullName ?? _selectedAssigneeId}');
-    }
-    buffer.writeln('\nPerformance Summary:');
-    for (final row in _rows) {
-      buffer.writeln('\n- ${row.user.fullName ?? row.user.email} (${_roleLabel(row.user.role)}):');
-      for (final period in ['daily', 'weekly', 'monthly', 'ytd']) {
-        final pProduct = row.percentages['$period-products'] ?? 0.0;
-        final pVisit = row.percentages['$period-visits'] ?? 0.0;
-        final pCollection = row.percentages['$period-collections'] ?? 0.0;
-        buffer.writeln('  $period: Products ${pProduct.toStringAsFixed(1)}%, Visits ${pVisit.toStringAsFixed(1)}%, Collections ${pCollection.toStringAsFixed(1)}%');
-      }
-    }
-    return buffer.toString();
-  }
-
-  String _roleLabel(int role) {
-    switch (role) {
-      case 2:
-        return 'Sales Manager';
-      case 3:
-        return 'BAS';
-      case 4:
-        return 'Agent';
-      case 5:
-        return 'Grounds Person';
-      default:
-        return 'Role $role';
-    }
-  }
-}
-
-class _PerformanceRow {
-  final UserModel user;
-  final Map<String, Map<String, int>> productTargets;
-  final Map<String, int> visitTargets;
-  final Map<String, int> collectionTargets;
-  final Map<String, int> customerTargets;
-  final Map<String, int> sampleTargets;
-  final Map<String, int> consignmentTargets;
-  final Map<String, int> actualProducts;
-  final Map<String, int> actualVisits;
-  final Map<String, int> actualCollections;
-  final Map<String, int> actualCustomers;
-  final Map<String, int> actualSamples;
-  final Map<String, int> actualConsignments;
-  final Map<String, double> percentages;
-
-  _PerformanceRow({
-    required this.user,
-    required this.productTargets,
-    required this.visitTargets,
-    required this.collectionTargets,
-    required this.customerTargets,
-    required this.sampleTargets,
-    required this.consignmentTargets,
-    required this.actualProducts,
-    required this.actualVisits,
-    required this.actualCollections,
-    required this.actualCustomers,
-    required this.actualSamples,
-    required this.actualConsignments,
-    required this.percentages,
-  });
 }

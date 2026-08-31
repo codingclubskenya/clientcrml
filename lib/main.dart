@@ -234,13 +234,20 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
 
     try {
       final userId = session.user.id;
-      final userData =
-          await _supabase
-              .from('users')
-              .select('role')
-              .eq('id', userId)
-              .maybeSingle();
       final metadataRole = session.user.userMetadata?['role']?.toString();
+      
+      Map<String, dynamic>? userData;
+      try {
+        userData = await _supabase
+            .from('users')
+            .select('role')
+            .eq('id', userId)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // Timeout or network error, silently fallback to metadata
+      }
+      
       final dbRole = userData?['role'] as int?;
       final resolvedRole =
           dbRole ??

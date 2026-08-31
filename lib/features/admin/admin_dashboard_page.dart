@@ -1295,6 +1295,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     bool isCollapsed = false,
   }) {
     return ListTile(
+      tileColor: Colors.transparent,
       leading: Icon(icon, color: Colors.white70),
       title:
           isCollapsed
