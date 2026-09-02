@@ -6,7 +6,6 @@ import '../dashboard/my_orders_page.dart';
 import '../dashboard/sample_distribution_page.dart';
 import '../dashboard/grounds_quotation_page.dart';
 import '../dashboard/my_shops_page.dart';
-import '../dashboard/user_school_profiles_page.dart';
 import 'bas_alerts_page.dart';
 import 'crm_settings_page.dart';
 import 'user_profile_page.dart';
@@ -14,6 +13,7 @@ import 'messages_page.dart';
 import '../../core/constants/grounds_screens.dart';
 import '../../core/constants/agent_screens.dart';
 import '../../features/database/database_service.dart';
+import '../../features/events/events_list_page.dart';
 import '../../models/task_model.dart';
 import '../project/role5_project_forms_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -42,6 +42,7 @@ class _SalesDashboardState extends State<SalesDashboard> {
   String? _userSubRegion;
   List<UserModel> _agents = [];
   List<RegionModel> _regions = [];
+  bool _isAssignedToEvent = false;
 
   @override
   void initState() {
@@ -53,6 +54,27 @@ class _SalesDashboardState extends State<SalesDashboard> {
       return data;
     });
     _loadUserInfo();
+    _checkEventAssignment();
+  }
+
+  Future<void> _checkEventAssignment() async {
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) return;
+      final assignments = await Supabase.instance.client
+          .from('event_assignments')
+          .select('id')
+          .eq('agent_id', currentUser.id)
+          .limit(1);
+      if (mounted) {
+        setState(() {
+          _isAssignedToEvent = (assignments as List).isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking event assignment: $e');
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _loadUserInfo() async {
@@ -285,125 +307,120 @@ class _SalesDashboardState extends State<SalesDashboard> {
   // --- UI Components ---
 
   Widget _buildQuickActions(BuildContext context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      alignment: WrapAlignment.spaceBetween,
-      children: [
-        _actionBtn(
-          "Schools",
-          Icons.school_outlined,
-          AppColors.primaryGreen,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SchoolOnboarding(),
-                ),
-              ),
+    final actions = <_QuickAction>[
+      _QuickAction(
+        "Schools",
+        Icons.school_outlined,
+        AppColors.primaryGreen,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SchoolOnboarding()),
         ),
-        _actionBtn(
-          "Profiles",
-          Icons.person_search_outlined,
-          AppColors.primaryGreen,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UserSchoolProfilesPage(),
-                ),
-              ),
+      ),
+      _QuickAction(
+        "Samples",
+        Icons.inventory_2_outlined,
+        AppColors.secondaryOrange,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SampleDistributionPage()),
         ),
-        _actionBtn(
-          "Samples",
-          Icons.inventory_2_outlined,
-          AppColors.secondaryOrange,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SampleDistributionPage(),
-                ),
-              ),
+      ),
+      _QuickAction(
+        "Orders",
+        Icons.assignment_outlined,
+        AppColors.primaryGreen,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const MyOrdersPage()),
         ),
-        _actionBtn(
-          "Orders",
-          Icons.assignment_outlined,
-          AppColors.primaryGreen,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MyOrdersPage()),
-              ),
+      ),
+      _QuickAction(
+        "Messages",
+        Icons.chat_bubble_outline,
+        AppColors.secondaryOrange,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const MessagesPage()),
         ),
-        _actionBtn(
-          "Messages",
-          Icons.chat_bubble_outline,
-          AppColors.secondaryOrange,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MessagesPage()),
-              ),
+      ),
+      _QuickAction(
+        "Contacts",
+        Icons.contacts_outlined,
+        AppColors.infoBlue,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ContactsPage()),
         ),
-        _actionBtn(
-          "Contacts",
-          Icons.contacts_outlined,
-          AppColors.infoBlue,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ContactsPage()),
-              ),
+      ),
+      _QuickAction(
+        "Deliveries",
+        Icons.local_shipping_outlined,
+        AppColors.infoBlue,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const GroundsDeliveriesScreen()),
         ),
-        _actionBtn(
-          "Deliveries",
-          Icons.local_shipping_outlined,
-          AppColors.infoBlue,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const GroundsDeliveriesScreen(),
-                ),
-              ),
+      ),
+      _QuickAction(
+        "Survey",
+        Icons.assignment_turned_in_outlined,
+        AppColors.infoBlue,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const Role5ProjectFormsPage()),
         ),
-        _actionBtn(
-          "Survey",
-          Icons.assignment_turned_in_outlined,
-          AppColors.infoBlue,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const Role5ProjectFormsPage(),
-                ),
-              ),
-        ),
-        _actionBtn(
-          "Quotation",
-          Icons.request_quote_outlined,
-          AppColors.primaryGreen,
-          onTap: () async {
-            final role = await _dbService.getCurrentUserRole();
-            if (!context.mounted) return;
-            if (role != 5) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Only Role 5 can create quotations.'),
-                ),
-              );
-              return;
-            }
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const GroundsQuotationPage(),
-              ),
+      ),
+      _QuickAction(
+        "Quotation",
+        Icons.request_quote_outlined,
+        AppColors.primaryGreen,
+        onTap: () async {
+          final role = await _dbService.getCurrentUserRole();
+          if (!context.mounted) return;
+          if (role != 5) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Only Role 5 can create quotations.')),
             );
-          },
+            return;
+          }
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GroundsQuotationPage()),
+          );
+        },
+      ),
+    ];
+
+    if (_isAssignedToEvent) {
+      actions.insert(
+        0,
+        _QuickAction(
+          "Events",
+          Icons.event,
+          AppColors.accentOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const EventsListPage()),
+          ),
         ),
-      ],
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        return _actionBtn(action.label, action.icon, action.color, onTap: action.onTap);
+      },
     );
   }
 
@@ -1617,4 +1634,13 @@ class _SalesDashboardState extends State<SalesDashboard> {
       ],
     );
   }
+}
+
+class _QuickAction {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  _QuickAction(this.label, this.icon, this.color, {required this.onTap});
 }

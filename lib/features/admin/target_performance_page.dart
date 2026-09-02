@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
@@ -9,6 +12,9 @@ import '../../models/target_model.dart';
 import '../../models/region_model.dart';
 import '../../models/user_model.dart';
 import '../database/database_service.dart';
+import 'utils/csv_download_stub.dart'
+    if (dart.library.html) 'utils/csv_download_web.dart'
+    if (dart.library.io) 'utils/csv_download_io.dart';
 
 class _PerformanceRow {
   final UserModel user;
@@ -61,6 +67,32 @@ class _CardMetric {
   final String value;
 
   const _CardMetric({required this.label, required this.value});
+}
+
+class _ReportSummary {
+  final List<_PerformanceRow> rows;
+  final int totalAssignees;
+  final int totalTargets;
+  final int totalSales;
+  final int totalVisits;
+  final int totalCustomers;
+  final int totalInstitutions;
+  final int totalBookshops;
+  final int avgSales;
+  final _PerformanceRow? bestPerformer;
+
+  const _ReportSummary({
+    required this.rows,
+    required this.totalAssignees,
+    required this.totalTargets,
+    required this.totalSales,
+    required this.totalVisits,
+    required this.totalCustomers,
+    required this.totalInstitutions,
+    required this.totalBookshops,
+    required this.avgSales,
+    required this.bestPerformer,
+  });
 }
 
 class TargetPerformancePage extends StatefulWidget {
@@ -337,6 +369,435 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
     });
   }
 
+  void _updateFilters(VoidCallback update, {bool reload = true}) {
+    setState(update);
+    if (reload) {
+      _loadPerformance();
+    }
+  }
+
+  String _scopeLabel(String scope) {
+    switch (scope) {
+      case 'regional':
+        return 'Regional';
+      case 'agent':
+        return 'Agent';
+      case 'business_advisor':
+        return 'Business Advisor';
+      case 'sales_rep':
+        return 'Sales Rep';
+      case 'individual':
+        return 'Individual';
+      default:
+        return scope;
+    }
+  }
+
+  String _selectedRegionLabel() {
+    if (_selectedRegionOptionId == null) return 'All Regions';
+    return _regionOptions.firstWhere(
+          (r) => r['id'] == _selectedRegionOptionId,
+          orElse: () => {'label': _selectedRegionOptionId!},
+        )['label'] ??
+        _selectedRegionOptionId!;
+  }
+
+  String _selectedAssigneeLabel() {
+    if (_selectedAssigneeOptionId == null) return 'All Assignees';
+    return _assigneeOptions.firstWhere(
+          (a) => a['id'] == _selectedAssigneeOptionId,
+          orElse: () => {'label': _selectedAssigneeOptionId!},
+        )['label'] ??
+        _selectedAssigneeOptionId!;
+  }
+
+  String _formatDateStamp(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _safeFilePart(String value) {
+    final cleaned = value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    return cleaned.isEmpty ? 'report' : cleaned;
+  }
+
+  List<_PerformanceRow> _getSortedRows() {
+    final rows = List<_PerformanceRow>.from(_rows);
+    final periodKey = _selectedPeriodKey();
+
+    if (_sortBy == 'All') {
+      rows.sort(
+        (a, b) => _periodValue(
+          b.actualVisits,
+          periodKey,
+        ).compareTo(_periodValue(a.actualVisits, periodKey)),
+      );
+    } else if (_sortBy == 'School') {
+      rows.sort(
+        (a, b) => _periodValue(
+          b.actualSchools,
+          periodKey,
+        ).compareTo(_periodValue(a.actualSchools, periodKey)),
+      );
+    } else if (_sortBy == 'Institution') {
+      rows.sort(
+        (a, b) => _periodValue(
+          b.actualInstitutions,
+          periodKey,
+        ).compareTo(_periodValue(a.actualInstitutions, periodKey)),
+      );
+    } else if (_sortBy == 'Bookshop') {
+      rows.sort(
+        (a, b) => _periodValue(
+          b.actualBookshops,
+          periodKey,
+        ).compareTo(_periodValue(a.actualBookshops, periodKey)),
+      );
+    }
+
+    return rows;
+  }
+
+  _ReportSummary _buildReportSummaryData([List<_PerformanceRow>? rows]) {
+    final reportRows = rows ?? _getSortedRows();
+    final periodKey = _selectedPeriodKey();
+
+    final totalAssignees = reportRows.length;
+    final totalTargets = reportRows.fold<int>(0, (sum, r) {
+      return sum +
+          r.productTargets.values.fold<int>(
+            0,
+            (s, v) => s + v.values.fold<int>(0, (ss, vv) => ss + vv),
+          ) +
+          r.visitTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.collectionTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.customerTargets.values.fold<int>(0, (s, v) => s + v) +
+          r.sampleTargets.values.fold<int>(0, (s, v) => s + v);
+    });
+    final totalSales = reportRows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualProducts, periodKey),
+    );
+    final totalVisits = reportRows.fold<int>(
+      0,
+      (sum, r) => sum + _combinedVisitValue(r, periodKey),
+    );
+    final totalCustomers = reportRows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualCustomers, periodKey),
+    );
+    final totalInstitutions = reportRows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualInstitutions, periodKey),
+    );
+    final totalBookshops = reportRows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualBookshops, periodKey),
+    );
+    final bestPerformer =
+        reportRows.isEmpty
+            ? null
+            : reportRows.reduce(
+              (a, b) =>
+                  _periodValue(a.actualProducts, periodKey) >=
+                          _periodValue(b.actualProducts, periodKey)
+                      ? a
+                      : b,
+            );
+    final avgSales =
+        totalAssignees > 0 ? (totalSales / totalAssignees).round() : 0;
+
+    return _ReportSummary(
+      rows: reportRows,
+      totalAssignees: totalAssignees,
+      totalTargets: totalTargets,
+      totalSales: totalSales,
+      totalVisits: totalVisits,
+      totalCustomers: totalCustomers,
+      totalInstitutions: totalInstitutions,
+      totalBookshops: totalBookshops,
+      avgSales: avgSales,
+      bestPerformer: bestPerformer,
+    );
+  }
+
+  List<List<String>> _buildExportRows(List<_PerformanceRow> rows) {
+    final periodKey = _selectedPeriodKey();
+    return [
+      for (var i = 0; i < rows.length; i++)
+        [
+          '${i + 1}',
+          rows[i].user.fullName ?? rows[i].user.email,
+          _roleLabel(rows[i].user.role),
+          _periodValue(rows[i].actualProducts, periodKey).toString(),
+          _periodValue(rows[i].actualVisits, periodKey).toString(),
+          _periodValue(rows[i].actualCustomers, periodKey).toString(),
+          _periodValue(rows[i].actualInstitutions, periodKey).toString(),
+          _periodValue(rows[i].actualBookshops, periodKey).toString(),
+          _periodValue(rows[i].pipeline, periodKey).toString(),
+          _periodValue(rows[i].actualSamples, periodKey).toString(),
+          _periodValue(rows[i].actualSampleReturns, periodKey).toString(),
+          _periodValue(rows[i].daysWorked, periodKey).toString(),
+        ],
+    ];
+  }
+
+  String _csvEscape(String value) {
+    final escaped = value.replaceAll('"', '""');
+    return '"$escaped"';
+  }
+
+  Future<void> _showExportOptions() async {
+    if (_isLoading) return;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf),
+                title: const Text('Download PDF'),
+                onTap: () => Navigator.pop(sheetContext, 'pdf'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: const Text('Download Excel'),
+                subtitle: const Text('CSV format'),
+                onTap: () => Navigator.pop(sheetContext, 'excel'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || choice == null) return;
+    if (choice == 'pdf') {
+      await _exportPdf();
+    } else if (choice == 'excel') {
+      await _exportExcel();
+    }
+  }
+
+  Future<void> _exportPdf() async {
+    final summary = _buildReportSummaryData();
+    if (summary.rows.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export.')));
+      return;
+    }
+
+    final pdf = pw.Document();
+    final fileName =
+        'target_performance_${_safeFilePart(_selectedScope)}_${_formatDateStamp(DateTime.now())}.pdf';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) {
+          return [
+            pw.Text(
+              'Target Performance Report',
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Scope: ${_scopeLabel(_selectedScope)} | Region: ${_selectedRegionLabel()} | Assignee: ${_selectedAssigneeLabel()} | Period: ${_selectedTargetPeriod ?? 'All Periods'} | ${_formatDateStamp(_startDate)} to ${_formatDateStamp(_endDate)}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _pdfMetricCard('Assignees', '${summary.totalAssignees}'),
+                _pdfMetricCard('Targets Matched', '${summary.totalTargets}'),
+                _pdfMetricCard('Total Sales', _formatCount(summary.totalSales)),
+                _pdfMetricCard('Total Visits', _formatCount(summary.totalVisits)),
+                _pdfMetricCard(
+                  'Schools Visited',
+                  _formatCount(summary.totalCustomers),
+                ),
+                _pdfMetricCard(
+                  'Institutions Visited',
+                  _formatCount(summary.totalInstitutions),
+                ),
+                _pdfMetricCard(
+                  'Bookshops Visited',
+                  _formatCount(summary.totalBookshops),
+                ),
+                _pdfMetricCard('Avg Sales', _formatCount(summary.avgSales)),
+                if (summary.bestPerformer != null)
+                  _pdfMetricCard(
+                    'Top Performer',
+                    summary.bestPerformer!.user.fullName ??
+                        summary.bestPerformer!.user.email,
+                  ),
+              ],
+            ),
+            pw.SizedBox(height: 16),
+            pw.Table.fromTextArray(
+              headers: const [
+                '#',
+                'Name',
+                'Role',
+                'Sales',
+                'Visits',
+                'Schools',
+                'Institutions',
+                'Bookshops',
+                'Pipeline',
+                'Samples',
+                'Returns',
+                'Days Worked',
+              ],
+              data: _buildExportRows(summary.rows),
+              headerStyle: pw.TextStyle(
+                fontSize: 9,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColors.grey300,
+              ),
+              cellAlignment: pw.Alignment.centerLeft,
+              columnWidths: const {
+                0: pw.FixedColumnWidth(18),
+                1: pw.FlexColumnWidth(2.2),
+                2: pw.FlexColumnWidth(1.3),
+                3: pw.FixedColumnWidth(42),
+                4: pw.FixedColumnWidth(42),
+                5: pw.FixedColumnWidth(42),
+                6: pw.FixedColumnWidth(52),
+                7: pw.FixedColumnWidth(48),
+                8: pw.FixedColumnWidth(44),
+                9: pw.FixedColumnWidth(44),
+                10: pw.FixedColumnWidth(44),
+                11: pw.FixedColumnWidth(50),
+              },
+            ),
+          ];
+        },
+      ),
+    );
+
+    try {
+      await Printing.sharePdf(bytes: await pdf.save(), filename: fileName);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF export started: $fileName')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to export PDF: $e')));
+      }
+    }
+  }
+
+  Future<void> _exportExcel() async {
+    final summary = _buildReportSummaryData();
+    if (summary.rows.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export.')));
+      return;
+    }
+
+    final headers = [
+      'Rank',
+      'Name',
+      'Role',
+      'Sales',
+      'Visits',
+      'Schools',
+      'Institutions',
+      'Bookshops',
+      'Pipeline',
+      'Samples',
+      'Returns',
+      'Days Worked',
+    ];
+    final buffer = StringBuffer();
+    buffer.writeln(_csvEscape('Target Performance Report'));
+    buffer.writeln(
+      _csvEscape(
+        'Scope: ${_scopeLabel(_selectedScope)} | Region: ${_selectedRegionLabel()} | Assignee: ${_selectedAssigneeLabel()} | Period: ${_selectedTargetPeriod ?? 'All Periods'} | ${_formatDateStamp(_startDate)} to ${_formatDateStamp(_endDate)}',
+      ),
+    );
+    buffer.writeln(
+      _csvEscape(
+        'Assignees: ${summary.totalAssignees} | Targets Matched: ${summary.totalTargets} | Total Sales: ${_formatCount(summary.totalSales)} | Total Visits: ${_formatCount(summary.totalVisits)} | Schools Visited: ${_formatCount(summary.totalCustomers)} | Institutions Visited: ${_formatCount(summary.totalInstitutions)} | Bookshops Visited: ${_formatCount(summary.totalBookshops)} | Avg Sales: ${_formatCount(summary.avgSales)}',
+      ),
+    );
+    buffer.writeln();
+    buffer.writeln(headers.map(_csvEscape).join(','));
+
+    for (final row in _buildExportRows(summary.rows)) {
+      buffer.writeln(row.map(_csvEscape).join(','));
+    }
+
+    final fileName =
+        'target_performance_${_safeFilePart(_selectedScope)}_${_formatDateStamp(DateTime.now())}.csv';
+
+    try {
+      await downloadCsvTemplate(fileName, buffer.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel export started: $fileName')),
+        );
+      }
+    } on UnsupportedError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download not supported on this device.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to export Excel: $e')));
+      }
+    }
+  }
+
+  pw.Widget _pdfMetricCard(String label, String value) {
+    return pw.Container(
+      width: 150,
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey100,
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(label, style: const pw.TextStyle(fontSize: 8)),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            value,
+            maxLines: 1,
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   bool _targetMatches(TargetModel target, UserModel user) {
     if (_selectedScope == 'regional') {
       final regionMatch =
@@ -604,6 +1065,12 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
         0;
   }
 
+  int _combinedVisitValue(_PerformanceRow row, String periodKey) {
+    return _periodValue(row.actualCustomers, periodKey) +
+        _periodValue(row.actualInstitutions, periodKey) +
+        _periodValue(row.actualBookshops, periodKey);
+  }
+
   String _formatCount(int value) {
     return value.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -650,23 +1117,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
 
   String _buildPerformanceContext() {
     final periodKey = _selectedPeriodKey();
-    final regionLabel =
-        _selectedRegionOptionId == null
-            ? 'All Regions'
-            : (_regionOptions.firstWhere(
-                  (r) => r['id'] == _selectedRegionOptionId,
-                  orElse: () => {'label': _selectedRegionOptionId!},
-                )['label'] ??
-                _selectedRegionOptionId);
-    final assigneeLabel =
-        _selectedAssigneeOptionId == null
-            ? 'All Assignees'
-            : (_assigneeOptions.firstWhere(
-                  (a) => a['id'] == _selectedAssigneeOptionId,
-                  orElse: () => {'label': _selectedAssigneeOptionId!},
-                )['label'] ??
-                _selectedAssigneeOptionId);
-    return 'Filters: scope=$_selectedScope, region=$regionLabel, assignee=$assigneeLabel, targetPeriod=$_selectedTargetPeriod, dateRange=${_startDate.toIso8601String()} to ${_endDate.toIso8601String()}, period=$periodKey. '
+    return 'Filters: scope=$_selectedScope, region=${_selectedRegionLabel()}, assignee=${_selectedAssigneeLabel()}, targetPeriod=$_selectedTargetPeriod, dateRange=${_startDate.toIso8601String()} to ${_endDate.toIso8601String()}, period=$periodKey. '
         'Performance: ${_rows.map((r) => '${r.user.fullName ?? r.user.email}: Sales=${_periodValue(r.actualProducts, periodKey)}, Visits=${_periodValue(r.actualVisits, periodKey)}, Schools=${_periodValue(r.actualCustomers, periodKey)}').join(' | ')}';
   }
 
@@ -707,11 +1158,11 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
 
   // Header matching the "EOD Reports" Top Bar
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
+
+        final title = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
             Text(
@@ -728,20 +1179,31 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
             ),
           ],
-        ),
-        Row(
+        );
+
+        final actions = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             if (_currentUserRole <= 2)
               IconButton(
                 icon: const Icon(Icons.smart_toy, color: AppColors.primaryDark),
                 onPressed: _showAiAssistant,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                padding: EdgeInsets.zero,
               ),
             IconButton(
               icon: const Icon(Icons.refresh, color: Color(0xFF64748B)),
               onPressed: _loadPerformance,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              padding: EdgeInsets.zero,
             ),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: _showExportOptions,
               icon: const Icon(
                 Icons.download_outlined,
                 size: 16,
@@ -761,11 +1223,56 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                   horizontal: 14,
                   vertical: 10,
                 ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(0, 36),
               ),
             ),
           ],
-        ),
-      ],
+        );
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'EOD Reports',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'End of day team performance summary',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              actions,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            title,
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: actions,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -804,7 +1311,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                     _scopeOptions,
                     (v) {
                       if (v != null) {
-                        setState(() {
+                        _updateFilters(() {
                           _selectedScope = v;
                           if (v == 'regional') {
                             _selectedAssigneeOptionId = null;
@@ -839,7 +1346,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                       ),
                       (v) {
                         if (v != null) {
-                          setState(() {
+                          _updateFilters(() {
                             _selectedRegionOptionId = v.isEmpty ? null : v;
                           });
                         }
@@ -865,7 +1372,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                       ),
                       (v) {
                         if (v != null) {
-                          setState(
+                          _updateFilters(
                             () =>
                                 _selectedAssigneeOptionId =
                                     v.isEmpty ? null : v,
@@ -883,16 +1390,19 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                         return match['label'] ?? value;
                       },
                     ),
+                  if (_selectedScope != 'regional') ...[
                     _buildDropdownField(
                       'Target Period',
                       _selectedTargetPeriod ?? '',
                       List<String>.from([''] + _targetPeriodOptions),
                       (v) {
                         if (v != null) {
-                          setState(
+                          _updateFilters(
                             () => _selectedTargetPeriod = v.isEmpty ? null : v,
+                            reload: false,
                           );
                           _applyPeriodDateRange(v.isEmpty ? null : v);
+                          _loadPerformance();
                         }
                       },
                       width: isWide ? 130 : double.infinity,
@@ -902,43 +1412,50 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                       },
                     ),
                     _buildDateField('Start Date', _startDate, (date) {
-                      if (date != null) setState(() => _startDate = date);
+                      if (date != null) {
+                        _updateFilters(() => _startDate = date);
+                      }
                     }, width: isWide ? 130 : double.infinity),
                     _buildDateField('End Date', _endDate, (date) {
-                      if (date != null) setState(() => _endDate = date);
+                      if (date != null) {
+                        _updateFilters(() => _endDate = date);
+                      }
                     }, width: isWide ? 130 : double.infinity),
-                      _buildDropdownField(
-                        'Sort By',
-                        _sortBy,
-                        ['All', 'School', 'Institution', 'Bookshop'],
-                        (v) {
-                          if (v != null) setState(() => _sortBy = v);
-                        },
-                        width: isWide ? 130 : double.infinity,
-                      ),
+                    _buildDropdownField(
+                      'Sort By',
+                      _sortBy,
+                      ['All', 'School', 'Institution', 'Bookshop'],
+                      (v) {
+                        if (v != null) {
+                          setState(() => _sortBy = v);
+                        }
+                      },
+                      width: isWide ? 130 : double.infinity,
+                    ),
                     SizedBox(
                       width: isWide ? 110 : double.infinity,
                       height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: _loadPerformance,
-                      icon: const Icon(
-                        Icons.search,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Get Report',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                      child: ElevatedButton.icon(
+                        onPressed: _loadPerformance,
+                        icon: const Icon(
+                          Icons.search,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Get Report',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6D273F),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               );
             },
@@ -1155,11 +1672,19 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
     );
     final totalActualVisits = _rows.fold<int>(
       0,
-      (sum, r) => sum + _periodValue(r.actualVisits, periodKey),
+      (sum, r) => sum + _combinedVisitValue(r, periodKey),
     );
     final totalActualCustomers = _rows.fold<int>(
       0,
       (sum, r) => sum + _periodValue(r.actualCustomers, periodKey),
+    );
+    final totalActualInstitutions = _rows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualInstitutions, periodKey),
+    );
+    final totalActualBookshops = _rows.fold<int>(
+      0,
+      (sum, r) => sum + _periodValue(r.actualBookshops, periodKey),
     );
     final bestPerformer =
         _rows.isEmpty
@@ -1210,6 +1735,14 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                   'label': 'Schools Visited',
                   'value': _formatCount(totalActualCustomers),
                 },
+                {
+                  'label': 'Institutions Visited',
+                  'value': _formatCount(totalActualInstitutions),
+                },
+                {
+                  'label': 'Bookshops Visited',
+                  'value': _formatCount(totalActualBookshops),
+                },
                 {'label': 'Avg Sales', 'value': _formatCount(avgSales)},
                 if (bestPerformer != null)
                   {
@@ -1222,43 +1755,51 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                   constraints.maxWidth > 800
                       ? 4
                       : (constraints.maxWidth > 500 ? 3 : 2);
-              return GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 2.5,
+              final gap = 12.0;
+              final cardWidth =
+                  (constraints.maxWidth - (gap * (crossAxisCount - 1))) /
+                  crossAxisCount;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
                 children:
                     items.map((item) {
-                      return Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              item['label']!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF64748B),
+                      return SizedBox(
+                        width: cardWidth,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(minHeight: 76),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                item['label']!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item['value']!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                              const SizedBox(height: 4),
+                              Text(
+                                item['value']!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     }).toList(),
@@ -1362,7 +1903,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                     children: [
                       CircleAvatar(
                         radius: 12,
-                        backgroundColor: const Color(0xFF0284C7),
+                        backgroundColor: const Color(0xFF6D273F),
                         child: Text(
                           '$rank',
                           style: const TextStyle(

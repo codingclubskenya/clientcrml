@@ -20,6 +20,8 @@ import 'role2_manager_dashboard_page.dart';
 import '../dashboard/agrovet_onboarding.dart';
 import '../profile/messages_page.dart';
 import '../events/events_list_page.dart';
+import '../catalog/product_list_screen.dart';
+import '../consignments/consignment_list_screen.dart';
 import '../welcome/auth/login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/agent_dashboard_page.dart';
@@ -260,6 +262,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const EventsListPage(),
+                    ),
+                  );
+                }),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Catalog',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                _buildNavItem(Icons.inventory_2_outlined, 'Product Catalog', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProductListScreen(),
+                    ),
+                  );
+                }),
+                _buildNavItem(Icons.local_shipping_outlined, 'Stock Assignments', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ConsignmentListScreen(),
                     ),
                   );
                 }),
@@ -529,6 +558,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const EventsListPage(),
+                    ),
+                  );
+                }),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Catalog',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                _buildNavItem(Icons.inventory_2_outlined, 'Product Catalog', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProductListScreen(),
+                    ),
+                  );
+                }),
+                _buildNavItem(Icons.local_shipping_outlined, 'Stock Assignments', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ConsignmentListScreen(),
                     ),
                   );
                 }),

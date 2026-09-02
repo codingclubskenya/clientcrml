@@ -8,6 +8,7 @@ import '../../features/admin/role3_supervision_dashboard_page.dart';
 import '../../features/profile/bas_alerts_page.dart';
 import '../../features/dashboard/my_shops_page.dart';
 import '../../features/admin/target_performance_page.dart';
+import '../../features/events/events_list_page.dart';
 
 class BasDashboardPage extends StatelessWidget {
   const BasDashboardPage({super.key});
@@ -116,6 +117,13 @@ class BasDashboardPage extends StatelessWidget {
                     'Performance',
                     AppColors.primaryDark,
                     const TargetPerformancePage(),
+                  ),
+                  _buildDashboardCard(
+                    context,
+                    Icons.event,
+                    'Events',
+                    AppColors.infoBlue,
+                    const EventsListPage(),
                   ),
                 ],
               ),

@@ -52,7 +52,18 @@ class AgentDashboardPage extends StatelessWidget {
               'Check your route plans and school visits.',
               style: TextStyle(fontSize: 16, color: AppColors.textMuted),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
+            _buildQuickActions(context),
+            const SizedBox(height: 20),
+            const Text(
+              'Menu',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 12),
             Expanded(
               child: GridView.count(
                 crossAxisCount: 2,
@@ -96,13 +107,6 @@ class AgentDashboardPage extends StatelessWidget {
                   ),
                   _buildDashboardCard(
                     context,
-                    Icons.event,
-                    'Events',
-                    AppColors.infoBlue,
-                    const EventsListPage(),
-                  ),
-                  _buildDashboardCard(
-                    context,
                     Icons.insights,
                     'Performance',
                     AppColors.primaryDark,
@@ -112,6 +116,91 @@ class AgentDashboardPage extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Quick Actions',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard(
+                context,
+                Icons.event,
+                'Events',
+                AppColors.infoBlue,
+                const EventsListPage(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                context,
+                Icons.add_business_outlined,
+                'New Lead',
+                AppColors.accentOrange,
+                const MyShopsPage(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard(
+    BuildContext context,
+    IconData icon,
+    String title,
+    Color color,
+    Widget destination,
+  ) {
+    return Card(
+      color: color.withValues(alpha: 0.1),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.3)),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 28, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: color),
+            ],
+          ),
         ),
       ),
     );

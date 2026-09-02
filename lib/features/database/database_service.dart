@@ -2083,6 +2083,492 @@ class DatabaseService {
         return 5;
     }
   }
+
+  // ==================== Event Module Methods ====================
+
+  Future<List<Map<String, dynamic>>> getEvents({
+    String? status,
+    String? region,
+  }) async {
+    try {
+      var query = _supabase.from('events').select();
+      if (status != null) query = query.eq('status', status);
+      if (region != null) query = query.eq('region', region);
+      final data = await query.order('start_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting events: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getEvent(String id) async {
+    try {
+      final data = await _supabase.from('events').select().eq('id', id).maybeSingle();
+      return data != null ? Map<String, dynamic>.from(data) : null;
+    } catch (e) {
+      debugPrint('Error getting event: $e');
+      return null;
+    }
+  }
+
+  Future<String?> createEvent(Map<String, dynamic> payload) async {
+    try {
+      final data = await _supabase.from('events').insert(payload).select().single();
+      return data['id']?.toString();
+    } catch (e) {
+      debugPrint('Error creating event: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateEvent(String id, Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('events').update(payload).eq('id', id);
+    } catch (e) {
+      debugPrint('Error updating event: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateEventStatus(String id, String status) async {
+    try {
+      await _supabase.from('events').update({'status': status}).eq('id', id);
+    } catch (e) {
+      debugPrint('Error updating event status: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventAssignments(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_assignments')
+          .select('*, users(full_name, email, phone)')
+          .eq('event_id', eventId)
+          .order('created_at');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event assignments: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> assignAgentToEvent(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_assignments').insert(payload);
+    } catch (e) {
+      debugPrint('Error assigning agent to event: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> removeEventAssignment(String assignmentId) async {
+    try {
+      await _supabase.from('event_assignments').delete().eq('id', assignmentId);
+    } catch (e) {
+      debugPrint('Error removing event assignment: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventCheckins(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_checkins')
+          .select('*, users(full_name, email)')
+          .eq('event_id', eventId)
+          .order('checkin_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event checkins: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> checkinToEvent(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_checkins').insert(payload);
+    } catch (e) {
+      debugPrint('Error checking in to event: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventTasks(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_tasks')
+          .select()
+          .eq('event_id', eventId)
+          .order('sort_order');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event tasks: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> createEventTask(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_tasks').insert(payload);
+    } catch (e) {
+      debugPrint('Error creating event task: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleEventTask(String taskId, bool completed) async {
+    try {
+      await _supabase.from('event_tasks').update({
+        'completed': completed,
+        'completed_at': completed ? DateTime.now().toIso8601String() : null,
+        'completed_by': completed ? getCurrentUserId() : null,
+      }).eq('id', taskId);
+    } catch (e) {
+      debugPrint('Error toggling event task: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventLeads(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_leads')
+          .select('*, schools(name), users(full_name)')
+          .eq('event_id', eventId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event leads: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> createEventLead(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_leads').insert(payload);
+    } catch (e) {
+      debugPrint('Error creating event lead: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventOrders(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_orders')
+          .select('*, orders(*, order_items(*)), users(full_name)')
+          .eq('event_id', eventId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event orders: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> linkOrderToEvent(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_orders').insert(payload);
+    } catch (e) {
+      debugPrint('Error linking order to event: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventSamples(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_samples')
+          .select('*, catalog_items(name, sku), users(full_name)')
+          .eq('event_id', eventId)
+          .order('distributed_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event samples: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> createEventSample(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_samples').insert(payload);
+    } catch (e) {
+      debugPrint('Error creating event sample: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventPhotos(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_photos')
+          .select('*, users(full_name)')
+          .eq('event_id', eventId)
+          .order('uploaded_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event photos: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> uploadEventPhoto(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_photos').insert(payload);
+    } catch (e) {
+      debugPrint('Error uploading event photo: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventExpenses(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_expenses')
+          .select('*, users(full_name)')
+          .eq('event_id', eventId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error getting event expenses: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> createEventExpense(Map<String, dynamic> payload) async {
+    try {
+      await _supabase.from('event_expenses').insert(payload);
+    } catch (e) {
+      debugPrint('Error creating event expense: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateEventExpenseStatus(String expenseId, String status) async {
+    try {
+      await _supabase.from('event_expenses').update({
+        'status': status,
+        'approved_by': getCurrentUserId(),
+        'approved_at': DateTime.now().toIso8601String(),
+      }).eq('id', expenseId);
+    } catch (e) {
+      debugPrint('Error updating event expense status: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getEventReport(String eventId) async {
+    try {
+      final data = await _supabase
+          .from('event_reports')
+          .select()
+          .eq('event_id', eventId)
+          .maybeSingle();
+      return data != null ? Map<String, dynamic>.from(data) : null;
+    } catch (e) {
+      debugPrint('Error getting event report: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveEventReport(Map<String, dynamic> payload) async {
+    try {
+      final eventId = payload['event_id'];
+      final existing = await _supabase
+          .from('event_reports')
+          .select('id')
+          .eq('event_id', eventId)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase
+            .from('event_reports')
+            .update(payload)
+            .eq('event_id', eventId);
+      } else {
+        await _supabase.from('event_reports').insert(payload);
+      }
+    } catch (e) {
+      debugPrint('Error saving event report: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getEventSummary(String eventId) async {
+    try {
+      final results = await Future.wait([
+        _supabase.from('event_checkins').select('id').eq('event_id', eventId),
+        _supabase.from('event_leads').select('id').eq('event_id', eventId),
+        _supabase.from('event_orders').select('id').eq('event_id', eventId),
+        _supabase.from('event_samples').select('id, quantity').eq('event_id', eventId),
+        _supabase.from('event_expenses').select('amount, status').eq('event_id', eventId),
+        _supabase.from('event_photos').select('id').eq('event_id', eventId),
+        _supabase.from('event_tasks').select('id, completed').eq('event_id', eventId),
+      ]);
+
+      final checkins = (results[0] as List).length;
+      final leads = (results[1] as List).length;
+      final orders = (results[2] as List).length;
+      final samples = (results[3] as List).fold<int>(0, (sum, s) => sum + ((s['quantity'] as num?)?.toInt() ?? 0));
+      final expenses = (results[4] as List).fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+      final photos = (results[5] as List).length;
+      final tasks = (results[6] as List).length;
+      final completedTasks = (results[6] as List).where((t) => t['completed'] == true).length;
+
+      return {
+        'checkins': checkins,
+        'leads': leads,
+        'orders': orders,
+        'samples': samples,
+        'expenses': expenses,
+        'photos': photos,
+        'tasks': tasks,
+        'completed_tasks': completedTasks,
+      };
+    } catch (e) {
+      debugPrint('Error getting event summary: $e');
+      return {
+        'checkins': 0,
+        'leads': 0,
+        'orders': 0,
+        'samples': 0,
+        'expenses': 0,
+        'photos': 0,
+        'tasks': 0,
+        'completed_tasks': 0,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getEventsDashboard({
+    String? region,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      var query = _supabase.from('events').select();
+      if (region != null) query = query.eq('region', region);
+      if (startDate != null) query = query.gte('start_at', startDate.toIso8601String());
+      if (endDate != null) query = query.lte('start_at', endDate.toIso8601String());
+      final events = List<Map<String, dynamic>>.from(await query);
+
+      final activeEvents = events.where((e) => e['status'] == 'active' || e['status'] == 'in_progress').length;
+      final upcomingEvents = events.where((e) => e['status'] == 'scheduled').length;
+      final completedEvents = events.where((e) => e['status'] == 'completed').length;
+
+      double totalRevenue = 0;
+      double totalBudget = 0;
+      double totalExpenses = 0;
+      int totalLeads = 0;
+      int totalOrders = 0;
+
+      for (final event in events) {
+        final eventId = event['id']?.toString();
+        if (eventId == null) continue;
+
+        final budget = event['budget'];
+        if (budget is num) totalBudget += budget.toDouble();
+
+        final summary = await getEventSummary(eventId);
+        totalLeads += (summary['leads'] as int?) ?? 0;
+        totalOrders += (summary['orders'] as int?) ?? 0;
+        totalExpenses += (summary['expenses'] as double?) ?? 0;
+      }
+
+      final roi = totalExpenses > 0 ? ((totalRevenue - totalExpenses) / totalExpenses * 100) : 0;
+
+      return {
+        'total_events': events.length,
+        'active_events': activeEvents,
+        'upcoming_events': upcomingEvents,
+        'completed_events': completedEvents,
+        'total_revenue': totalRevenue,
+        'total_budget': totalBudget,
+        'total_expenses': totalExpenses,
+        'total_leads': totalLeads,
+        'total_orders': totalOrders,
+        'roi': roi,
+        'events': events,
+      };
+    } catch (e) {
+      debugPrint('Error getting events dashboard: $e');
+      return {
+        'total_events': 0,
+        'active_events': 0,
+        'upcoming_events': 0,
+        'completed_events': 0,
+        'total_revenue': 0,
+        'total_budget': 0,
+        'total_expenses': 0,
+        'total_leads': 0,
+        'total_orders': 0,
+        'roi': 0,
+        'events': <Map<String, dynamic>>[],
+      };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTopPerformingEvents({int limit = 5}) async {
+    try {
+      final events = await getEvents();
+      final eventsWithMetrics = <Map<String, dynamic>>[];
+
+      for (final event in events) {
+        final eventId = event['id']?.toString();
+        if (eventId == null) continue;
+        final summary = await getEventSummary(eventId);
+        eventsWithMetrics.add({
+          ...event,
+          'metrics': summary,
+        });
+      }
+
+      eventsWithMetrics.sort((a, b) {
+        final aOrders = (a['metrics']['orders'] as int?) ?? 0;
+        final bOrders = (b['metrics']['orders'] as int?) ?? 0;
+        return bOrders.compareTo(aOrders);
+      });
+
+      return eventsWithMetrics.take(limit).toList();
+    } catch (e) {
+      debugPrint('Error getting top performing events: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTopEventAgents(String eventId) async {
+    try {
+      final assignments = await getEventAssignments(eventId);
+      final agentsWithMetrics = <Map<String, dynamic>>[];
+
+      for (final assignment in assignments) {
+        final agentId = assignment['agent_id']?.toString();
+        if (agentId == null) continue;
+
+        final leads = await _supabase.from('event_leads').select('id').eq('event_id', eventId).eq('agent_id', agentId);
+        final orders = await _supabase.from('event_orders').select('id').eq('event_id', eventId).eq('agent_id', agentId);
+
+        agentsWithMetrics.add({
+          ...assignment,
+          'leads_count': (leads as List).length,
+          'orders_count': (orders as List).length,
+        });
+      }
+
+      agentsWithMetrics.sort((a, b) {
+        final aOrders = (a['orders_count'] as int?) ?? 0;
+        final bOrders = (b['orders_count'] as int?) ?? 0;
+        return bOrders.compareTo(aOrders);
+      });
+
+      return agentsWithMetrics;
+    } catch (e) {
+      debugPrint('Error getting top event agents: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
 }
 
 class SchoolSaveResult {

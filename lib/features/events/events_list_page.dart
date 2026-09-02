@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../database/database_service.dart';
+import 'event_date_format.dart';
 
 class EventsListPage extends StatefulWidget {
   const EventsListPage({super.key});
@@ -10,13 +12,29 @@ class EventsListPage extends StatefulWidget {
 
 class _EventsListPageState extends State<EventsListPage> {
   final _supabase = Supabase.instance.client;
+  final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
+  bool _canCreate = false;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
+    _checkUserRole();
+  }
+
+  Future<void> _checkUserRole() async {
+    try {
+      final role = await _dbService.getCurrentUserRole();
+      if (mounted) {
+        setState(() {
+          _canCreate = role != 5;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking role: $e');
+    }
   }
 
   Future<void> _loadEvents() async {
@@ -27,7 +45,9 @@ class _EventsListPageState extends State<EventsListPage> {
         _events = (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed loading events: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed loading events: $e')));
+      }
     } finally {
       setState(() => _loading = false);
     }
@@ -56,7 +76,7 @@ class _EventsListPageState extends State<EventsListPage> {
                   final e = _events[i];
                   final title = e['name'] ?? 'Untitled event';
                   final region = e['region'] ?? '';
-                  final start = e['start_at'] ?? '';
+                  final start = EventDateFormat.formatShort(e['start_at']);
                   return ListTile(
                     title: Text(title),
                     subtitle: Text('$region • $start'),
@@ -65,10 +85,12 @@ class _EventsListPageState extends State<EventsListPage> {
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openCreate,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _canCreate
+          ? FloatingActionButton(
+              onPressed: _openCreate,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

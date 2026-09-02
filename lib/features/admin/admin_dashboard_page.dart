@@ -17,6 +17,7 @@ import 'catalog_import_page.dart';
 import '../dashboard/my_orders_page.dart';
 import '../profile/messages_page.dart';
 import '../events/events_list_page.dart';
+import '../events/event_manager_dashboard_page.dart';
 import '../welcome/auth/login_page.dart';
 import 'users_list_page.dart';
 import 'assign_books_page.dart';
@@ -37,6 +38,8 @@ import 'admin_individual_performance_page.dart';
 import '../../../core/constants/agent_dashboard_page.dart';
 import '../../../features/profile/profile_page.dart';
 import '../../../core/constants/bas_dashboard_page.dart';
+import '../catalog/product_list_screen.dart';
+import '../consignments/consignment_list_screen.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -992,6 +995,63 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   );
                 }, isCollapsed: isCollapsed),
+                _buildSidebarItem(context, Icons.analytics, 'Event Dashboard', () {
+                  if (MediaQuery.of(context).size.width < 800) {
+                    Navigator.pop(context);
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EventManagerDashboardPage(),
+                    ),
+                  );
+                }, isCollapsed: isCollapsed),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Text(
+                    'CATALOG',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.inventory_2_outlined,
+                  'Product Catalog',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800) {
+                      Navigator.pop(context);
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProductListScreen(),
+                      ),
+                    );
+                  },
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.local_shipping_outlined,
+                  'Stock Assignments',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800) {
+                      Navigator.pop(context);
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ConsignmentListScreen(),
+                      ),
+                    );
+                  },
+                  isCollapsed: isCollapsed,
+                ),
                 _buildSidebarItem(
                   context,
                   Icons.analytics_outlined,

@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
@@ -186,6 +189,61 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       if (!mounted) return;
       setState(() => isOffline = results.contains(ConnectivityResult.none));
     });
+  }
+
+  Future<void> _pickContactFromPhonebook() async {
+    FocusScope.of(context).unfocus();
+
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final permission =
+            await FlutterContacts.permissions.request(PermissionType.read);
+        if (permission != PermissionStatus.granted) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Contacts permission is required to pick a phone number.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
+
+      final contact = await FlutterContacts.native.showPicker(
+        properties: {ContactProperty.name, ContactProperty.phone},
+      );
+      if (!mounted || contact == null) return;
+      if (contact.phones.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected contact has no phone number.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final pickedName = contact.displayName?.trim() ?? '';
+      final pickedPhone = contact.phones.first.number.trim();
+
+      setState(() {
+        if (_contactNameController.text.trim().isEmpty && pickedName.isNotEmpty) {
+          _contactNameController.text = pickedName;
+        }
+        _contactPhoneController.text = pickedPhone;
+      });
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not open contacts picker: ${e.message ?? e.code}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // --- SUBMISSION LOGIC ---
@@ -917,6 +975,9 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
             _contactPhoneLabel,
             controller: _contactPhoneController,
             keyboardType: TextInputType.phone,
+            suffixIcon: Icons.contacts_outlined,
+            suffixTooltip: 'Pick from phonebook',
+            onSuffixPressed: _pickContactFromPhonebook,
           ),
           const SizedBox(height: 16),
           _buildTextField(
@@ -1303,6 +1364,9 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
     TextInputType? keyboardType,
     ValueChanged<String>? onChanged,
     String? helperText,
+    IconData? suffixIcon,
+    VoidCallback? onSuffixPressed,
+    String? suffixTooltip,
   }) {
     return TextField(
       controller: controller,
@@ -1313,6 +1377,14 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
         labelText: label,
         helperText: helperText,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        suffixIcon:
+            suffixIcon == null
+                ? null
+                : IconButton(
+                  tooltip: suffixTooltip,
+                  onPressed: onSuffixPressed,
+                  icon: Icon(suffixIcon),
+                ),
       ),
     );
   }

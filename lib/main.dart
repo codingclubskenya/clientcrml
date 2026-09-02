@@ -31,6 +31,15 @@ import 'features/events/event_photos_page.dart';
 import 'features/events/event_expenses_page.dart';
 import 'features/events/event_reports_page.dart';
 import 'features/events/event_samples_page.dart';
+import 'features/events/event_orders_page.dart';
+import 'features/events/event_manager_dashboard_page.dart';
+import 'features/events/event_assignments_management_page.dart';
+
+// Catalog & consignment module
+import 'features/catalog/product_list_screen.dart';
+import 'features/catalog/add_product_screen.dart';
+import 'features/consignments/consignment_list_screen.dart';
+import 'features/consignments/create_consignment_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,6 +117,14 @@ class DeHeusApp extends StatelessWidget {
         '/events/expenses': (_) => const EventExpensesPage(),
         '/events/reports': (_) => const EventReportsPage(),
         '/events/samples': (_) => const EventSamplesPage(),
+        '/events/orders': (_) => const EventOrdersPage(),
+        '/events/dashboard': (_) => const EventManagerDashboardPage(),
+        '/events/manage-assignments': (_) => const EventAssignmentsManagementPage(),
+        // Catalog & consignments
+        '/catalog/products': (_) => const ProductListScreen(),
+        '/catalog/products/add': (_) => const AddProductScreen(),
+        '/consignments': (_) => const ConsignmentListScreen(),
+        '/consignments/create': (_) => const CreateConsignmentScreen(),
       },
 
       onGenerateRoute: _onGenerateRoute,
