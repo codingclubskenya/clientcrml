@@ -16,7 +16,8 @@ import 'core/constants/agent_dashboard_page.dart';
 import 'features/welcome/auth/reset_password_page.dart';
 import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'services/github_release_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'services/server_update_service.dart';
 import 'dart:async';
 
 // Event module pages
@@ -308,62 +309,64 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
   }
 
   Future<void> _checkForUpdate() async {
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
+    if (!kIsWeb) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
 
-    final updateAvailable =
-        await GithubReleaseService(
-          owner: 'dehus',
-          repo: 'dehus',
-        ).isUpdateAvailable();
+      final service = ServerUpdateService();
+      final info = await service.fetchVersionInfo();
 
-    if (!mounted || !updateAvailable) return;
+      if (info == null || !mounted) return;
 
-    final release =
-        await GithubReleaseService(
-          owner: 'dehus',
-          repo: 'dehus',
-        ).fetchLatestRelease();
-    if (!mounted || release == null) return;
+      final current = await PackageInfo.fromPlatform();
+      final currentVersion = current.version;
+      final currentBuild = current.buildNumber;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Update Available'),
-            content: Text(
-              'A new version (${release.tagName.replaceFirst(RegExp(r'^v'), '')}) is available.\n\nPlease update to get the latest features and bug fixes.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Later'),
+      final isNewer = service._compareBuildNumbers(
+            info.buildNumber,
+            currentBuild,
+          ) >
+          0;
+
+      if (!isNewer) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (ctx) => AlertDialog(
+              title: const Text('Update Available'),
+              content: Text(
+                'A new version (${info.version}) is available.\n\nPlease update to get the latest features and bug fixes.',
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final uri = Uri.parse(
-                    release.apkDownloadUrl ?? release.htmlUrl,
-                  );
-                  if (!await launchUrl(
-                    uri,
-                    mode: LaunchMode.externalApplication,
-                  )) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Could not open update link'),
-                        ),
-                      );
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Later'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final uri = Uri.parse(ServerUpdateService.apkUrl);
+                    if (!await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    )) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open update link'),
+                          ),
+                        );
+                      }
                     }
-                  }
-                },
-                child: const Text('Update'),
-              ),
-            ],
-          ),
-    );
+                  },
+                  child: const Text('Update'),
+                ),
+              ],
+            ),
+      );
+    }
   }
 
   @override
