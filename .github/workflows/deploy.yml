@@ -34,3 +34,19 @@ jobs:
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: ${{ secrets.DEPLOY_PATH }}
           SOURCE: "build/web/"
+
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: Deploy APK via SCP
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no build/app/outputs/flutter-apk/app-x86_64-release.apk ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/clientapps/crm/bizx.apk
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
