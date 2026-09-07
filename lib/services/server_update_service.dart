@@ -33,12 +33,7 @@ class ServerUpdateService {
 
   Future<AppVersion?> fetchVersionInfo() async {
     final uri = Uri.parse('https://$_host$_versionPath');
-    final response = await http.get(
-      uri,
-      headers: {
-        'User-Agent': 'dehus-app',
-      },
-    );
+    final response = await http.get(uri, headers: {'User-Agent': 'dehus-app'});
 
     if (response.statusCode != 200) {
       return null;
@@ -66,7 +61,8 @@ class ServerUpdateService {
     final partsA = a.split('.').map(int.tryParse).whereType<int>().toList();
     final partsB = b.split('.').map(int.tryParse).whereType<int>().toList();
 
-    final maxLen = partsA.length > partsB.length ? partsA.length : partsB.length;
+    final maxLen =
+        partsA.length > partsB.length ? partsA.length : partsB.length;
 
     for (var i = 0; i < maxLen; i++) {
       final valA = i < partsA.length ? partsA[i] : 0;

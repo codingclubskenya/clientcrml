@@ -61,8 +61,10 @@ bool _isPasswordResetLink(Uri uri) {
   if (kIsWeb) {
     return uri.path == '/reset-password';
   }
-  return uri.scheme == 'dehus' && uri.host == 'reset-password'
-      || (uri.scheme == 'https' && uri.host == 'other-ashen.vercel.app' && uri.path == '/reset-password');
+  return uri.scheme == 'dehus' && uri.host == 'reset-password' ||
+      (uri.scheme == 'https' &&
+          uri.host == 'other-ashen.vercel.app' &&
+          uri.path == '/reset-password');
 }
 
 Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
@@ -71,7 +73,7 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     String? code = uri.queryParameters['code'];
     String? accessToken = uri.queryParameters['access_token'];
     String? refreshToken = uri.queryParameters['refresh_token'];
-    
+
     if (uri.fragment.isNotEmpty) {
       final fragmentParams = Uri.splitQueryString(uri.fragment);
       code ??= fragmentParams['code'];
@@ -80,11 +82,12 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     }
 
     return MaterialPageRoute(
-      builder: (_) => ResetPasswordPage(
-        code: code,
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-      ),
+      builder:
+          (_) => ResetPasswordPage(
+            code: code,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          ),
       settings: settings,
     );
   }
@@ -140,7 +143,8 @@ class DeHeusApp extends StatelessWidget {
         '/events/samples': (_) => const EventSamplesPage(),
         '/events/orders': (_) => const EventOrdersPage(),
         '/events/dashboard': (_) => const EventManagerDashboardPage(),
-        '/events/manage-assignments': (_) => const EventAssignmentsManagementPage(),
+        '/events/manage-assignments':
+            (_) => const EventAssignmentsManagementPage(),
         // Catalog & consignments
         '/catalog/products': (_) => const ProductListScreen(),
         '/catalog/products/add': (_) => const AddProductScreen(),
@@ -200,11 +204,11 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
   void _setupDeepLinkListener() {
     _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
       if (!_isPasswordResetLink(uri)) return;
-      
+
       String? code = uri.queryParameters['code'];
       String? accessToken = uri.queryParameters['access_token'];
       String? refreshToken = uri.queryParameters['refresh_token'];
-      
+
       if (uri.fragment.isNotEmpty) {
         final fragmentParams = Uri.splitQueryString(uri.fragment);
         code ??= fragmentParams['code'];
@@ -215,11 +219,12 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       if (mounted) {
         navigatorKey.currentState?.push(
           MaterialPageRoute(
-            builder: (_) => ResetPasswordPage(
-              code: code,
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-            ),
+            builder:
+                (_) => ResetPasswordPage(
+                  code: code,
+                  accessToken: accessToken,
+                  refreshToken: refreshToken,
+                ),
           ),
         );
       }
@@ -238,7 +243,7 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       String? code = initialUri.queryParameters['code'];
       String? accessToken = initialUri.queryParameters['access_token'];
       String? refreshToken = initialUri.queryParameters['refresh_token'];
-      
+
       if (initialUri.fragment.isNotEmpty) {
         final fragmentParams = Uri.splitQueryString(initialUri.fragment);
         code ??= fragmentParams['code'];
@@ -273,7 +278,7 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
     try {
       final userId = session.user.id;
       final metadataRole = session.user.userMetadata?['role']?.toString();
-      
+
       Map<String, dynamic>? userData;
       try {
         userData = await _supabase
@@ -285,7 +290,7 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       } catch (_) {
         // Timeout or network error, silently fallback to metadata
       }
-      
+
       final dbRole = userData?['role'] as int?;
       final resolvedRole =
           dbRole ??
@@ -322,11 +327,8 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       final currentVersion = current.version;
       final currentBuild = current.buildNumber;
 
-      final isNewer = service._compareBuildNumbers(
-            info.buildNumber,
-            currentBuild,
-          ) >
-          0;
+      final isNewer =
+          service._compareBuildNumbers(info.buildNumber, currentBuild) > 0;
 
       if (!isNewer) return;
 
