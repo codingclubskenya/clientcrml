@@ -26,7 +26,15 @@ jobs:
       - name: Build Web Application
         run: flutter build web --release
 
-      - name: Deploy Application
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Deploy Web Application
         run: |
           sudo cp -r build/web/* /var/www/html/bizx/
           sudo systemctl reload nginx
+
+      - name: Deploy APK
+        run: |
+          mkdir -p /home/client/clientapps/crm
+          cp build/app/outputs/flutter-apk/app-release.apk /home/client/clientapps/crm/bizx.apk
