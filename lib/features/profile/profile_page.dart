@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../dashboard/agrovet_onboarding.dart';
 import '../dashboard/contacts_page.dart';
+import '../dashboard/daily_check_in_page.dart';
 import '../dashboard/my_orders_page.dart';
 import '../dashboard/sample_distribution_page.dart';
 import '../dashboard/grounds_quotation_page.dart';
@@ -43,6 +44,7 @@ class _SalesDashboardState extends State<SalesDashboard> {
   List<UserModel> _agents = [];
   List<RegionModel> _regions = [];
   bool _isAssignedToEvent = false;
+  bool _isCheckedIn = false;
 
   @override
   void initState() {
@@ -55,6 +57,24 @@ class _SalesDashboardState extends State<SalesDashboard> {
     });
     _loadUserInfo();
     _checkEventAssignment();
+    _refreshCheckInStatus();
+  }
+
+  Future<void> _refreshCheckInStatus() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final res = await Supabase.instance.client
+          .from('visit_checkins')
+          .select('id')
+          .eq('agent_id', userId)
+          .isFilter('checkout_at', null)
+          .limit(1);
+      if (!mounted) return;
+      setState(() {
+        _isCheckedIn = (res as List).isNotEmpty;
+      });
+    } catch (_) {}
   }
 
   Future<void> _checkEventAssignment() async {
@@ -125,6 +145,43 @@ class _SalesDashboardState extends State<SalesDashboard> {
         SnackBar(content: Text('Failed to assign supervisor: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _showCheckInRequiredMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please check in first to access onboarding.'),
+        backgroundColor: AppColors.accentOrange,
+      ),
+    );
+  }
+
+  Future<void> _openSchoolOnboarding() async {
+    await _refreshCheckInStatus();
+    if (!mounted) return;
+    if (!_isCheckedIn) {
+      _showCheckInRequiredMessage();
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SchoolOnboarding()),
+    );
+  }
+
+  Future<void> _openOnboardTab() async {
+    await _refreshCheckInStatus();
+    if (!mounted) return;
+    if (!_isCheckedIn) {
+      _showCheckInRequiredMessage();
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MyShopsPage()),
+    );
   }
 
   @override
@@ -309,13 +366,11 @@ class _SalesDashboardState extends State<SalesDashboard> {
   Widget _buildQuickActions(BuildContext context) {
     final actions = <_QuickAction>[
       _QuickAction(
-        "Schools",
+        "Onboard",
         Icons.school_outlined,
         AppColors.primaryGreen,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SchoolOnboarding()),
-        ),
+        onTap: _openSchoolOnboarding,
+        enabled: _isCheckedIn,
       ),
       _QuickAction(
         "Samples",
@@ -419,7 +474,13 @@ class _SalesDashboardState extends State<SalesDashboard> {
       itemCount: actions.length,
       itemBuilder: (context, index) {
         final action = actions[index];
-        return _actionBtn(action.label, action.icon, action.color, onTap: action.onTap);
+        return _actionBtn(
+          action.label,
+          action.icon,
+          action.color,
+          onTap: action.onTap,
+          enabled: action.enabled,
+        );
       },
     );
   }
@@ -429,23 +490,64 @@ class _SalesDashboardState extends State<SalesDashboard> {
     IconData icon,
     Color color, {
     required VoidCallback onTap,
+    bool enabled = true,
   }) {
+    final effectiveColor = enabled ? color : Colors.grey;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        if (!enabled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please check in first to access this feature.'),
+              backgroundColor: AppColors.accentOrange,
+            ),
+          );
+          return;
+        }
+        onTap();
+      },
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: color.withValues(alpha: 0.1),
-            child: Icon(icon, color: color, size: 28),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: effectiveColor.withValues(alpha: 0.1),
+                child: Icon(icon, color: effectiveColor, size: 28),
+              ),
+              if (!enabled)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.lock,
+                      size: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+          Expanded(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: enabled ? Colors.black87 : Colors.grey,
+                height: 1.1,
+              ),
             ),
           ),
         ],
@@ -561,6 +663,31 @@ class _SalesDashboardState extends State<SalesDashboard> {
                   ),
                   Row(
                     children: [
+                      IconButton(
+                        icon: Icon(
+                          _isCheckedIn
+                              ? Icons.fingerprint
+                              : Icons.fingerprint_outlined,
+                          color: _isCheckedIn
+                              ? AppColors.accentOrange
+                              : Colors.white,
+                          size: isCompact ? 24 : 28,
+                        ),
+                        tooltip: _isCheckedIn
+                            ? 'On duty — tap to check out / open'
+                            : 'Check in',
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DailyCheckInPage(),
+                            ),
+                          );
+                          if (mounted) {
+                            await _refreshCheckInStatus();
+                          }
+                        },
+                      ),
                       IconButton(
                         icon: Icon(
                           Icons.sync,
@@ -1598,10 +1725,7 @@ class _SalesDashboardState extends State<SalesDashboard> {
             ),
           );
         } else if (index == 2) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyShopsPage()),
-          );
+          _openOnboardTab();
         } else if (index == 3) {
           Navigator.push(
             context,
@@ -1616,21 +1740,54 @@ class _SalesDashboardState extends State<SalesDashboard> {
           );
         }
       },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
-        BottomNavigationBarItem(
+      items: [
+        const BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
+        const BottomNavigationBarItem(
           icon: Icon(Icons.inventory_2_outlined),
           label: "Samples",
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.school), label: "Onboard"),
         BottomNavigationBarItem(
+          icon: _buildOnboardNavIcon(),
+          label: _isCheckedIn ? "Onboard" : "Locked",
+        ),
+        const BottomNavigationBarItem(
           icon: Icon(Icons.notifications_none),
           label: "Alerts",
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.point_of_sale_outlined),
           label: "Pipeline",
         ),
+      ],
+    );
+  }
+
+  Widget _buildOnboardNavIcon() {
+    final locked = !_isCheckedIn;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          Icons.school,
+          color: locked ? Colors.grey : AppColors.primaryGreen,
+        ),
+        if (locked)
+          Positioned(
+            right: -7,
+            top: -7,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.lock_rounded,
+                size: 10,
+                color: AppColors.accentOrange,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1641,6 +1798,13 @@ class _QuickAction {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final bool enabled;
 
-  _QuickAction(this.label, this.icon, this.color, {required this.onTap});
+  _QuickAction(
+    this.label,
+    this.icon,
+    this.color, {
+    required this.onTap,
+    this.enabled = true,
+  });
 }

@@ -133,10 +133,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
-      final redirectTo =
-          kIsWeb
-              ? '${Uri.base.origin}/reset-password'
-              : 'dehus://reset-password';
+      final redirectTo = 'https://other-ashen.vercel.app/reset-password';
       await supabase.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
 
       if (!mounted) return;

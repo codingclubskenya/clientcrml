@@ -180,12 +180,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_supplierId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a supplier')),
-      );
-      return;
-    }
     if (_category == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a category')),
@@ -202,8 +196,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       sku: _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
       description:
           _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-      supplierId: _supplierId!,
-      supplierName: _supplierName!,
+      supplierId: _supplierId,
+      supplierName: _supplierName,
       category: _category!,
       barcode: _barcodeCtrl.text.trim().isEmpty
           ? null
@@ -336,19 +330,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
         const SizedBox(height: 12),
         _dropdownField(
           label: 'Supplier',
-          required: true,
           value: _supplierId,
-          items: _suppliers
-              .map((s) => DropdownMenuItem<String>(
-                    value: s,
-                    child: Text(s, overflow: TextOverflow.ellipsis),
-                  ))
-              .toList(),
+          items: [
+            const DropdownMenuItem<String>(value: null, child: Text('None')),
+            ..._suppliers.map((s) => DropdownMenuItem<String>(
+                  value: s,
+                  child: Text(s, overflow: TextOverflow.ellipsis),
+                )),
+          ],
           onChanged: (v) => setState(() {
             _supplierId = v;
             _supplierName = v;
           }),
-          validator: (v) => v == null ? 'Please select a supplier' : null,
         ),
         const SizedBox(height: 12),
         _dropdownField(

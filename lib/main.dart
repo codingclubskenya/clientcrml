@@ -9,10 +9,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'features/admin/admin_dashboard_page.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/welcome/auth/admin_login_page.dart';
+import 'features/profile/profile_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/constants/bas_dashboard_page.dart';
 import 'core/constants/agent_dashboard_page.dart';
-import 'features/profile/profile_page.dart';
 import 'features/welcome/auth/reset_password_page.dart';
 import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -40,10 +40,12 @@ import 'features/catalog/product_list_screen.dart';
 import 'features/catalog/add_product_screen.dart';
 import 'features/consignments/consignment_list_screen.dart';
 import 'features/consignments/create_consignment_screen.dart';
+import 'services/catalog_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+  await CatalogService.instance.init();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
@@ -58,7 +60,8 @@ bool _isPasswordResetLink(Uri uri) {
   if (kIsWeb) {
     return uri.path == '/reset-password';
   }
-  return uri.scheme == 'dehus' && uri.host == 'reset-password';
+  return uri.scheme == 'dehus' && uri.host == 'reset-password'
+      || (uri.scheme == 'https' && uri.host == 'other-ashen.vercel.app' && uri.path == '/reset-password');
 }
 
 Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
@@ -85,6 +88,23 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     );
   }
   return null;
+}
+
+Widget _dashboardForRole(int? role) {
+  switch (role) {
+    case 1:
+      return const AdminDashboardPage();
+    case 2:
+      return const AdminDashboardScreen();
+    case 3:
+      return const BasDashboardPage();
+    case 4:
+      return const AgentDashboardPage();
+    case 5:
+      return const SalesDashboard();
+    default:
+      return const WelcomePage();
+  }
 }
 
 class DeHeusApp extends StatelessWidget {
@@ -269,20 +289,11 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       final resolvedRole =
           dbRole ??
           int.tryParse(metadataRole ?? '') ??
-          (metadataRole?.toLowerCase() == 'admin' ? 1 : null) ??
-          5;
-
-      Widget destination;
-      // Roles 1-4 are admin area, role 5 is field agent
-      if (resolvedRole == 5) {
-        destination = const AgentDashboardPage();
-      } else {
-        destination = const AdminDashboardPage();
-      }
+          (metadataRole?.toLowerCase() == 'admin' ? 1 : null);
 
       if (!mounted) return;
       setState(() {
-        _destination = destination;
+        _destination = _dashboardForRole(resolvedRole);
         _loading = false;
       });
       _checkForUpdate();

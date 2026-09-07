@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import '../../core/constants/colors.dart';
 import '../../models/consignment_model.dart';
+import '../../models/user_model.dart';
 import '../../services/catalog_service.dart';
 import '../consignments/consignment_list_screen.dart';
 
@@ -21,6 +22,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
   List<Map<String, dynamic>> _availableOrders = [];
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _sales = [];
+  UserModel? _currentUserModel;
   bool _loading = true;
 
   String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
@@ -29,14 +31,30 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   CatalogService get _catalog => CatalogService.instance;
 
+  String _consignmentStatusLabel(ConsignmentStatus status) {
+    switch (status) {
+      case ConsignmentStatus.pending:
+        return 'Pending';
+      case ConsignmentStatus.active:
+        return 'Active';
+      case ConsignmentStatus.completed:
+        return 'Completed';
+      case ConsignmentStatus.cancelled:
+        return 'Cancelled';
+    }
+  }
+
   /// Best-effort display name for the current user. Used as the
   /// business-associate key when validating stock against the
   /// local consignment service.
+  String? get _currentBusinessAssociateId =>
+      _currentUserModel?.id ?? _supabase.auth.currentUser?.id;
+
   String? get _currentBusinessAssociate {
     final user = _supabase.auth.currentUser;
-    final meta = user?.userMetadata;
-    final name = meta?['full_name']?.toString() ??
-        meta?['name']?.toString() ??
+    final name = _currentUserModel?.fullName ??
+        user?.userMetadata?['full_name']?.toString() ??
+        user?.userMetadata?['name']?.toString() ??
         user?.email?.split('@').first;
     return (name == null || name.isEmpty) ? null : name;
   }
@@ -63,11 +81,16 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     if (id == null) return;
     setState(() => _loading = true);
     try {
+      final currentUser = _supabase.auth.currentUser;
+      final currentUserModel = currentUser == null
+          ? null
+          : await _dbService.getUser(currentUser.id);
       final orders = await _dbService.getEventOrders(id);
       final available = await _getAvailableOrders(id);
       final products = await _loadProducts();
       final sales = await _loadSales(id);
       setState(() {
+        _currentUserModel = currentUserModel;
         _eventOrders = orders;
         _availableOrders = available;
         _products = products;
@@ -132,7 +155,14 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
           .order('sold_at', ascending: false);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
-      debugPrint('Error loading sales: $e');
+      if (e is PostgrestException && e.code == 'PGRST205') {
+        debugPrint(
+          'event_sales table is missing from the current Supabase schema. '
+          'Apply supabase/schema_updates_event_sales.sql.',
+        );
+      } else {
+        debugPrint('Error loading sales: $e');
+      }
       return <Map<String, dynamic>>[];
     }
   }
@@ -220,22 +250,32 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       return;
     }
 
-    // Filter to products that still have stock in the shared catalog.
+    final sellerId = _currentBusinessAssociateId;
+    final sellerName = _currentBusinessAssociate;
+    final sellerLabel = sellerName ?? sellerId;
+
+    // Filter to products that are both in stock and still allocated
+    // to the current seller's consignment.
     final sellable = _products.where((p) {
       final id = p['id']?.toString() ?? '';
       if (id.isEmpty) return false;
       final stock = p['current_stock'];
       if (stock is num && stock <= 0) return false;
       final live = _catalog.productById(id);
-      if (live == null) return false;
-      return live.currentStock > 0;
+      if (live == null || live.currentStock <= 0) return false;
+      final remaining = _catalog.remainingAllocationFor(
+        businessAssociateId: sellerId,
+        businessAssociateName: sellerName,
+        productId: id,
+      );
+      return remaining > 0;
     }).toList();
 
     if (sellable.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No products with available stock. Assign a consignment first.',
+            'No products are assigned to your consignment yet.',
           ),
         ),
       );
@@ -247,7 +287,6 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     final amountController = TextEditingController();
     String paymentMethod = 'cash';
     final notesController = TextEditingController();
-    final ba = _currentBusinessAssociate;
     bool oversellWarning = false;
 
     final result = await showDialog<bool>(
@@ -255,12 +294,19 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           int? remainingForSelected() {
-            if (ba == null || selectedProductId == null) return null;
-            final alloc = _catalog.activeAllocationFor(
-              businessAssociate: ba,
+            if (selectedProductId == null) return null;
+            if (sellerId == null && sellerName == null) return null;
+            return _catalog.remainingAllocationFor(
+              businessAssociateId: sellerId,
+              businessAssociateName: sellerName,
               productId: selectedProductId!,
             );
-            return alloc?.unitsRemaining;
+          }
+
+          void recomputeOversellWarning() {
+            final r = remainingForSelected();
+            final qty = int.tryParse(quantityController.text) ?? 0;
+            oversellWarning = r != null && qty > r;
           }
 
           void recomputeAmount() {
@@ -287,7 +333,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (ba != null)
+                  if (sellerLabel != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(
@@ -303,7 +349,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'Linked to consignment for: $ba',
+                              'Linked to consignment for: $sellerLabel',
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.green),
                             ),
@@ -339,6 +385,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                         selectedProductId = val;
                         oversellWarning = false;
                         recomputeAmount();
+                        recomputeOversellWarning();
                       });
                     },
                   ),
@@ -353,17 +400,15 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                         return 'Consignment remaining: $r';
                       })(),
                       errorText: oversellWarning
-                          ? 'Exceeds your consignment allocation'
+                          ? 'Exceeds available consignment allocation'
                           : null,
                       border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
                       setDialogState(() {
-                        final r = remainingForSelected();
-                        final qty = int.tryParse(val) ?? 0;
-                        oversellWarning = r != null && qty > r;
                         recomputeAmount();
+                        recomputeOversellWarning();
                       });
                     },
                   ),
@@ -446,12 +491,12 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
         paymentMethod,
         notesController.text.trim(),
       );
-      if (!updated && ba != null) {
+      if (!updated && sellerLabel != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Sale not recorded: exceeds your consignment allocation.',
+                'Sale not recorded: exceeds available consignment allocation.',
               ),
             ),
           );
@@ -462,8 +507,8 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   /// Returns `true` if the sale was successfully recorded against
   /// the user's consignment allocation and Supabase. When the user
-  /// has no active consignment for the product, the Supabase insert
-  /// is still attempted but no local stock is decremented.
+  /// has no active consignment for the product, or the requested
+  /// quantity exceeds the remaining allocation, the sale is rejected.
   Future<bool> _recordSale(
     String productId,
     int quantity,
@@ -474,16 +519,19 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     final eventId = _eventId;
     if (eventId == null) return false;
 
-    final ba = _currentBusinessAssociate;
-    final consignmentUpdated = ba != null
+    final sellerId = _currentBusinessAssociateId;
+    final sellerName = _currentBusinessAssociate;
+    final hasSeller = sellerId != null || sellerName != null;
+    final consignmentUpdated = hasSeller
         ? _catalog.recordSale(
-            businessAssociate: ba,
+            businessAssociateId: sellerId,
+            businessAssociateName: sellerName,
             productId: productId,
             units: quantity,
           )
         : null;
 
-    if (ba != null && consignmentUpdated == null) {
+    if (hasSeller && consignmentUpdated == null) {
       // Allocation missing or insufficient. Bail out before writing
       // to Supabase so the rest of the system stays consistent.
       return false;
@@ -510,6 +558,18 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       _load();
       return true;
     } catch (e) {
+      if (e is PostgrestException && e.code == 'PGRST205') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Sales table is not set up yet. Apply the event_sales migration.',
+              ),
+            ),
+          );
+        }
+        return false;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to record sale: $e')),
@@ -735,12 +795,14 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   List<Widget> _buildConsignmentChildren() {
     final ba = _currentBusinessAssociate;
-    final consignments = ba == null
-        ? <dynamic>[]
+    final List<Consignment> consignments = ba == null
+        ? <Consignment>[]
         : _catalog.consignments
             .where((c) =>
-                c.businessAssociateName == ba &&
-                c.status.label != 'Cancelled')
+                (c.businessAssociateId == _currentBusinessAssociateId ||
+                    c.businessAssociateName.trim().toLowerCase() ==
+                        ba.trim().toLowerCase()) &&
+                c.status != ConsignmentStatus.cancelled)
             .toList();
 
     if (consignments.isEmpty) {
@@ -790,7 +852,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                  Text('${c.status.label}',
+                  Text(_consignmentStatusLabel(c.status),
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.primaryGreen)),
                 ],

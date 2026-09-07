@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/consignment_item_model.dart';
 import '../models/consignment_model.dart';
 import '../models/product_model.dart';
@@ -24,6 +25,91 @@ class CatalogService extends ChangeNotifier {
   final List<Product> _products = [];
   final List<Consignment> _consignments = [];
 
+  // Tracks whether persisted state has been loaded into memory.
+  bool _initialized = false;
+  bool get isInitialized => _initialized;
+
+  static const String _kBoxName = 'catalog_products_box';
+  static const String _kProductsKey = 'products';
+  static const String _kConsignmentsKey = 'consignments';
+  static const String _kSeededKey = 'seeded';
+
+  /// Loads the product catalog from the Hive local cache. On the very first
+  /// run (no cached data yet) the seed products are written through so that
+  /// subsequent launches restore the exact state the user sees instead of
+  /// re-seeding defaults (which is what previously caused added products to
+  /// vanish and deleted products to reappear after an app restart).
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      final box = await Hive.openBox(_kBoxName);
+      final seeded = box.get(_kSeededKey) == true;
+      if (seeded) {
+        // Restore persisted state. The list may legitimately be empty if the
+        // user removed every product, so we must NOT re-seed in that case.
+        _products.clear();
+        final stored = box.get(_kProductsKey);
+        if (stored is List) {
+          _products.addAll(
+            stored
+                .map((e) => Product.fromMap(Map<String, dynamic>.from(e)))
+                .toList(),
+          );
+        }
+        _consignments.clear();
+        final storedConsignments = box.get(_kConsignmentsKey);
+        if (storedConsignments is List) {
+          _consignments.addAll(
+            storedConsignments
+                .map((e) => Consignment.fromMap(Map<String, dynamic>.from(e)))
+                .toList(),
+          );
+        } else {
+          await _persistConsignments(box);
+        }
+      } else {
+        // First run: persist the seeded defaults so future launches load
+        // from disk instead of re-seeding.
+        await _persistProducts(box);
+        await _persistConsignments(box);
+        await box.put(_kSeededKey, true);
+      }
+      notifyListeners();
+    } catch (e, st) {
+      debugPrint('CatalogService.init failed: $e\n$st');
+    }
+  }
+
+  Future<Box<dynamic>> _openBox() async {
+    if (_initialized) return Hive.box(_kBoxName);
+    return Hive.openBox(_kBoxName);
+  }
+
+  Future<void> _persistProducts([Box<dynamic>? box]) async {
+    try {
+      box ??= await _openBox();
+      await box.put(
+        _kProductsKey,
+        _products.map((p) => p.toMap()).toList(),
+      );
+    } catch (e, st) {
+      debugPrint('CatalogService._persistProducts failed: $e\n$st');
+    }
+  }
+
+  Future<void> _persistConsignments([Box<dynamic>? box]) async {
+    try {
+      box ??= await _openBox();
+      await box.put(
+        _kConsignmentsKey,
+        _consignments.map((c) => c.toMap()).toList(),
+      );
+    } catch (e, st) {
+      debugPrint('CatalogService._persistConsignments failed: $e\n$st');
+    }
+  }
+
   // --- Products -------------------------------------------------------------
 
   List<Product> get products => List.unmodifiable(_products);
@@ -37,6 +123,7 @@ class CatalogService extends ChangeNotifier {
 
   void addProduct(Product product) {
     _products.add(product);
+    _persistProducts();
     notifyListeners();
   }
 
@@ -49,6 +136,7 @@ class CatalogService extends ChangeNotifier {
     } else {
       _products[idx] = product;
     }
+    _persistProducts();
     notifyListeners();
   }
 
@@ -57,6 +145,8 @@ class CatalogService extends ChangeNotifier {
     for (final c in _consignments) {
       c.items.removeWhere((i) => i.product.id == id);
     }
+    _persistProducts();
+    _persistConsignments();
     notifyListeners();
   }
 
@@ -70,6 +160,7 @@ class CatalogService extends ChangeNotifier {
     if (units <= 0) return p;
     if (p.currentStock < units) return null;
     _products[idx] = p.copyWith(currentStock: p.currentStock - units);
+    _persistProducts();
     notifyListeners();
     return _products[idx];
   }
@@ -87,6 +178,7 @@ class CatalogService extends ChangeNotifier {
 
   void addConsignment(Consignment c) {
     _consignments.insert(0, c);
+    _persistConsignments();
     notifyListeners();
   }
 
@@ -96,7 +188,8 @@ class CatalogService extends ChangeNotifier {
   List<String> get suppliers {
     final set = <String>{};
     for (final p in _products) {
-      if (p.supplierName.trim().isNotEmpty) set.add(p.supplierName);
+      final name = p.supplierName;
+      if (name != null && name.trim().isNotEmpty) set.add(name);
     }
     final list = set.toList()..sort();
     return List.unmodifiable(list);
@@ -186,15 +279,37 @@ class CatalogService extends ChangeNotifier {
     return List.unmodifiable(list);
   }
 
+  String _normalizedKey(String? value) => value?.trim().toLowerCase() ?? '';
+
+  bool _matchesBusinessAssociate(
+    Consignment consignment, {
+    String? businessAssociateId,
+    String? businessAssociateName,
+  }) {
+    final targetId = _normalizedKey(businessAssociateId);
+    final targetName = _normalizedKey(businessAssociateName);
+    return (targetId.isNotEmpty &&
+            _normalizedKey(consignment.businessAssociateId) == targetId) ||
+        (targetName.isNotEmpty &&
+            _normalizedKey(consignment.businessAssociateName) == targetName);
+  }
+
   /// Returns the latest active or pending consignment for [businessAssociate]
   /// that contains the given [productId], or `null` if none exists.
   ConsignmentItem? activeAllocationFor({
-    required String businessAssociate,
+    String? businessAssociateId,
+    String? businessAssociateName,
     required String productId,
   }) {
     ConsignmentItem? best;
     for (final c in _consignments) {
-      if (c.businessAssociateName != businessAssociate) continue;
+      if (!_matchesBusinessAssociate(
+        c,
+        businessAssociateId: businessAssociateId,
+        businessAssociateName: businessAssociateName,
+      )) {
+        continue;
+      }
       if (c.status == ConsignmentStatus.cancelled ||
           c.status == ConsignmentStatus.completed) {
         continue;
@@ -209,41 +324,105 @@ class CatalogService extends ChangeNotifier {
     return best;
   }
 
+  List<ConsignmentItem> _activeAllocationsFor({
+    String? businessAssociateId,
+    String? businessAssociateName,
+    required String productId,
+  }) {
+    final allocations = <ConsignmentItem>[];
+    for (final c in _consignments) {
+      if (!_matchesBusinessAssociate(
+        c,
+        businessAssociateId: businessAssociateId,
+        businessAssociateName: businessAssociateName,
+      )) {
+        continue;
+      }
+      if (c.status == ConsignmentStatus.cancelled ||
+          c.status == ConsignmentStatus.completed) {
+        continue;
+      }
+      for (final item in c.items) {
+        if (item.product.id != productId) continue;
+        if (item.unitsRemaining <= 0) continue;
+        allocations.add(item);
+      }
+    }
+    return allocations;
+  }
+
+  int remainingAllocationFor({
+    String? businessAssociateId,
+    String? businessAssociateName,
+    required String productId,
+  }) {
+    return _activeAllocationsFor(
+      businessAssociateId: businessAssociateId,
+      businessAssociateName: businessAssociateName,
+      productId: productId,
+    ).fold(0, (sum, item) => sum + item.unitsRemaining);
+  }
+
   /// Records [units] sold from the consignment that allocated [productId]
   /// to [businessAssociate]. Decrements [ConsignmentItem.unitsSold] and
   /// [Product.currentStock]. Returns the updated [ConsignmentItem] on
   /// success or `null` if the consignment has no remaining units for the
   /// product.
   ConsignmentItem? recordSale({
-    required String businessAssociate,
+    String? businessAssociateId,
+    String? businessAssociateName,
     required String productId,
     required int units,
   }) {
     if (units <= 0) return null;
-    final allocation = activeAllocationFor(
-      businessAssociate: businessAssociate,
+    final allocations = _activeAllocationsFor(
+      businessAssociateId: businessAssociateId,
+      businessAssociateName: businessAssociateName,
       productId: productId,
     );
-    if (allocation == null || allocation.unitsRemaining < units) {
+    final totalRemaining = allocations.fold(
+      0,
+      (sum, item) => sum + item.unitsRemaining,
+    );
+    if (allocations.isEmpty || totalRemaining < units) {
       return null;
     }
+
     final stockResult = consumeStock(productId, units);
     if (stockResult == null) return null;
-    allocation.unitsSold += units;
+
+    var remaining = units;
+    for (final allocation in allocations) {
+      if (remaining <= 0) break;
+      final take = remaining < allocation.unitsRemaining
+          ? remaining
+          : allocation.unitsRemaining;
+      allocation.unitsSold += take;
+      remaining -= take;
+    }
+
+    _persistConsignments();
     notifyListeners();
-    return allocation;
+    return allocations.first;
   }
 
   /// Returns the total units sold across every active consignment for
   /// [businessAssociate] + [productId]. Used by the event orders page
   /// to display how much of the BA's allocation is consumed.
   int totalUnitsSold({
-    required String businessAssociate,
+    String? businessAssociateId,
+    String? businessAssociateName,
     required String productId,
   }) {
     int total = 0;
     for (final c in _consignments) {
-      if (c.businessAssociateName != businessAssociate) continue;
+      if (!_matchesBusinessAssociate(
+        c,
+        businessAssociateId: businessAssociateId,
+        businessAssociateName: businessAssociateName,
+      )) {
+        continue;
+      }
       for (final i in c.items) {
         if (i.product.id == productId) total += i.unitsSold;
       }

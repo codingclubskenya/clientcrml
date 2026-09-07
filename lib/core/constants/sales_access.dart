@@ -5,12 +5,12 @@ class SalesAccess {
 
   static bool canEditSalesFlow(int? role) {
     if (role == null) return false;
-    return role == 1 || role == 2 || role == 4 || role == 5;
+    return role == 1 || role == 2 || role == 3 || role == 4 || role == 5;
   }
 
   static bool canCheckout(int? role) {
     if (role == null) return false;
-    return role == 1 || role == 4 || role == 5;
+    return role == 1 || role == 3 || role == 4 || role == 5;
   }
 
   static bool canFinishPendingOrder(int? role) {

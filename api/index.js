@@ -634,7 +634,7 @@ ${reportContext}`;
 // AI Chat proxy - forwards requests to OpenRouter API
 app.post("/api/ai/chat", async (req, res) => {
   try {
-    const { messages, context } = req.body;
+    let { messages, context } = req.body;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
 
     if (!openRouterKey) {
@@ -643,9 +643,22 @@ app.post("/api/ai/chat", async (req, res) => {
         .json({ error: "OpenRouter API key not configured on server" });
     }
 
+    if (!context) {
+      try {
+        const [sales, pipeline, agents] = await Promise.all([
+          REPORT_QUERIES.sales_summary({}),
+          REPORT_QUERIES.pipeline_analysis({}),
+          REPORT_QUERIES.agent_performance({})
+        ]);
+        context = JSON.stringify({ sales, pipeline, agents });
+      } catch (err) {
+        console.error("Auto context fetch failed:", err);
+      }
+    }
+
     const systemPrompt = context
       ? `${DB_SCHEMA_PROMPT}\n\nYou are analyzing the following performance data. Answer questions about it accurately using your schema knowledge.\n\nPerformance Context:\n${context}`
-      : DB_SCHEMA_PROMPT;
+      : `${DB_SCHEMA_PROMPT}\n\nYou are a helpful AI assistant. You don't have access to live data right now, so please explain that to the user instead of listing the database schema.`;
 
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",

@@ -3,8 +3,8 @@ class Product {
   final String name;
   final String? sku;
   final String? description;
-  final String supplierId;
-  final String supplierName;
+  final String? supplierId;
+  final String? supplierName;
   final String category;
   final String? barcode;
   final double unitPrice;
@@ -31,8 +31,8 @@ class Product {
     required this.name,
     this.sku,
     this.description,
-    required this.supplierId,
-    required this.supplierName,
+    this.supplierId,
+    this.supplierName,
     required this.category,
     this.barcode,
     required this.unitPrice,
@@ -57,6 +57,76 @@ class Product {
   bool get isOutOfStock => currentStock <= 0;
 
   bool get isBook => category.toLowerCase() == 'books';
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'sku': sku,
+        'description': description,
+        'supplierId': supplierId,
+        'supplierName': supplierName,
+        'category': category,
+        'barcode': barcode,
+        'unitPrice': unitPrice,
+        'wholesalePrice': wholesalePrice,
+        'unit': unit,
+        'currentStock': currentStock,
+        'minStock': minStock,
+        'maxStock': maxStock,
+        'imageUrl': imageUrl,
+        'isActive': isActive,
+        'author': author,
+        'publisher': publisher,
+        'isbn': isbn,
+        'edition': edition,
+        'gradeLevel': gradeLevel,
+        'subject': subject,
+        'language': language,
+        'pageCount': pageCount,
+      };
+
+  factory Product.fromMap(Map<dynamic, dynamic> map) => Product(
+        id: (map['id'] ?? '').toString(),
+        name: (map['name'] ?? '').toString(),
+        sku: _optStr(map['sku']),
+        description: _optStr(map['description']),
+        supplierId: _optStr(map['supplierId']),
+        supplierName: _optStr(map['supplierName']),
+        category: (map['category'] ?? '').toString(),
+        barcode: _optStr(map['barcode']),
+        unitPrice: _parseDouble(map['unitPrice']),
+        wholesalePrice: _parseDouble(map['wholesalePrice']),
+        unit: (map['unit'] ?? '').toString(),
+        currentStock: _parseInt(map['currentStock']),
+        minStock: _parseInt(map['minStock']),
+        maxStock: _parseInt(map['maxStock']),
+        imageUrl: _optStr(map['imageUrl']),
+        isActive: map['isActive'] == true,
+        author: _optStr(map['author']),
+        publisher: _optStr(map['publisher']),
+        isbn: _optStr(map['isbn']),
+        edition: _optStr(map['edition']),
+        gradeLevel: _optStr(map['gradeLevel']),
+        subject: _optStr(map['subject']),
+        language: _optStr(map['language']),
+        pageCount: _parseInt(map['pageCount']),
+      );
+
+  static String? _optStr(dynamic v) =>
+      v == null ? null : v.toString().isEmpty ? null : v.toString();
+
+  static double _parseDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    return 0.0;
+  }
+
+  static int _parseInt(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
 
   Product copyWith({
     String? id,

@@ -63,22 +63,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _taskTimeFilter = 'All'; // 'All', 'Daily', 'Weekly', 'Monthly'
   String _taskStatusFilter = 'All'; // 'All', 'Open', 'In Progress', 'Closed'
   bool _isSidebarExpanded = true;
+  int? _currentRole;
 
   @override
   void initState() {
     super.initState();
-    _dashboardFuture = Future.value(const _AdminDashboardData(
-      users: <UserModel>[],
-      schools: <SchoolModel>[],
-      tasks: <TaskModel>[],
-      routePlans: <Map<String, dynamic>>[],
-      geofences: <Map<String, dynamic>>[],
-    ));
+    _dashboardFuture = Future.value(
+      const _AdminDashboardData(
+        users: <UserModel>[],
+        schools: <SchoolModel>[],
+        tasks: <TaskModel>[],
+        routePlans: <Map<String, dynamic>>[],
+        geofences: <Map<String, dynamic>>[],
+      ),
+    );
     _enforceRoleAndLoad();
   }
 
   Future<void> _enforceRoleAndLoad() async {
     final role = await _dbService.getCurrentUserRole();
+    if (mounted) {
+      setState(() {
+        _currentRole = role;
+      });
+    }
     // Roles 1-4 can access admin area; role 5 is field agent
     if (role == 5 && mounted) {
       Navigator.pushAndRemoveUntil(
@@ -904,426 +912,249 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.only(bottom: 8),
               children: [
+                _buildSidebarSection(
+                  'Overview',
+                  isCollapsed: isCollapsed,
+                  isFirst: true,
+                ),
                 _buildSidebarItem(context, Icons.dashboard, 'Dashboard', () {
                   if (!isDesktop) {
                     Navigator.pop(context);
                   }
                 }, isCollapsed: isCollapsed),
+                // TODO: Not to be accessible for admin role 1
+                if (_currentRole != 1)
                 _buildSidebarItem(
                   context,
                   Icons.insights_outlined,
                   'Individual Performance',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => const AdminIndividualPerformancePage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(context, Icons.public, 'Regions', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
+                  () => _openFromSidebar(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const RegionsPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.manage_accounts, 'Manage Regions', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RegionsManagementPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.track_changes, 'Targets', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TargetsPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.insights, 'Performance', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TargetPerformancePage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.smart_toy, 'AI Assistant', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AiAssistantPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.event, 'Events', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EventsListPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                _buildSidebarItem(context, Icons.analytics, 'Event Dashboard', () {
-                  if (MediaQuery.of(context).size.width < 800) {
-                    Navigator.pop(context);
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EventManagerDashboardPage(),
-                    ),
-                  );
-                }, isCollapsed: isCollapsed),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  child: Text(
-                    'CATALOG',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.1,
-                      color: AppColors.textMuted,
-                    ),
+                    const AdminIndividualPerformancePage(),
                   ),
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.inventory_2_outlined,
-                  'Product Catalog',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProductListScreen(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.local_shipping_outlined,
-                  'Stock Assignments',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ConsignmentListScreen(),
-                      ),
-                    );
-                  },
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
                   Icons.analytics_outlined,
                   'Analytics',
-                  () async {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AnalyticsPage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(context, const AnalyticsPage()),
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
-                  Icons.upload_file,
-                  'Import Catalog',
-                  () async {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CatalogImportPage(),
-                      ),
-                    );
-                    _refreshDashboard();
-                  },
+                  Icons.smart_toy,
+                  'AI Assistant',
+                  () => _openFromSidebar(context, const AiAssistantPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection('Team', isCollapsed: isCollapsed),
+                _buildSidebarItem(
+                  context,
+                  Icons.people_outline,
+                  'Team Directory',
+                  () => _openFromSidebar(context, const UsersListPage()),
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
                   Icons.chat_bubble_outline,
                   'Messages',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MessagesPage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(context, const MessagesPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                // TODO: Not to be accessible for admin role 1
+                if (_currentRole != 1)
+                _buildSidebarItem(
+                  context,
+                  Icons.public,
+                  'Regions',
+                  () => _openFromSidebar(context, const RegionsPage()),
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
-                  Icons.people_outline,
-                  'Team Directory',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const UsersListPage(),
-                      ),
-                    );
-                  },
+                  Icons.manage_accounts,
+                  'Manage Regions',
+                  () =>
+                      _openFromSidebar(context, const RegionsManagementPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.track_changes,
+                  'Targets',
+                  () => _openFromSidebar(context, const TargetsPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.insights,
+                  'Performance',
+                  () =>
+                      _openFromSidebar(context, const TargetPerformancePage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection('Catalog', isCollapsed: isCollapsed),
+                _buildSidebarItem(
+                  context,
+                  Icons.inventory_2_outlined,
+                  'Product Catalog',
+                  () => _openFromSidebar(context, const ProductListScreen()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.upload_file,
+                  'Import Catalog',
+                  () => _openFromSidebar(
+                    context,
+                    const CatalogImportPage(),
+                    refreshAfter: true,
+                  ),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.local_shipping_outlined,
+                  'Stock Assignments',
+                  () =>
+                      _openFromSidebar(context, const ConsignmentListScreen()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection(
+                  'Schools & Field',
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
                   Icons.school_outlined,
                   'User Schools',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const UserSchoolOnboardingPage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(
+                    context,
+                    const UserSchoolOnboardingPage(),
+                  ),
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
                   Icons.local_shipping_outlined,
                   'Assign Delivery',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AssignBooksPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.receipt_long_outlined,
-                  'Sample Receipts',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SampleReceiptsPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.playlist_add_check_circle_outlined,
-                  'Sample Requests',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminSampleRequestsPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.shopping_bag_outlined,
-                  'Orders & Items',
-                  () async {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MyOrdersPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.inventory_2_outlined,
-                  'Manage Sample',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SampleDistributionPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.table_chart_outlined,
-                  'CRM Workspace',
-                  () async {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminCrmPage(),
-                      ),
-                    );
-                    _refreshDashboard();
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.account_tree_outlined,
-                  'Pipeline Data',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminPipelineDataPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.assignment_outlined,
-                  'Project',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProjectFormBuilderPage(),
-                      ),
-                    );
-                  },
-                  isCollapsed: isCollapsed,
-                ),
-                _buildSidebarItem(
-                  context,
-                  Icons.fact_check_outlined,
-                  'Project Responses',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProjectFormResponsesPage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(context, const AssignBooksPage()),
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
                   Icons.route_outlined,
                   'Route Planner',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Role2RoutePlanPage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(context, const Role2RoutePlanPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection(
+                  'Samples & Orders',
                   isCollapsed: isCollapsed,
                 ),
                 _buildSidebarItem(
                   context,
+                  Icons.playlist_add_check_circle_outlined,
+                  'Sample Requests',
+                  () => _openFromSidebar(
+                    context,
+                    const AdminSampleRequestsPage(),
+                  ),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.receipt_long_outlined,
+                  'Sample Receipts',
+                  () => _openFromSidebar(context, const SampleReceiptsPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.inventory_2_outlined,
+                  'Manage Sample',
+                  () =>
+                      _openFromSidebar(context, const SampleDistributionPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.shopping_bag_outlined,
+                  'Orders & Items',
+                  () => _openFromSidebar(context, const MyOrdersPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection('CRM', isCollapsed: isCollapsed),
+                _buildSidebarItem(
+                  context,
+                  Icons.table_chart_outlined,
+                  'CRM Workspace',
+                  () => _openFromSidebar(
+                    context,
+                    const AdminCrmPage(),
+                    refreshAfter: true,
+                  ),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.account_tree_outlined,
+                  'Pipeline Data',
+                  () =>
+                      _openFromSidebar(context, const AdminPipelineDataPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                // TODO: Not to be accessible for admin role 1
+                if (_currentRole != 1)
+                _buildSidebarItem(
+                  context,
                   Icons.campaign_outlined,
                   'FB & WhatsApp Pipeline',
-                  () {
-                    if (MediaQuery.of(context).size.width < 800) {
-                      Navigator.pop(context);
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminSocialPipelinePage(),
-                      ),
-                    );
-                  },
+                  () => _openFromSidebar(
+                    context,
+                    const AdminSocialPipelinePage(),
+                  ),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection('Events', isCollapsed: isCollapsed),
+                _buildSidebarItem(
+                  context,
+                  Icons.event,
+                  'Events',
+                  () => _openFromSidebar(context, const EventsListPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.analytics,
+                  'Event Dashboard',
+                  () => _openFromSidebar(
+                    context,
+                    const EventManagerDashboardPage(),
+                  ),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarSection('surveys', isCollapsed: isCollapsed),
+                _buildSidebarItem(
+                  context,
+                  Icons.assignment_outlined,
+                  'Project',
+                  () =>
+                      _openFromSidebar(context, const ProjectFormBuilderPage()),
+                  isCollapsed: isCollapsed,
+                ),
+                _buildSidebarItem(
+                  context,
+                  Icons.fact_check_outlined,
+                  'Project Responses',
+                  () => _openFromSidebar(
+                    context,
+                    const ProjectFormResponsesPage(),
+                  ),
                   isCollapsed: isCollapsed,
                 ),
               ],
@@ -1368,6 +1199,48 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       hoverColor: Colors.white.withValues(alpha: 0.1),
       dense: isCollapsed,
     );
+  }
+
+  Widget _buildSidebarSection(
+    String title, {
+    required bool isCollapsed,
+    bool isFirst = false,
+  }) {
+    if (isCollapsed) {
+      return SizedBox(height: isFirst ? 12 : 18);
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, isFirst ? 16 : 20, 20, 8),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+  }
+
+  void _openFromSidebar(
+    BuildContext context,
+    Widget page, {
+    bool refreshAfter = false,
+  }) {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
+
+    if (!isDesktop && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+
+    navigator.push(MaterialPageRoute(builder: (_) => page)).then((_) {
+      if (refreshAfter && mounted) {
+        _refreshDashboard();
+      }
+    });
   }
 
   Widget _buildSchoolsMap(

@@ -15,10 +15,10 @@ void main() {
     expect(SalesAccess.isViewOnly(2), isFalse);
   });
 
-  test('bas role is view only', () {
-    expect(SalesAccess.canEditSalesFlow(3), isFalse);
-    expect(SalesAccess.canCheckout(3), isFalse);
-    expect(SalesAccess.isViewOnly(3), isTrue);
+  test('bas role can edit and checkout', () {
+    expect(SalesAccess.canEditSalesFlow(3), isTrue);
+    expect(SalesAccess.canCheckout(3), isTrue);
+    expect(SalesAccess.isViewOnly(3), isFalse);
   });
 
   test('field roles can edit and checkout', () {

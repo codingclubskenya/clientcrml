@@ -4,7 +4,10 @@ import 'package:uuid/uuid.dart';
 import '../../models/consignment_item_model.dart';
 import '../../models/consignment_model.dart';
 import '../../models/product_model.dart';
+import '../../models/user_model.dart';
 import '../../services/catalog_service.dart';
+import '../../features/database/database_service.dart';
+import 'product_selection_page.dart';
 import '../catalog/catalog_theme.dart';
 
 class CreateConsignmentScreen extends StatefulWidget {
@@ -23,20 +26,25 @@ class CreateConsignmentScreen extends StatefulWidget {
 }
 
 class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
+  static const _addNewBaId = '__add_new_ba__';
+
   final _service = CatalogService.instance;
+  final _db = DatabaseService();
 
   final List<_DraftItem> _items = [];
   final _notesCtrl = TextEditingController();
   final _newBaCtrl = TextEditingController();
   String? _selectedBa;
+  UserModel? _selectedUser;
   bool _submitting = false;
   bool _addingNewBa = false;
-  final Set<String> _selectedProductIds = {};
+  late Future<List<UserModel>> _usersFuture;
 
   @override
   void initState() {
     super.initState();
     _service.addListener(_onServiceChanged);
+    _usersFuture = _db.getAllUsers();
   }
 
   @override
@@ -74,8 +82,76 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
     _service.addBusinessAssociate(name);
     setState(() {
       _selectedBa = name;
+      _selectedUser = UserModel(id: name, email: '', fullName: name, role: 5);
       _addingNewBa = false;
       _newBaCtrl.clear();
+    });
+  }
+
+  /// Stable, de-duplicated list for the BA dropdown. Synthesized BA
+  /// entries are keyed by name so rebuilds can match the selected value.
+  List<UserModel> _buildDisplayUsers(List<UserModel> dbUsers) {
+    final byId = <String, UserModel>{};
+    for (final name in _businessAssociates) {
+      if (name.trim().isEmpty) continue;
+      byId.putIfAbsent(
+        name,
+        () => UserModel(id: name, email: '', fullName: name, role: 5),
+      );
+    }
+    for (final user in dbUsers) {
+      final label = user.fullName ?? user.email;
+      if (_businessAssociates.contains(label)) continue;
+      byId.putIfAbsent(user.id, () => user);
+    }
+    final list = byId.values.toList()
+      ..sort((a, b) => (a.fullName ?? a.email)
+          .toLowerCase()
+          .compareTo((b.fullName ?? b.email).toLowerCase()));
+    return list;
+  }
+
+  String? _selectedDropdownId(List<UserModel> displayUsers) {
+    if (_selectedUser != null) {
+      for (final u in displayUsers) {
+        if (u.id == _selectedUser!.id) return u.id;
+      }
+    }
+    if (_selectedBa != null) {
+      for (final u in displayUsers) {
+        if (u.id == _selectedBa || (u.fullName ?? u.email) == _selectedBa) {
+          return u.id;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openProductSelection() async {
+    final selectedIds = await Navigator.of(context).push<Set<String>>(
+      MaterialPageRoute(
+        builder: (_) => ProductSelectionPage(
+          products: _service.products,
+          initiallySelectedIds:
+              _items.map((d) => d.product.id).toSet(),
+        ),
+      ),
+    );
+    if (selectedIds == null || !mounted) return;
+
+    for (final id in selectedIds) {
+      if (!_items.any((d) => d.product.id == id)) {
+        final product = _service.products.firstWhere((p) => p.id == id);
+        _items.add(_DraftItem(product: product));
+      }
+    }
+    setState(() {});
+  }
+
+  void _removeItem(_DraftItem item) {
+    setState(() {
+      _items.remove(item);
+      item.dispose();
     });
   }
 
@@ -84,34 +160,14 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
   int get _totalUnits =>
       _items.fold(0, (s, i) => s + i.unitsToAssign);
 
-  void _toggleProduct(Product p, bool selected) {
-    setState(() {
-      if (selected) {
-        if (_selectedProductIds.add(p.id)) {
-          _items.add(_DraftItem(product: p));
-        }
-      } else {
-        _selectedProductIds.remove(p.id);
-        _items.removeWhere((i) => i.product.id == p.id);
-      }
-    });
-  }
-
-  void _removeItem(_DraftItem item) {
-    setState(() {
-      _selectedProductIds.remove(item.product.id);
-      _items.remove(item);
-      item.dispose();
-    });
-  }
-
   String _generateConsignmentId() {
     final ts = DateTime.now().millisecondsSinceEpoch;
     return 'CON-${ts.toString().substring(7)}-${const Uuid().v4().substring(0, 4)}';
   }
 
   Future<void> _submit() async {
-    if (_selectedBa == null) {
+    final selectedBa = _selectedUser?.fullName ?? _selectedBa;
+    if (selectedBa == null || selectedBa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a Business Associate')),
       );
@@ -169,8 +225,9 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
 
     final consignment = Consignment(
       consignmentId: _generateConsignmentId(),
-      businessAssociateId: _selectedBa!,
-      businessAssociateName: _selectedBa!,
+      businessAssociateId:
+          _selectedUser?.id ?? _selectedBa ?? '',
+      businessAssociateName: selectedBa,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       createdAt: DateTime.now(),
       status: ConsignmentStatus.active,
@@ -241,6 +298,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
   }
 
   Widget _productSelectionCard() {
+    final count = _items.length;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -250,6 +308,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: const [
@@ -257,96 +316,73 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                   color: CatalogColors.primaryAccent),
               SizedBox(width: 8),
               Text('Select Products',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Tap products to include them in this consignment.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+          Text(
+            count == 0
+                ? 'Tap below to choose products by category.'
+                : '$count product(s) selected.',
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, c) {
-              final cross = c.maxWidth > 700 ? 3 : 2;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _products.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: cross,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 2.6,
-                ),
-                itemBuilder: (ctx, i) {
-                  final p = _products[i];
-                  final selected = _selectedProductIds.contains(p.id);
-                  final disabled = p.isOutOfStock;
-                  return InkWell(
-                    onTap: disabled
-                        ? null
-                        : () => _toggleProduct(p, !selected),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? CatalogColors.primaryAccent
-                                .withValues(alpha: 0.08)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: selected
-                              ? CatalogColors.primaryAccent
-                              : CatalogColors.cardBorder,
-                          width: selected ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: selected,
-                            onChanged: disabled
-                                ? null
-                                : (v) => _toggleProduct(p, v ?? false),
-                            activeColor: CatalogColors.primaryAccent,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(p.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600)),
-                                Text(
-                                  'KSh ${p.unitPrice.toStringAsFixed(2)} • ${p.currentStock} ${p.unit} in stock',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF64748B)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (disabled)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(Icons.block,
-                                  color: CatalogColors.lowStockText, size: 18),
-                            ),
-                        ],
+          OutlinedButton.icon(
+            onPressed: _openProductSelection,
+            icon: const Icon(Icons.category_outlined),
+            label: Text(
+              count == 0 ? 'Choose Products' : 'Edit Selection ($count)',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: CatalogColors.primaryAccent,
+              side: const BorderSide(color: CatalogColors.cardBorder),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(height: 12),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: count,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (ctx, i) {
+                final p = _items[i].product;
+                return ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor:
+                        CatalogColors.primaryAccent.withValues(alpha: 0.1),
+                    child: Text(
+                      p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: CatalogColors.primaryAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
-                  );
-                },
-              );
-            },
-          ),
+                  ),
+                  title: Text(p.name,
+                      style: const TextStyle(fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                      '${p.category} • KSh ${p.unitPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  trailing: Text('${p.currentStock} ${p.unit}',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF64748B))),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -362,6 +398,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Text('Item Configuration',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -388,17 +425,19 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(p.name,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(
-                      'Available: ${p.currentStock} ${p.unit} • Supplier: ${p.supplierName}',
+                      'Available: ${p.currentStock} ${p.unit} • Supplier: ${p.supplierName ?? '—'}',
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF64748B)),
                     ),
@@ -504,6 +543,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: const [
@@ -511,8 +551,8 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                   color: CatalogColors.primaryAccent),
               SizedBox(width: 8),
               Text('Assignment Information',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),
@@ -548,39 +588,63 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
               ],
             )
           else
-            DropdownButtonFormField<String>(
-              value: _selectedBa,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Business Associate (Sales Rep) *',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                isDense: true,
-              ),
-              items: [
-                ..._businessAssociates.map(
-                  (b) => DropdownMenuItem<String>(
-                    value: b,
-                    child: Text(b, overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-                const DropdownMenuItem<String>(
-                  value: '__add_new__',
-                  child: Row(
-                    children: [
-                      Icon(Icons.add, size: 16, color: CatalogColors.primaryAccent),
-                      SizedBox(width: 6),
-                      Text('Add new business associate…'),
-                    ],
-                  ),
-                ),
-              ],
-              onChanged: (v) {
-                if (v == '__add_new__') {
-                  setState(() => _addingNewBa = true);
-                  return;
+            FutureBuilder<List<UserModel>>(
+              future: _usersFuture,
+              builder: (context, snapshot) {
+                final users =
+                    snapshot.hasData ? snapshot.data! : <UserModel>[];
+                if (!snapshot.hasData) {
+                  return const SizedBox(
+                    height: 48,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
                 }
-                setState(() => _selectedBa = v);
+                final displayUsers = _buildDisplayUsers(users);
+                final selectedId = _selectedDropdownId(displayUsers);
+
+                return DropdownButtonFormField<String>(
+                  value: selectedId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Business Associate (Sales Rep) *',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    isDense: true,
+                  ),
+                  items: [
+                    ...displayUsers.map((u) => DropdownMenuItem<String>(
+                          value: u.id,
+                          child: Text(
+                            u.fullName ?? u.email,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        )),
+                    const DropdownMenuItem<String>(
+                      value: _addNewBaId,
+                      child: Row(
+                        children: [
+                          Icon(Icons.add,
+                              size: 16, color: CatalogColors.primaryAccent),
+                          SizedBox(width: 6),
+                          Text('Add new business associate…'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null || v == _addNewBaId) {
+                      setState(() => _addingNewBa = true);
+                      return;
+                    }
+                    final match =
+                        displayUsers.firstWhere((u) => u.id == v);
+                    setState(() {
+                      _selectedUser = match;
+                      _selectedBa = match.fullName ?? match.email;
+                    });
+                  },
+                );
               },
             ),
           const SizedBox(height: 12),
@@ -613,6 +677,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: const [
@@ -620,8 +685,8 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                   color: CatalogColors.primaryAccent),
               SizedBox(width: 8),
               Text('Consignment Preview',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),

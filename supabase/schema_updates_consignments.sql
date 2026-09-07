@@ -261,7 +261,7 @@ drop policy if exists "admins_can_manage_consignments" on public.consignments;
 drop policy if exists "authenticated_can_view_consignments" on public.consignments;
 drop policy if exists "agents_can_view_own_consignments" on public.consignments;
 drop policy if exists "agents_can_create_pending_consignments" on public.consignments;
-drop policy if exists "managers_can_update_consignments" on public.consignments;
+drop policy if exists "managers_can_manage_consignments" on public.consignments;
 
 create policy "admins_can_manage_consignments"
   on public.consignments

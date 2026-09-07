@@ -33,6 +33,31 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     });
   }
 
+  Future<String?> _buildContext() async {
+    try {
+      final Map<String, dynamic> combinedContext = {};
+      final reportTypes = [
+        'sales_summary', 'pipeline_analysis', 'agent_performance',
+        'regional_summary', 'event_summary', 'sample_roi', 'targets_analysis'
+      ];
+      
+      for (var type in reportTypes) {
+        final cacheKey = 'report_${type}_$_currentUserRole';
+        final cached = await _dbService.getCachedReport(cacheKey);
+        if (cached != null && cached['report'] != null) {
+          combinedContext[type] = cached['report'];
+        }
+      }
+      
+      if (combinedContext.isNotEmpty) {
+        return jsonEncode(combinedContext);
+      }
+    } catch (e) {
+      debugPrint('Error building AI context: $e');
+    }
+    return null;
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isWaiting) return;
@@ -44,12 +69,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     _controller.clear();
 
     try {
+      final contextData = await _buildContext();
+      
       final response = await http.post(
         Uri.parse(ApiConfig.aiChatUrl()),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'messages': _messages.map((m) => {'role': m['role'], 'content': m['content']}).toList(),
-          'context': null,
+          'context': contextData,
         }),
       );
 

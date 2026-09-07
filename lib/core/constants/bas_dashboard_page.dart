@@ -9,12 +9,19 @@ import '../../features/profile/bas_alerts_page.dart';
 import '../../features/dashboard/my_shops_page.dart';
 import '../../features/admin/target_performance_page.dart';
 import '../../features/events/events_list_page.dart';
+import '../../features/consignments/consignment_list_screen.dart';
 
 class BasDashboardPage extends StatelessWidget {
   const BasDashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    final displayName = currentUser?.userMetadata?['full_name']?.toString() ??
+        currentUser?.userMetadata?['name']?.toString() ??
+        currentUser?.email?.split('@').first ??
+        'BAS User';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('BAS Dashboard'),
@@ -62,6 +69,16 @@ class BasDashboardPage extends StatelessWidget {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
                 children: [
+                  _buildDashboardCard(
+                    context,
+                    Icons.inventory_2_outlined,
+                    'My Consignments',
+                    AppColors.primaryGreen,
+                    ConsignmentListScreen(
+                      businessAssociateId: currentUser?.id,
+                      businessAssociateName: displayName,
+                    ),
+                  ),
                   _buildDashboardCard(
                     context,
                     Icons.school_outlined,

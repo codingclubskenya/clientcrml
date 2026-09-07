@@ -59,7 +59,6 @@ class _ClockInPageState extends State<ClockInPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen dimensions
     final screenSize = MediaQuery.of(context).size;
     final bool isSmallScreen = screenSize.height < 600;
 
@@ -82,7 +81,6 @@ class _ClockInPageState extends State<ClockInPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 1. Digital Clock & Date
                     Text(
                       DateTime.now().toString().split(' ')[0],
                       style: TextStyle(
@@ -102,7 +100,6 @@ class _ClockInPageState extends State<ClockInPage> {
 
                     SizedBox(height: screenSize.height * 0.05),
 
-                    // 2. Status & Location Card
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 30),
                       child: Container(
@@ -121,10 +118,9 @@ class _ClockInPageState extends State<ClockInPage> {
                                 children: [
                                   Icon(
                                     Icons.location_on,
-                                    color:
-                                        _isClockedIn
-                                            ? AppColors.primaryGreen
-                                            : Colors.grey,
+                                    color: _isClockedIn
+                                        ? AppColors.primaryGreen
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 8),
                                   const Text(
@@ -148,10 +144,9 @@ class _ClockInPageState extends State<ClockInPage> {
                               style: TextStyle(
                                 letterSpacing: 1.5,
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    _isClockedIn
-                                        ? AppColors.primaryGreen
-                                        : Colors.grey,
+                                color: _isClockedIn
+                                    ? AppColors.primaryGreen
+                                    : Colors.grey,
                               ),
                             ),
                           ],
@@ -161,7 +156,6 @@ class _ClockInPageState extends State<ClockInPage> {
 
                     SizedBox(height: screenSize.height * 0.08),
 
-                    // 3. The Action Button (Responsive Size)
                     _buildResponsiveClockButton(screenSize),
                   ],
                 ),
@@ -174,7 +168,6 @@ class _ClockInPageState extends State<ClockInPage> {
   }
 
   Widget _buildResponsiveClockButton(Size screenSize) {
-    // Diameter is 25% of screen height, but limited between 160 and 240
     double diameter = (screenSize.height * 0.25).clamp(160.0, 240.0);
 
     return GestureDetector(
@@ -197,11 +190,10 @@ class _ClockInPageState extends State<ClockInPage> {
             ),
           ],
           border: Border.all(
-            color:
-                _isClockedIn
-                    ? AppColors.secondaryOrange
-                    : AppColors.primaryGreen,
-            width: diameter * 0.04, // Responsive border thickness
+            color: _isClockedIn
+                ? AppColors.secondaryOrange
+                : AppColors.primaryGreen,
+            width: diameter * 0.04,
           ),
         ),
         child: Column(
@@ -209,21 +201,19 @@ class _ClockInPageState extends State<ClockInPage> {
           children: [
             Icon(
               _isClockedIn ? Icons.stop_rounded : Icons.play_arrow_rounded,
-              size: diameter * 0.4, // Responsive icon size
-              color:
-                  _isClockedIn
-                      ? AppColors.secondaryOrange
-                      : AppColors.primaryGreen,
+              size: diameter * 0.4,
+              color: _isClockedIn
+                  ? AppColors.secondaryOrange
+                  : AppColors.primaryGreen,
             ),
             Text(
               _isClockedIn ? "CHECK OUT" : "CHECK IN",
               style: TextStyle(
-                fontSize: diameter * 0.08, // Responsive text size
+                fontSize: diameter * 0.08,
                 fontWeight: FontWeight.bold,
-                color:
-                    _isClockedIn
-                        ? AppColors.secondaryOrange
-                        : AppColors.primaryGreen,
+                color: _isClockedIn
+                    ? AppColors.secondaryOrange
+                    : AppColors.primaryGreen,
               ),
             ),
           ],

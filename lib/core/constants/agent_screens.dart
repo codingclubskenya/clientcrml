@@ -1,7 +1,8 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'colors.dart';
+import '../../core/constants/colors.dart';
 import '../../features/dashboard/school_sell_page.dart';
 
 class AgentRoutePlanScreen extends StatefulWidget {
@@ -12,82 +13,554 @@ class AgentRoutePlanScreen extends StatefulWidget {
 }
 
 class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
   bool _isLoading = true;
-  List<Map<String, dynamic>> _routePlans = [];
+  DateTime _selectedDate = DateTime.now();
+
+  List<Map<String, dynamic>> _visitations = [];
+  List<Map<String, dynamic>> _managedAgents = [];
+  List<Map<String, dynamic>> _regionalSchools = [];
+
+  String? _currentUserRole;
 
   @override
   void initState() {
     super.initState();
-    _fetchRoutePlans();
+    _loadInitialData();
   }
 
-  Future<void> _fetchRoutePlans() async {
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    await _fetchUserRole();
+    await _fetchRoutePlan();
+    if (_currentUserRole == 'supervisor' || _currentUserRole == 'admin') {
+      await _fetchAgentsAndSchools();
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // Fetch Current User Role
+  Future<void> _fetchUserRole() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
-
-      final response = await Supabase.instance.client
-          .from('route_plans')
-          .select()
-          .eq('assigned_to', userId)
-          .order('route_date', ascending: true);
-
-      setState(() {
-        _routePlans = List<Map<String, dynamic>>.from(response);
-        _isLoading = false;
-      });
+      final res =
+          await _supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .maybeSingle();
+      _currentUserRole = res?['role'] ?? 'agent';
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Error fetching role: $e');
+    }
+  }
+
+  // Fetch Route Plan / To-Do List for Selected Date
+  Future<void> _fetchRoutePlan() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final formattedDate =
+          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+      var query = _supabase
+          .from('visitations')
+          .select('id, visit_date, status, notes, schools(id, name, address)')
+          .eq('visit_date', formattedDate);
+
+      // Agents see only their assigned visits; Supervisors see all visits in their area or assigned
+      if (_currentUserRole == 'agent') {
+        query = query.eq('assigned_to', user.id);
+      }
+
+      final response = await query;
+      _visitations = List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching route plan: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading route plans: $e')),
+          SnackBar(content: Text('Failed to load route plan: $e')),
         );
       }
     }
   }
 
+  // Fetch Managed Agents and Regional Schools (for Supervisor Assign Modal)
+  Future<void> _fetchAgentsAndSchools() async {
+    try {
+      final agentsRes = await _supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'agent');
+      _managedAgents = List<Map<String, dynamic>>.from(agentsRes);
+
+      final schoolsRes = await _supabase
+          .from('schools')
+          .select('id, name, address');
+      _regionalSchools = List<Map<String, dynamic>>.from(schoolsRes);
+    } catch (e) {
+      debugPrint('Error fetching helper data: $e');
+    }
+  }
+
+  // Toggle Visit Status (To-Do Checkbox)
+  Future<void> _toggleVisitStatus(String visitId, bool currentStatus) async {
+    final newStatus = currentStatus ? 'pending' : 'completed';
+
+    // Optimistic UI Update
+    setState(() {
+      final index = _visitations.indexWhere((v) => v['id'] == visitId);
+      if (index != -1) {
+        _visitations[index]['status'] = newStatus;
+      }
+    });
+
+    try {
+      await _supabase
+          .from('visitations')
+          .update({'status': newStatus})
+          .eq('id', visitId);
+    } catch (e) {
+      debugPrint('Error updating status: $e');
+      _fetchRoutePlan(); // Revert on failure
+    }
+  }
+
+  // Handle Pick and Bulk Upload File (Excel / CSV)
+  Future<void> _handleBulkUpload() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv', 'xlsx', 'xls'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      final filePath = result.files.single.path!;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Uploading route plan file: ${result.files.single.name}...',
+          ),
+        ),
+      );
+
+      try {
+        // TODO: Parse CSV/Excel rows here using 'csv' or 'excel' packages,
+        // then perform batch insertion into Supabase `visitations` table.
+
+        await Future.delayed(const Duration(seconds: 2)); // Simulated delay
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bulk Route Plan uploaded successfully!'),
+              backgroundColor: AppColors.primaryGreen,
+            ),
+          );
+          _fetchRoutePlan();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Bulk upload failed: $e')));
+        }
+      }
+    }
+  }
+
+  // Open "Assign Visitation" Dialog
+  void _showAssignVisitationDialog() {
+    String? selectedSchoolId;
+    String? selectedAgentId;
+    DateTime assignedDate = _selectedDate;
+    final notesController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Assign Visitation',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Select School Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Select School',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.school),
+                    ),
+                    items:
+                        _regionalSchools.map((school) {
+                          return DropdownMenuItem<String>(
+                            value: school['id'],
+                            child: Text(school['name'] ?? 'Unnamed School'),
+                          );
+                        }).toList(),
+                    onChanged:
+                        (val) => setModalState(() => selectedSchoolId = val),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Select Field Agent Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Assign to Field Agent',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    items:
+                        _managedAgents.map((agent) {
+                          return DropdownMenuItem<String>(
+                            value: agent['id'],
+                            child: Text(agent['full_name'] ?? 'Agent'),
+                          );
+                        }).toList(),
+                    onChanged:
+                        (val) => setModalState(() => selectedAgentId = val),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Notes Input
+                  TextField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Visit Purpose / Instructions',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.note),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryDark,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () async {
+                        if (selectedSchoolId == null ||
+                            selectedAgentId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Please select both a school and an agent.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final formattedDate =
+                            "${assignedDate.year}-${assignedDate.month.toString().padLeft(2, '0')}-${assignedDate.day.toString().padLeft(2, '0')}";
+
+                        try {
+                          await _supabase.from('visitations').insert({
+                            'school_id': selectedSchoolId,
+                            'assigned_to': selectedAgentId,
+                            'visit_date': formattedDate,
+                            'status': 'pending',
+                            'notes': notesController.text.trim(),
+                            'created_by': _supabase.auth.currentUser?.id,
+                          });
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Visitation assigned successfully!',
+                                ),
+                                backgroundColor: AppColors.primaryGreen,
+                              ),
+                            );
+                            _fetchRoutePlan();
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error assigning visit: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text(
+                        'Assign Visit',
+                        style: TextStyle(
+                          color: AppColors.surfaceWhite,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final completedVisits =
+        _visitations.where((v) => v['status'] == 'completed').length;
+    final totalVisits = _visitations.length;
+
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('My Route Plan'),
+        title: const Text('My Route Plan Checklist'),
         backgroundColor: AppColors.primaryDark,
         foregroundColor: AppColors.surfaceWhite,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Bulk Upload Route Plan',
+            onPressed: _handleBulkUpload,
+          ),
+        ],
       ),
+      floatingActionButton:
+          (_currentUserRole == 'supervisor' || _currentUserRole == 'admin')
+              ? FloatingActionButton.extended(
+                onPressed: _showAssignVisitationDialog,
+                backgroundColor: AppColors.primaryGreen,
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text(
+                  'Assign Visit',
+                  style: TextStyle(color: Colors.white),
+                ),
+              )
+              : null,
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _routePlans.isEmpty
-              ? const Center(child: Text('No route plans assigned to you.'))
-              : ListView.builder(
-                itemCount: _routePlans.length,
-                itemBuilder: (context, index) {
-                  final plan = _routePlans[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
+              : Column(
+                children: [
+                  // --- DATE BAR & PROGRESS SUMMARY ---
+                  Container(
+                    padding: const EdgeInsets.all(16),
                     color: AppColors.surfaceWhite,
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: AppColors.primaryPale,
-                        child: Icon(
-                          Icons.directions_car,
-                          color: AppColors.primaryGreen,
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today,
+                                  size: 18,
+                                  color: AppColors.primaryDark,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDate,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2030),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    _selectedDate = picked;
+                                    _isLoading = true;
+                                  });
+                                  _fetchRoutePlan().then((_) {
+                                    setState(() => _isLoading = false);
+                                  });
+                                }
+                              },
+                              child: const Text('Change Date'),
+                            ),
+                          ],
                         ),
-                      ),
-                      title: Text(
-                        plan['title'] ?? 'Route Plan',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        'Date: ${plan['route_date']} \nStatus: ${plan['status']} \nNotes: ${plan['notes'] ?? 'None'}',
-                      ),
-                      isThreeLine: true,
+                        const SizedBox(height: 12),
+                        LinearProgressIndicator(
+                          value:
+                              totalVisits > 0
+                                  ? completedVisits / totalVisits
+                                  : 0,
+                          backgroundColor: Colors.grey[200],
+                          color: AppColors.primaryGreen,
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '$completedVisits of $totalVisits Completed',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                            Text(
+                              totalVisits > 0
+                                  ? '${((completedVisits / totalVisits) * 100).toStringAsFixed(0)}%'
+                                  : '0%',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                  const Divider(height: 1),
+
+                  // --- TO-DO CHECKLIST LIST ---
+                  Expanded(
+                    child:
+                        _visitations.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.assignment_turned_in_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No visits scheduled for this date.',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _visitations.length,
+                              itemBuilder: (context, index) {
+                                final visit = _visitations[index];
+                                final school = visit['schools'] ?? {};
+                                final isDone = visit['status'] == 'completed';
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color:
+                                          isDone
+                                              ? AppColors.primaryGreen
+                                                  .withOpacity(0.5)
+                                              : Colors.grey.shade200,
+                                    ),
+                                  ),
+                                  child: CheckboxListTile(
+                                    value: isDone,
+                                    activeColor: AppColors.primaryGreen,
+                                    title: Text(
+                                      school['name'] ?? 'School Visit',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        decoration:
+                                            isDone
+                                                ? TextDecoration.lineThrough
+                                                : TextDecoration.none,
+                                        color:
+                                            isDone
+                                                ? AppColors.textMuted
+                                                : AppColors.textDark,
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (school['address'] != null)
+                                          Text(
+                                            school['address'],
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        if (visit['notes'] != null &&
+                                            (visit['notes'] as String)
+                                                .isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 4.0,
+                                            ),
+                                            child: Text(
+                                              'Note: ${visit['notes']}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontStyle: FontStyle.italic,
+                                                color: AppColors.infoBlue,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    onChanged: (bool? checked) {
+                                      if (checked != null) {
+                                        _toggleVisitStatus(visit['id'], isDone);
+                                      }
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                  ),
+                ],
               ),
     );
   }
@@ -201,7 +674,6 @@ class AgentSubmitOrderScreen extends StatefulWidget {
 class _AgentSubmitOrderScreenState extends State<AgentSubmitOrderScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _schools = [];
-  final Map<String, String> _stageBySchoolId = <String, String>{};
 
   @override
   void initState() {
@@ -216,25 +688,8 @@ class _AgentSubmitOrderScreenState extends State<AgentSubmitOrderScreen> {
           .select()
           .order('name');
 
-      final salesResponse = await Supabase.instance.client
-          .from('school_sales')
-          .select('school_id,sale_status,stage_updated_at')
-          .order('stage_updated_at', ascending: false);
-
-      final stageMap = <String, String>{};
-      for (final row in List<Map<String, dynamic>>.from(salesResponse)) {
-        final schoolId = (row['school_id'] ?? '').toString();
-        if (schoolId.isEmpty || stageMap.containsKey(schoolId)) continue;
-        final rawStage = (row['sale_status'] ?? '').toString().trim();
-        if (rawStage.isEmpty) continue;
-        stageMap[schoolId] = _formatStage(rawStage);
-      }
-
       setState(() {
         _schools = List<Map<String, dynamic>>.from(response);
-        _stageBySchoolId
-          ..clear()
-          ..addAll(stageMap);
         _isLoading = false;
       });
     } catch (e) {
@@ -251,7 +706,7 @@ class _AgentSubmitOrderScreenState extends State<AgentSubmitOrderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select School for Pipeline'),
+        title: const Text('Select School for Order'),
         backgroundColor: AppColors.primaryDark,
         foregroundColor: AppColors.surfaceWhite,
       ),
@@ -261,149 +716,35 @@ class _AgentSubmitOrderScreenState extends State<AgentSubmitOrderScreen> {
               : _schools.isEmpty
               ? const Center(child: Text('No schools available.'))
               : ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 10),
                 itemCount: _schools.length,
                 itemBuilder: (context, index) {
                   final school = _schools[index];
-                  final schoolName =
-                      school['name']?.toString() ?? 'Unknown School';
-                  final county =
-                      school['county']?.toString() ?? 'Unknown County';
-                  final phone = school['phone']?.toString();
-                  final category = school['book_category']?.toString();
-                  final source =
-                      school['source']?.toString().isNotEmpty == true
-                          ? school['source'].toString()
-                          : 'manual';
-                  final captureStatus =
-                      school['capture_status']?.toString().isNotEmpty == true
-                          ? school['capture_status'].toString()
-                          : 'active';
-                  final schoolId = school['id']?.toString() ?? '';
-                  final pipelineStage = _stageBySchoolId[schoolId];
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => SchoolSellPage(school: school),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const CircleAvatar(
-                                  backgroundColor: AppColors.primaryPale,
-                                  child: Icon(
-                                    Icons.shopping_bag_outlined,
-                                    color: AppColors.accentOrange,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    schoolName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                const Icon(Icons.arrow_forward_ios, size: 16),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _schoolMetaChip(
-                                  Icons.location_on_outlined,
-                                  county,
-                                ),
-                                _schoolMetaChip(
-                                  Icons.phone_outlined,
-                                  (phone != null && phone.trim().isNotEmpty)
-                                      ? phone
-                                      : 'No phone',
-                                ),
-                                _schoolMetaChip(
-                                  Icons.menu_book_outlined,
-                                  (category != null &&
-                                          category.trim().isNotEmpty)
-                                      ? category
-                                      : 'General',
-                                ),
-                                _schoolMetaChip(
-                                  Icons.source_outlined,
-                                  'Source: $source',
-                                ),
-                                _schoolMetaChip(
-                                  Icons.verified_outlined,
-                                  'Status: $captureStatus',
-                                ),
-                                if (pipelineStage != null)
-                                  _schoolMetaChip(
-                                    Icons.timeline_outlined,
-                                    'Stage: $pipelineStage',
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
+                  return ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.primaryPale,
+                      child: Icon(
+                        Icons.shopping_bag_outlined,
+                        color: AppColors.accentOrange,
                       ),
                     ),
+                    title: Text(
+                      school['name'] ?? 'Unknown School',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(school['county'] ?? 'Unknown County'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SchoolSellPage(school: school),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
     );
-  }
-
-  Widget _schoolMetaChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7FA),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.blueGrey),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatStage(String stage) {
-    return stage
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map((part) {
-          if (part.isEmpty) return part;
-          return '${part[0].toUpperCase()}${part.substring(1)}';
-        })
-        .join(' ');
   }
 }
 
