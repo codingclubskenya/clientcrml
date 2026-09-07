@@ -59,3 +59,28 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  build-apk:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --pub-cache-path /tmp/pub-cache
+
+      - name: Deploy APK
+        run: |
+          sudo mkdir -p /home/client/clientapps/crm/
+          sudo cp build/app/outputs/flutter-apk/app-release.apk /home/client/clientapps/crm/bizx.apk
+        shell: bash
