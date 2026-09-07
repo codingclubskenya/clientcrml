@@ -1,0 +1,32 @@
+name: Flutter CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Run Static Analysis
+        run: flutter analyze
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Build Web Application
+        run: flutter build web --release
+
+      - name: Deploy Application
+        run: |
+          sudo cp -r build/web/* /var/www/html/bizx/
+          sudo systemctl reload nginx
