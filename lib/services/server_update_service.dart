@@ -1,7 +1,10 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AppVersion {
   final String version;
@@ -54,10 +57,10 @@ class ServerUpdateService {
     final current = await PackageInfo.fromPlatform();
     final currentBuildNumber = current.buildNumber;
 
-    return _compareBuildNumbers(info.buildNumber, currentBuildNumber) > 0;
+    return compareBuildNumbers(info.buildNumber, currentBuildNumber) > 0;
   }
 
-  int _compareBuildNumbers(String a, String b) {
+  int compareBuildNumbers(String a, String b) {
     final partsA = a.split('.').map(int.tryParse).whereType<int>().toList();
     final partsB = b.split('.').map(int.tryParse).whereType<int>().toList();
 
@@ -72,5 +75,27 @@ class ServerUpdateService {
     }
 
     return 0;
+  }
+
+  Future<String?> downloadApk({
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final dio = Dio();
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/bizx_update.apk';
+
+    try {
+      await dio.download(_apkUrl, filePath, onReceiveProgress: onProgress);
+      return filePath;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> installApk(String filePath) async {
+    await OpenFile.open(
+      filePath,
+      type: 'application/vnd.android.package-archive',
+    );
   }
 }

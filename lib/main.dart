@@ -15,7 +15,6 @@ import 'core/constants/bas_dashboard_page.dart';
 import 'core/constants/agent_dashboard_page.dart';
 import 'features/welcome/auth/reset_password_page.dart';
 import 'package:app_links/app_links.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'services/server_update_service.dart';
 import 'dart:async';
@@ -324,11 +323,10 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       if (info == null || !mounted) return;
 
       final current = await PackageInfo.fromPlatform();
-      final currentVersion = current.version;
       final currentBuild = current.buildNumber;
 
       final isNewer =
-          service._compareBuildNumbers(info.buildNumber, currentBuild) > 0;
+          service.compareBuildNumbers(info.buildNumber, currentBuild) > 0;
 
       if (!isNewer) return;
 
@@ -338,8 +336,15 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
         builder:
             (ctx) => AlertDialog(
               title: const Text('Update Available'),
-              content: Text(
-                'A new version (${info.version}) is available.\n\nPlease update to get the latest features and bug fixes.',
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'A new version (${info.version}) is available.\n\nPlease update to get the latest features and bug fixes.',
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Downloading APK...'),
+                ],
               ),
               actions: [
                 TextButton(
@@ -349,26 +354,81 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    final uri = Uri.parse(ServerUpdateService.apkUrl);
-                    if (!await launchUrl(
-                      uri,
-                      mode: LaunchMode.externalApplication,
-                    )) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not open update link'),
-                          ),
-                        );
-                      }
-                    }
+                    await _downloadAndInstallApk(context, service);
                   },
-                  child: const Text('Update'),
+                  child: const Text('Download & Install'),
                 ),
               ],
             ),
       );
     }
+  }
+
+  Future<void> _downloadAndInstallApk(
+    BuildContext context,
+    ServerUpdateService service,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (ctx) => const AlertDialog(
+            title: Text('Downloading Update'),
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Please wait...'),
+              ],
+            ),
+          ),
+    );
+
+    String? apkPath;
+    try {
+      apkPath = await service.downloadApk();
+    } catch (_) {
+      apkPath = null;
+    }
+
+    if (!context.mounted) return;
+    Navigator.pop(context);
+
+    if (apkPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Failed to download APK. Please check your connection.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Download Complete'),
+            content: const Text(
+              'Tap Install to open the APK file and update the app.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Later'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await service.installApk(apkPath!);
+                },
+                child: const Text('Install'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
