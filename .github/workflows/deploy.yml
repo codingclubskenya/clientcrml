@@ -53,7 +53,7 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no build/app/outputs/flutter-apk/app-x86_64-release.apk ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/bizx.apk
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no build/app/outputs/flutter-apk/app-x86_64-release.apk ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/bizz.apk
           scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no version.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/version.json
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}

@@ -29,7 +29,7 @@ class AppVersion {
 class ServerUpdateService {
   static const String _host = 'codingclubskenya.com';
   static const String _versionPath = '/update/version.json';
-  static const String _apkPath = '/update/bizx.apk';
+  static const String _apkPath = '/update/bizz.apk';
   static const String _apkUrl = 'https://$_host$_apkPath';
 
   static String get apkUrl => _apkUrl;
