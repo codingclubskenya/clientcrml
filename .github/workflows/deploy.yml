@@ -50,7 +50,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
 
       - name: Generate version.json
         run: |
@@ -60,6 +60,11 @@ jobs:
           echo '  "apk_url": "https://codingclubskenya.com/update/bizz.apk"' >> version.json
           echo '}' >> version.json
 
+      - name: Prepare APK for deployment
+        run: |
+          mkdir -p build/app/outputs/apk/release
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/apk/release/bizz.apk
+
       - name: Deploy APK and version.json via SCP
         run: |
           mkdir -p ~/.ssh
@@ -68,7 +73,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "rm -f /home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/bizz.apk"
-          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no build/app/outputs/flutter-apk/app-release.apk ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/bizz.apk
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no build/app/outputs/apk/release/bizz.apk ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/bizz.apk
           scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no version.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/devops/home/personal/personalweb/frontend-apk-web/codingclubskenya/dist/update/version.json
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}

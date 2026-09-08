@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import 'audit_log_page.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class SchoolProfilePage extends StatefulWidget {
   const SchoolProfilePage({super.key, required this.schoolId});
@@ -565,8 +566,7 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
           ),
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          MapTileLayer(
             userAgentPackageName: 'com.dehus.app',
           ),
           MarkerLayer(

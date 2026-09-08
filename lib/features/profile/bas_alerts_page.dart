@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class BasAlertsPage extends StatefulWidget {
   const BasAlertsPage({super.key});
@@ -352,9 +353,7 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
                           ),
                         ),
                         children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          MapTileLayer(
                             userAgentPackageName: 'com.longhorn.dehus',
                             maxNativeZoom: 19,
                             panBuffer: 2,
@@ -535,8 +534,7 @@ class _BasAlertsFullScreenMapPage extends StatelessWidget {
           ),
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          MapTileLayer(
             userAgentPackageName: 'com.longhorn.dehus',
             maxNativeZoom: 19,
             panBuffer: 2,

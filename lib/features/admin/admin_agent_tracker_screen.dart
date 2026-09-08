@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class AdminAgentTrackerScreen extends StatefulWidget {
   const AdminAgentTrackerScreen({super.key});
@@ -238,9 +239,7 @@ class _AdminAgentTrackerScreenState extends State<AdminAgentTrackerScreen> {
                                   initialZoom: 12.0,
                                 ),
                                 children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  MapTileLayer(
                                     userAgentPackageName: 'com.longhorn.dehus',
                                   ),
                                   CircleLayer(circles: _buildGeofenceCircles()),

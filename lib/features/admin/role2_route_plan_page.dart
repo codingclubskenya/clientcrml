@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../../models/farmer_model.dart';
 import '../database/database_service.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class Role2RoutePlanPage extends StatefulWidget {
   const Role2RoutePlanPage({super.key});
@@ -651,9 +652,7 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
                           ),
                         ),
                         children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          MapTileLayer(
                             userAgentPackageName: 'com.longhorn.dehus',
                             maxNativeZoom: 19,
                           ),
@@ -933,8 +932,7 @@ class _Role2RouteFullScreenMapPage extends StatelessWidget {
           ),
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          MapTileLayer(
             userAgentPackageName: 'com.longhorn.dehus',
             maxNativeZoom: 19,
           ),

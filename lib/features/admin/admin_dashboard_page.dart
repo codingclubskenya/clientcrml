@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/colors.dart';
+import '../../core/widgets/map_tile_controls.dart';
 import '../database/database_service.dart';
 import '../../../models/farmer_model.dart';
 import '../../../models/task_model.dart';
@@ -1497,32 +1498,43 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ),
                             )
-                            : FlutterMap(
-                              options: MapOptions(
-                                initialCenter: _mapCenter(mapSchools),
-                                initialZoom: mapSchools.length > 1 ? 6.3 : 11.5,
-                                minZoom: 2,
-                                maxZoom: 18,
-                                backgroundColor: const Color(0xFFE9EFE8),
-                                interactionOptions: const InteractionOptions(
-                                  flags:
-                                      InteractiveFlag.all &
-                                      ~InteractiveFlag.rotate,
-                                ),
-                              ),
+                            : Stack(
                               children: [
-                                TileLayer(
-                                  urlTemplate:
-                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName:
-                                      'dehus.longhorn.publishers',
-                                  maxNativeZoom: 19,
-                                  panBuffer: 2,
+                                FlutterMap(
+                                  options: MapOptions(
+                                    initialCenter: _mapCenter(mapSchools),
+                                    initialZoom:
+                                        mapSchools.length > 1 ? 6.3 : 11.5,
+                                    minZoom: 2,
+                                    maxZoom: 18,
+                                    backgroundColor: const Color(0xFFE9EFE8),
+                                    interactionOptions: const InteractionOptions(
+                                      flags:
+                                          InteractiveFlag.all &
+                                          ~InteractiveFlag.rotate,
+                                    ),
+                                  ),
+                                  children: [
+                                    MapTileLayer(
+                                      userAgentPackageName:
+                                          'dehus.longhorn.publishers',
+                                      maxNativeZoom: 19,
+                                      panBuffer: 2,
+                                    ),
+                                    PolygonLayer(polygons: polygons),
+                                    PolylineLayer(polylines: polylines),
+                                    MarkerLayer(
+                                      markers: _schoolMarkers(
+                                        context,
+                                        mapSchools,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                PolygonLayer(polygons: polygons),
-                                PolylineLayer(polylines: polylines),
-                                MarkerLayer(
-                                  markers: _schoolMarkers(context, mapSchools),
+                                const Positioned(
+                                  right: 12,
+                                  top: 12,
+                                  child: MapStyleSwitcher(),
                                 ),
                               ],
                             ),
@@ -1936,8 +1948,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   ),
                 ),
-              ],
-            ),
+                ],
+              ),
           ),
         );
       },
@@ -1974,27 +1986,37 @@ class _FullScreenMapPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Field Operations Map')),
-      body: FlutterMap(
-        options: MapOptions(
-          initialCenter: _mapCenter(schools),
-          initialZoom: schools.length > 1 ? 6.3 : 11.5,
-          minZoom: 2,
-          maxZoom: 18,
-          backgroundColor: const Color(0xFFE9EFE8),
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-          ),
-        ),
+      body: Stack(
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'dehus.longhorn.publishers',
-            maxNativeZoom: 19,
-            panBuffer: 2,
+          Positioned.fill(
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: _mapCenter(schools),
+                initialZoom: schools.length > 1 ? 6.3 : 11.5,
+                minZoom: 2,
+                maxZoom: 18,
+                backgroundColor: const Color(0xFFE9EFE8),
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+              ),
+              children: [
+                MapTileLayer(
+                  userAgentPackageName: 'dehus.longhorn.publishers',
+                  maxNativeZoom: 19,
+                  panBuffer: 2,
+                ),
+                PolygonLayer(polygons: polygons),
+                PolylineLayer(polylines: polylines),
+                MarkerLayer(markers: markers),
+              ],
+            ),
           ),
-          PolygonLayer(polygons: polygons),
-          PolylineLayer(polylines: polylines),
-          MarkerLayer(markers: markers),
+          const Positioned(
+            right: 12,
+            top: 12,
+            child: MapStyleSwitcher(),
+          ),
         ],
       ),
     );

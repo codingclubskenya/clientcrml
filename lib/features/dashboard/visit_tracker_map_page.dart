@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class VisitTrackerMapPage extends StatefulWidget {
   final Position? currentPosition;
@@ -164,8 +165,7 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
               mapController: _mapController,
               options: MapOptions(initialCenter: center, initialZoom: 13.0),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                MapTileLayer(
                   userAgentPackageName: 'com.longhorn.dehus',
                 ),
                 if (_history.isNotEmpty) _buildHistoryMarkers(),

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../core/constants/colors.dart';
 import 'visit_tracker_map_page.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class DailyCheckInPage extends StatefulWidget {
   const DailyCheckInPage({super.key});
@@ -406,9 +407,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                   ),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  MapTileLayer(
                     userAgentPackageName: 'com.longhorn.dehus',
                   ),
                   if (_currentPosition != null)

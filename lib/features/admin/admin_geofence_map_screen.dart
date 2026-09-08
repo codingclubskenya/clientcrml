@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../core/widgets/map_tile_controls.dart';
 
 class AdminGeofenceMapScreen extends StatefulWidget {
   const AdminGeofenceMapScreen({super.key});
@@ -492,8 +493,7 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
             onTap: _onMapTapped,
           ),
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            MapTileLayer(
               userAgentPackageName: 'com.longhorn.dehus',
               maxNativeZoom: 19,
               panBuffer: 2,
@@ -841,8 +841,7 @@ class _AdminGeofenceFullScreenMapPage extends StatelessWidget {
           ),
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          MapTileLayer(
             userAgentPackageName: 'com.longhorn.dehus',
             maxNativeZoom: 19,
             panBuffer: 2,
