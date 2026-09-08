@@ -45,8 +45,17 @@ import 'services/catalog_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  await CatalogService.instance.init();
+  try {
+    await Hive.initFlutter();
+  } catch (_) {
+    // Hive initialization failed - minimal app will run
+  }
+
+  try {
+    await CatalogService.instance.init();
+  } catch (_) {
+    // CatalogService failed - app will run without persisted catalog
+  }
 
   try {
     await Supabase.initialize(
