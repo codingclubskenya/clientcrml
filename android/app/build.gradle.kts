@@ -49,10 +49,6 @@ flutter {
 }
 
 afterEvaluate {
-    tasks.findByName("compileReleaseJavaWithJavac")?.let {
-        (it as JavaCompile).exclude("io/flutter/plugins/GeneratedPluginRegistrant.java")
-    }
-
     val filePicker = project(":file_picker")
     filePicker.pluginManager.apply("org.jetbrains.kotlin.android")
     filePicker.afterEvaluate {

@@ -45,23 +45,34 @@ class MainActivity : FlutterActivity() {
 
     private fun saveToDownloads(fileName: String, bytes: ByteArray, mimeType: String): Boolean {
         val resolver = applicationContext.contentResolver
-        val downloadsUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-            put(MediaStore.Downloads.MIME_TYPE, mimeType)
-            put(MediaStore.Downloads.IS_PENDING, 1)
+        return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                val downloadsUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = resolver.insert(downloadsUri, values) ?: return false
+                resolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(bytes)
+                    stream.flush()
+                } ?: return false
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+                true
+            } else {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                val file = File(downloadsDir, fileName)
+                file.writeBytes(bytes)
+                true
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
-        val uri = resolver.insert(downloadsUri, values) ?: return false
-        resolver.openOutputStream(uri)?.use { stream ->
-            stream.write(bytes)
-            stream.flush()
-        } ?: return false
-        values.clear()
-        values.put(MediaStore.Downloads.IS_PENDING, 0)
-        resolver.update(uri, values, null, null)
-        return true
     }
 }
