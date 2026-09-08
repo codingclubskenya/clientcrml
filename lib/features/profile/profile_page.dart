@@ -108,9 +108,11 @@ class _SalesDashboardState extends State<SalesDashboard> {
       final regions = await _dbService.getAllRegions();
       if (!mounted) return;
       setState(() {
-        _userName = user.fullName?.trim().isEmpty ?? true ? null : user.fullName;
+        _userName =
+            user.fullName?.trim().isEmpty ?? true ? null : user.fullName;
         _userRegion = user.region?.trim().isEmpty ?? true ? null : user.region;
-        _userSubRegion = user.subRegion?.trim().isEmpty ?? true ? null : user.subRegion;
+        _userSubRegion =
+            user.subRegion?.trim().isEmpty ?? true ? null : user.subRegion;
         _regions = regions;
         _agents = users.where((u) => u.role == 4).toList();
       });
@@ -129,7 +131,11 @@ class _SalesDashboardState extends State<SalesDashboard> {
       final agent = agentMatch.first;
       final user = await _dbService.getUser(currentUser.id);
       if (user == null) return;
-      final updated = user.copyWith(regionId: agent.regionId, region: agent.region, subRegion: agent.subRegion);
+      final updated = user.copyWith(
+        regionId: agent.regionId,
+        region: agent.region,
+        subRegion: agent.subRegion,
+      );
       await _dbService.saveUser(updated);
       if (!mounted) return;
       setState(() {
@@ -137,12 +143,20 @@ class _SalesDashboardState extends State<SalesDashboard> {
         _userSubRegion = agent.subRegion;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Supervisor assigned. Region set to ${agent.region}.${agent.subRegion != null ? ' ($agent.subRegion)' : ''}'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            'Supervisor assigned. Region set to ${agent.region}.${agent.subRegion != null ? ' ($agent.subRegion)' : ''}',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to assign supervisor: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Failed to assign supervisor: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -376,55 +390,67 @@ class _SalesDashboardState extends State<SalesDashboard> {
         "Samples",
         Icons.inventory_2_outlined,
         AppColors.secondaryOrange,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SampleDistributionPage()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SampleDistributionPage(),
+              ),
+            ),
       ),
       _QuickAction(
         "Orders",
         Icons.assignment_outlined,
         AppColors.primaryGreen,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MyOrdersPage()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MyOrdersPage()),
+            ),
       ),
       _QuickAction(
         "Messages",
         Icons.chat_bubble_outline,
         AppColors.secondaryOrange,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MessagesPage()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MessagesPage()),
+            ),
       ),
       _QuickAction(
         "Contacts",
         Icons.contacts_outlined,
         AppColors.infoBlue,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ContactsPage()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ContactsPage()),
+            ),
       ),
       _QuickAction(
         "Deliveries",
         Icons.local_shipping_outlined,
         AppColors.infoBlue,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const GroundsDeliveriesScreen()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const GroundsDeliveriesScreen(),
+              ),
+            ),
       ),
       _QuickAction(
         "Survey",
         Icons.assignment_turned_in_outlined,
         AppColors.infoBlue,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const Role5ProjectFormsPage()),
-        ),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const Role5ProjectFormsPage(),
+              ),
+            ),
       ),
       _QuickAction(
         "Quotation",
@@ -435,13 +461,17 @@ class _SalesDashboardState extends State<SalesDashboard> {
           if (!context.mounted) return;
           if (role != 5) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Only Role 5 can create quotations.')),
+              const SnackBar(
+                content: Text('Only Role 5 can create quotations.'),
+              ),
             );
             return;
           }
           await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const GroundsQuotationPage()),
+            MaterialPageRoute(
+              builder: (context) => const GroundsQuotationPage(),
+            ),
           );
         },
       ),
@@ -454,10 +484,11 @@ class _SalesDashboardState extends State<SalesDashboard> {
           "Events",
           Icons.event,
           AppColors.accentOrange,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const EventsListPage()),
-          ),
+          onTap:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EventsListPage()),
+              ),
         ),
       );
     }
@@ -555,10 +586,19 @@ class _SalesDashboardState extends State<SalesDashboard> {
     );
   }
 
-  Widget _buildSalesHeader(BuildContext context, Map<String, dynamic>? performanceData) {
-    final monthly = (performanceData ?? _cachedPerformanceData ?? {})['monthly'] as Map<String, dynamic>? ?? {};
+  Widget _buildSalesHeader(
+    BuildContext context,
+    Map<String, dynamic>? performanceData,
+  ) {
+    final monthly =
+        (performanceData ?? _cachedPerformanceData ?? {})['monthly']
+            as Map<String, dynamic>? ??
+        {};
     final monthlyVisits = monthly['visits']?.toString() ?? '0';
-    final totalMetric = (monthly['visitedSchools'] ?? 0) + (monthly['visits'] ?? 0) + (monthly['orders'] ?? 0);
+    final totalMetric =
+        (monthly['visitedSchools'] ?? 0) +
+        (monthly['visits'] ?? 0) +
+        (monthly['orders'] ?? 0);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 420;
@@ -621,42 +661,72 @@ class _SalesDashboardState extends State<SalesDashboard> {
                               fontSize: isCompact ? 12 : 14,
                             ),
                           ),
-                           Text(
-                             _userName ?? 'User',
-                             style: TextStyle(
-                               color: Colors.white,
-                               fontSize: isCompact ? 15 : 18,
-                               fontWeight: FontWeight.bold,
-                               letterSpacing: 0.5,
-                             ),
-                           ),
-                           if (_userRegion != null)
-                             Text(
-                               _userRegion!,
-                               style: TextStyle(
-                                 color: Colors.white.withValues(alpha: 0.85),
-                                 fontSize: isCompact ? 11 : 12,
-                               ),
-                             )
-                           else
-                             Container(
-                               margin: const EdgeInsets.only(top: 4),
-                               padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 10, vertical: isCompact ? 4 : 6),
-                               decoration: BoxDecoration(
-                                 color: Colors.white.withValues(alpha: 0.15),
-                                 borderRadius: BorderRadius.circular(8),
-                                 border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                               ),
-                               child: DropdownButtonHideUnderline(
-                                 child: DropdownButton<String>(
-                                   value: null,
-                                   hint: Text('Select Supervisor', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: isCompact ? 11 : 12)),
-                                   icon: Icon(Icons.arrow_drop_down, color: Colors.white.withValues(alpha: 0.9), size: isCompact ? 16 : 18),
-                                   items: _agents.map((a) => DropdownMenuItem(value: a.id, child: Text(a.fullName ?? a.email, style: TextStyle(fontSize: isCompact ? 11 : 12)))).toList(),
-                                   onChanged: _assignSupervisor,
-                                 ),
-                               ),
-                             ),
+                          Text(
+                            _userName ?? 'User',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isCompact ? 15 : 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          if (_userRegion != null)
+                            Text(
+                              _userRegion!,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: isCompact ? 11 : 12,
+                              ),
+                            )
+                          else
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isCompact ? 8 : 10,
+                                vertical: isCompact ? 4 : 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: null,
+                                  hint: Text(
+                                    'Select Supervisor',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      fontSize: isCompact ? 11 : 12,
+                                    ),
+                                  ),
+                                  icon: Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    size: isCompact ? 16 : 18,
+                                  ),
+                                  items:
+                                      _agents
+                                          .map(
+                                            (a) => DropdownMenuItem(
+                                              value: a.id,
+                                              child: Text(
+                                                a.fullName ?? a.email,
+                                                style: TextStyle(
+                                                  fontSize: isCompact ? 11 : 12,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: _assignSupervisor,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -668,14 +738,16 @@ class _SalesDashboardState extends State<SalesDashboard> {
                           _isCheckedIn
                               ? Icons.fingerprint
                               : Icons.fingerprint_outlined,
-                          color: _isCheckedIn
-                              ? AppColors.accentOrange
-                              : Colors.white,
+                          color:
+                              _isCheckedIn
+                                  ? AppColors.accentOrange
+                                  : Colors.white,
                           size: isCompact ? 24 : 28,
                         ),
-                        tooltip: _isCheckedIn
-                            ? 'On duty — tap to check out / open'
-                            : 'Check in',
+                        tooltip:
+                            _isCheckedIn
+                                ? 'On duty — tap to check out / open'
+                                : 'Check in',
                         onPressed: () async {
                           await Navigator.push(
                             context,
@@ -829,14 +901,14 @@ class _SalesDashboardState extends State<SalesDashboard> {
                                 size: 14,
                               ),
                               const SizedBox(width: 4),
-                               Text(
-                                 "$monthlyVisits Visits",
-                                 style: TextStyle(
-                                   color: AppColors.surfaceWhite,
-                                   fontWeight: FontWeight.bold,
-                                   fontSize: isCompact ? 11 : 12,
-                                 ),
-                               ),
+                              Text(
+                                "$monthlyVisits Visits",
+                                style: TextStyle(
+                                  color: AppColors.surfaceWhite,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isCompact ? 11 : 12,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1046,10 +1118,18 @@ class _SalesDashboardState extends State<SalesDashboard> {
       role: role,
     );
 
-    final dailyTargets = await _dbService.getTargetsForCurrentUser(period: 'daily');
-    final weeklyTargets = await _dbService.getTargetsForCurrentUser(period: 'weekly');
-    final monthlyTargets = await _dbService.getTargetsForCurrentUser(period: 'monthly');
-    final yearlyTargets = await _dbService.getTargetsForCurrentUser(period: 'yearly');
+    final dailyTargets = await _dbService.getTargetsForCurrentUser(
+      period: 'daily',
+    );
+    final weeklyTargets = await _dbService.getTargetsForCurrentUser(
+      period: 'weekly',
+    );
+    final monthlyTargets = await _dbService.getTargetsForCurrentUser(
+      period: 'monthly',
+    );
+    final yearlyTargets = await _dbService.getTargetsForCurrentUser(
+      period: 'yearly',
+    );
     final targets = monthlyTargets;
     final sampleReturnsData = await _dbService.getSampleDistributions(
       agentId: _dbService.getCurrentUserId(),
@@ -1087,7 +1167,8 @@ class _SalesDashboardState extends State<SalesDashboard> {
         'yearly': yearlyTargets,
       },
       'sampleReturns': sampleReturns,
-      'sampleReturnsTarget': (monthlyTargets['sample_distribution'] ?? 0).toInt(),
+      'sampleReturnsTarget':
+          (monthlyTargets['sample_distribution'] ?? 0).toInt(),
       'consignments': consignments,
       'consignmentsTarget': (monthlyTargets['consignment'] ?? 0).toInt(),
     };
@@ -1221,35 +1302,44 @@ class _SalesDashboardState extends State<SalesDashboard> {
 
     final salesTarget = yearly['wonSales'] ?? 0;
     final salesTargetMax = (targets['product_sales'] ?? 0).toDouble();
-    final salesPercent = salesTargetMax > 0 ? (salesTarget / salesTargetMax).clamp(0.0, 1.0) : 0.0;
+    final salesPercent =
+        salesTargetMax > 0
+            ? (salesTarget / salesTargetMax).clamp(0.0, 1.0)
+            : 0.0;
 
     final visits = monthly['visits'] ?? 0;
-    final visitsTarget = (targets['customer_visits'] ?? monthly['target'] ?? 0).toDouble();
-    final visitsPercent = visitsTarget > 0 ? (visits / visitsTarget).clamp(0.0, 1.0) : 0.0;
+    final visitsTarget =
+        (targets['customer_visits'] ?? monthly['target'] ?? 0).toDouble();
+    final visitsPercent =
+        visitsTarget > 0 ? (visits / visitsTarget).clamp(0.0, 1.0) : 0.0;
 
     final collections = monthly['orders'] ?? 0;
     final collectionsTarget = (targets['collections'] ?? 0).toDouble();
-    final collectionsPercent = collectionsTarget > 0
-        ? (collections / collectionsTarget).clamp(0.0, 1.0)
-        : 0.0;
+    final collectionsPercent =
+        collectionsTarget > 0
+            ? (collections / collectionsTarget).clamp(0.0, 1.0)
+            : 0.0;
 
     final newCustomers = monthly['visitedSchools'] ?? 0;
     final newCustomersTarget = (targets['new_customers'] ?? 0).toDouble();
-    final newCustomersPercent = newCustomersTarget > 0
-        ? (newCustomers / newCustomersTarget).clamp(0.0, 1.0)
-        : 0.0;
+    final newCustomersPercent =
+        newCustomersTarget > 0
+            ? (newCustomers / newCustomersTarget).clamp(0.0, 1.0)
+            : 0.0;
 
     final sampleReturns = (data['sampleReturns'] ?? 0) as int;
     final sampleReturnsTarget = (data['sampleReturnsTarget'] ?? 0) as int;
-    final sampleReturnsPercent = sampleReturnsTarget > 0
-        ? (sampleReturns / sampleReturnsTarget).clamp(0.0, 1.0)
-        : 0.0;
+    final sampleReturnsPercent =
+        sampleReturnsTarget > 0
+            ? (sampleReturns / sampleReturnsTarget).clamp(0.0, 1.0)
+            : 0.0;
 
     final consignments = (data['consignments'] ?? 0) as int;
     final consignmentsTarget = (data['consignmentsTarget'] ?? 0) as int;
-    final consignmentsPercent = consignmentsTarget > 0
-        ? (consignments / consignmentsTarget).clamp(0.0, 1.0)
-        : 0.0;
+    final consignmentsPercent =
+        consignmentsTarget > 0
+            ? (consignments / consignmentsTarget).clamp(0.0, 1.0)
+            : 0.0;
 
     return Column(
       children: [
@@ -1741,7 +1831,10 @@ class _SalesDashboardState extends State<SalesDashboard> {
         }
       },
       items: [
-        const BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home_filled),
+          label: "Home",
+        ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.inventory_2_outlined),
           label: "Samples",

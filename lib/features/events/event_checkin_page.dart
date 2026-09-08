@@ -22,9 +22,10 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
   bool _hasCheckedIn = false;
   String? _lastCheckinId;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -57,7 +58,9 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
         _lastCheckinId = lastCheckinId;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
     } finally {
       setState(() => _loading = false);
     }
@@ -82,7 +85,9 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
         throw Exception('Location permissions are permanently denied');
       }
 
-      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
     } catch (e) {
       rethrow;
     }
@@ -99,7 +104,8 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
       if (image == null) return null;
 
       final file = File(image.path);
-      final fileName = 'selfie_${DateTime.now().millisecondsSinceEpoch}_${image.name}';
+      final fileName =
+          'selfie_${DateTime.now().millisecondsSinceEpoch}_${image.name}';
 
       await _supabase.storage.from('event_selfies').upload(fileName, file);
       return _supabase.storage.from('event_selfies').getPublicUrl(fileName);
@@ -134,14 +140,14 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
         'location_text': '${position.latitude}, ${position.longitude}',
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully checked in!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Successfully checked in!')));
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Check-in failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Check-in failed: $e')));
       setState(() => _loading = false);
     }
   }
@@ -176,9 +182,9 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
       );
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Check-out failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Check-out failed: $e')));
       setState(() => _loading = false);
     }
   }
@@ -189,71 +195,100 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
       appBar: AppBar(
         title: const Text('Event Check-ins'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildStatusCard(),
-                Expanded(
-                  child: _checkins.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: _checkins.length,
-                          itemBuilder: (ctx, i) {
-                            final c = _checkins[i];
-                            final user = c['users'] as Map<String, dynamic>?;
-                            final name = user?['full_name']?.toString() ?? user?['email']?.toString() ?? 'Unknown';
-                            final type = c['checkin_type']?.toString() ?? 'checkin';
-                            final time = EventDateFormat.format(c['checkin_at']);
-                            final hasSelfie = c['selfie_url'] != null && c['selfie_url'].toString().isNotEmpty;
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                children: [
+                  _buildStatusCard(),
+                  Expanded(
+                    child:
+                        _checkins.isEmpty
+                            ? _buildEmptyState()
+                            : ListView.builder(
+                              padding: const EdgeInsets.all(12),
+                              itemCount: _checkins.length,
+                              itemBuilder: (ctx, i) {
+                                final c = _checkins[i];
+                                final user =
+                                    c['users'] as Map<String, dynamic>?;
+                                final name =
+                                    user?['full_name']?.toString() ??
+                                    user?['email']?.toString() ??
+                                    'Unknown';
+                                final type =
+                                    c['checkin_type']?.toString() ?? 'checkin';
+                                final time = EventDateFormat.format(
+                                  c['checkin_at'],
+                                );
+                                final hasSelfie =
+                                    c['selfie_url'] != null &&
+                                    c['selfie_url'].toString().isNotEmpty;
 
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: type == 'checkin'
-                                      ? Colors.green.withValues(alpha: 0.1)
-                                      : Colors.orange.withValues(alpha: 0.1),
-                                  child: Icon(
-                                    type == 'checkin' ? Icons.login : Icons.logout,
-                                    color: type == 'checkin' ? Colors.green : Colors.orange,
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor:
+                                          type == 'checkin'
+                                              ? Colors.green.withValues(
+                                                alpha: 0.1,
+                                              )
+                                              : Colors.orange.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                      child: Icon(
+                                        type == 'checkin'
+                                            ? Icons.login
+                                            : Icons.logout,
+                                        color:
+                                            type == 'checkin'
+                                                ? Colors.green
+                                                : Colors.orange,
+                                      ),
+                                    ),
+                                    title: Text(name),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('${type.toUpperCase()} • $time'),
+                                        if (c['location_text'] != null)
+                                          Text(
+                                            'Location: ${c['location_text']}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    trailing:
+                                        hasSelfie
+                                            ? const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                            )
+                                            : null,
+                                    isThreeLine: true,
                                   ),
-                                ),
-                                title: Text(name),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('${type.toUpperCase()} • $time'),
-                                    if (c['location_text'] != null)
-                                      Text('Location: ${c['location_text']}', style: const TextStyle(fontSize: 11)),
-                                  ],
-                                ),
-                                trailing: hasSelfie
-                                    ? const Icon(Icons.check_circle, color: Colors.green)
-                                    : null,
-                                isThreeLine: true,
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-      floatingActionButton: _loading
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _hasCheckedIn ? _performCheckout : _performCheckin,
-              icon: Icon(_hasCheckedIn ? Icons.logout : Icons.login),
-              label: Text(_hasCheckedIn ? 'Check Out' : 'Check In'),
-              backgroundColor: _hasCheckedIn ? Colors.orange : Colors.green,
-            ),
+                                );
+                              },
+                            ),
+                  ),
+                ],
+              ),
+      floatingActionButton:
+          _loading
+              ? null
+              : FloatingActionButton.extended(
+                onPressed: _hasCheckedIn ? _performCheckout : _performCheckin,
+                icon: Icon(_hasCheckedIn ? Icons.logout : Icons.login),
+                label: Text(_hasCheckedIn ? 'Check Out' : 'Check In'),
+                backgroundColor: _hasCheckedIn ? Colors.orange : Colors.green,
+              ),
     );
   }
 
@@ -262,7 +297,10 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _hasCheckedIn ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+        color:
+            _hasCheckedIn
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _hasCheckedIn ? Colors.green : Colors.orange,

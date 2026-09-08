@@ -25,9 +25,10 @@ class _EventReportsPageState extends State<EventReportsPage> {
   final _challengesController = TextEditingController();
   final _recommendationsController = TextEditingController();
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -61,7 +62,8 @@ class _EventReportsPageState extends State<EventReportsPage> {
       if (report != null) {
         _summaryController.text = report['summary']?.toString() ?? '';
         _challengesController.text = report['challenges']?.toString() ?? '';
-        _recommendationsController.text = report['recommendations']?.toString() ?? '';
+        _recommendationsController.text =
+            report['recommendations']?.toString() ?? '';
       }
 
       setState(() {
@@ -70,7 +72,9 @@ class _EventReportsPageState extends State<EventReportsPage> {
         _event = event;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
     } finally {
       setState(() => _loading = false);
     }
@@ -88,9 +92,10 @@ class _EventReportsPageState extends State<EventReportsPage> {
       final reportPayload = {
         'event_id': id,
         'created_by': currentUser?.id,
-        'summary': _summaryController.text.trim().isEmpty
-            ? _generateAutoSummary(summary)
-            : _summaryController.text.trim(),
+        'summary':
+            _summaryController.text.trim().isEmpty
+                ? _generateAutoSummary(summary)
+                : _summaryController.text.trim(),
         'attendance_count': summary['checkins'] ?? 0,
         'visitors_count': summary['checkins'] ?? 0,
         'schools_count': 0,
@@ -109,9 +114,9 @@ class _EventReportsPageState extends State<EventReportsPage> {
       );
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to generate report: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate report: $e')));
     } finally {
       setState(() => _generating = false);
     }
@@ -142,76 +147,81 @@ class _EventReportsPageState extends State<EventReportsPage> {
       appBar: AppBar(
         title: const Text('Event Report'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_event != null) _buildEventHeader(),
-                const SizedBox(height: 16),
-                _buildMetricsGrid(),
-                const SizedBox(height: 20),
-                _buildSectionHeader('Post-Event Report'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _summaryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Event Summary',
-                    border: OutlineInputBorder(),
-                    hintText: 'Describe the overall event outcome',
-                  ),
-                  maxLines: 4,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _challengesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Challenges Faced',
-                    border: OutlineInputBorder(),
-                    hintText: 'What challenges were encountered?',
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _recommendationsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Recommendations',
-                    border: OutlineInputBorder(),
-                    hintText: 'What recommendations for future events?',
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 20),
-                if (_canGenerate)
-                  ElevatedButton.icon(
-                    onPressed: _generating ? null : _generateReport,
-                    icon: _generating
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save),
-                    label: Text(_generating ? 'Generating...' : 'Generate / Update Report'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                if (_report != null) ...[
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_event != null) _buildEventHeader(),
+                  const SizedBox(height: 16),
+                  _buildMetricsGrid(),
                   const SizedBox(height: 20),
-                  _buildSectionHeader('Report History'),
+                  _buildSectionHeader('Post-Event Report'),
                   const SizedBox(height: 12),
-                  _buildReportHistory(),
+                  TextField(
+                    controller: _summaryController,
+                    decoration: const InputDecoration(
+                      labelText: 'Event Summary',
+                      border: OutlineInputBorder(),
+                      hintText: 'Describe the overall event outcome',
+                    ),
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _challengesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Challenges Faced',
+                      border: OutlineInputBorder(),
+                      hintText: 'What challenges were encountered?',
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _recommendationsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Recommendations',
+                      border: OutlineInputBorder(),
+                      hintText: 'What recommendations for future events?',
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 20),
+                  if (_canGenerate)
+                    ElevatedButton.icon(
+                      onPressed: _generating ? null : _generateReport,
+                      icon:
+                          _generating
+                              ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(Icons.save),
+                      label: Text(
+                        _generating
+                            ? 'Generating...'
+                            : 'Generate / Update Report',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  if (_report != null) ...[
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('Report History'),
+                    const SizedBox(height: 12),
+                    _buildReportHistory(),
+                  ],
                 ],
-              ],
-            ),
+              ),
     );
   }
 
@@ -233,7 +243,10 @@ class _EventReportsPageState extends State<EventReportsPage> {
           const SizedBox(height: 4),
           Text('${_event!['venue'] ?? ''} • ${_event!['region'] ?? ''}'),
           if (_event!['start_at'] != null)
-            Text('Date: ${EventDateFormat.formatShort(_event!['start_at'])}', style: TextStyle(color: Colors.grey[600])),
+            Text(
+              'Date: ${EventDateFormat.formatShort(_event!['start_at'])}',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
         ],
       ),
     );
@@ -241,12 +254,42 @@ class _EventReportsPageState extends State<EventReportsPage> {
 
   Widget _buildMetricsGrid() {
     final metrics = [
-      _ReportMetric('Check-ins', '${_summary['checkins'] ?? 0}', Icons.login, Colors.blue),
-      _ReportMetric('Leads', '${_summary['leads'] ?? 0}', Icons.people, Colors.purple),
-      _ReportMetric('Orders', '${_summary['orders'] ?? 0}', Icons.shopping_cart, Colors.green),
-      _ReportMetric('Samples', '${_summary['samples'] ?? 0}', Icons.inventory, Colors.orange),
-      _ReportMetric('Photos', '${_summary['photos'] ?? 0}', Icons.photo, Colors.pink),
-      _ReportMetric('Tasks Done', '${_summary['completed_tasks'] ?? 0}/${_summary['tasks'] ?? 0}', Icons.check_circle, Colors.teal),
+      _ReportMetric(
+        'Check-ins',
+        '${_summary['checkins'] ?? 0}',
+        Icons.login,
+        Colors.blue,
+      ),
+      _ReportMetric(
+        'Leads',
+        '${_summary['leads'] ?? 0}',
+        Icons.people,
+        Colors.purple,
+      ),
+      _ReportMetric(
+        'Orders',
+        '${_summary['orders'] ?? 0}',
+        Icons.shopping_cart,
+        Colors.green,
+      ),
+      _ReportMetric(
+        'Samples',
+        '${_summary['samples'] ?? 0}',
+        Icons.inventory,
+        Colors.orange,
+      ),
+      _ReportMetric(
+        'Photos',
+        '${_summary['photos'] ?? 0}',
+        Icons.photo,
+        Colors.pink,
+      ),
+      _ReportMetric(
+        'Tasks Done',
+        '${_summary['completed_tasks'] ?? 0}/${_summary['tasks'] ?? 0}',
+        Icons.check_circle,
+        Colors.teal,
+      ),
     ];
 
     return GridView.builder(
@@ -304,17 +347,26 @@ class _EventReportsPageState extends State<EventReportsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_report!['summary'] != null) ...[
-            const Text('Summary:', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Summary:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             Text(_report!['summary'].toString()),
             const SizedBox(height: 12),
           ],
           if (_report!['challenges'] != null) ...[
-            const Text('Challenges:', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Challenges:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             Text(_report!['challenges'].toString()),
             const SizedBox(height: 12),
           ],
           if (_report!['recommendations'] != null) ...[
-            const Text('Recommendations:', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Recommendations:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             Text(_report!['recommendations'].toString()),
           ],
           const SizedBox(height: 12),
@@ -330,10 +382,7 @@ class _EventReportsPageState extends State<EventReportsPage> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-      ),
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
     );
   }
 }

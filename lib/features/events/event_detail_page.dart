@@ -17,9 +17,10 @@ class _EventDetailPageState extends State<EventDetailPage> {
   bool _loading = true;
   bool _canManage = false;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -48,11 +49,14 @@ class _EventDetailPageState extends State<EventDetailPage> {
     if (id == null) return;
     setState(() => _loading = true);
     try {
-      final row = await _supabase.from('events').select().eq('id', id).maybeSingle();
+      final row =
+          await _supabase.from('events').select().eq('id', id).maybeSingle();
       if (row != null) setState(() => _event = Map<String, dynamic>.from(row));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed loading event: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed loading event: $e')));
       }
     } finally {
       setState(() => _loading = false);
@@ -77,35 +81,45 @@ class _EventDetailPageState extends State<EventDetailPage> {
             ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_event != null) ...[
-                    Text(
-                      _event!['name'] ?? '',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_event!['venue'] ?? ''} • ${_event!['region'] ?? ''}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 24),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_event != null) ...[
+                      Text(
+                        _event!['name'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_event!['venue'] ?? ''} • ${_event!['region'] ?? ''}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    _buildMenuGrid(),
                   ],
-                  _buildMenuGrid(),
-                ],
+                ),
               ),
-            ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
-              onPressed: () => Navigator.pushNamed(context, '/events/reports', arguments: {'id': _eventId}),
-              child: const Icon(Icons.picture_as_pdf),
-            )
-          : null,
+      floatingActionButton:
+          _canManage
+              ? FloatingActionButton(
+                onPressed:
+                    () => Navigator.pushNamed(
+                      context,
+                      '/events/reports',
+                      arguments: {'id': _eventId},
+                    ),
+                child: const Icon(Icons.picture_as_pdf),
+              )
+              : null,
     );
   }
 
@@ -118,24 +132,9 @@ class _EventDetailPageState extends State<EventDetailPage> {
           Colors.blue,
           '/events/manage-assignments',
         ),
-      _EventMenuItem(
-        'Check-ins',
-        Icons.login,
-        Colors.green,
-        '/events/checkin',
-      ),
-      _EventMenuItem(
-        'Tasks',
-        Icons.checklist,
-        Colors.orange,
-        '/events/tasks',
-      ),
-      _EventMenuItem(
-        'Leads',
-        Icons.people,
-        Colors.purple,
-        '/events/leads',
-      ),
+      _EventMenuItem('Check-ins', Icons.login, Colors.green, '/events/checkin'),
+      _EventMenuItem('Tasks', Icons.checklist, Colors.orange, '/events/tasks'),
+      _EventMenuItem('Leads', Icons.people, Colors.purple, '/events/leads'),
       _EventMenuItem(
         'Orders',
         Icons.shopping_cart,

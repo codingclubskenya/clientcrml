@@ -41,9 +41,9 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
 
   Future<void> _exportPdf(_UserSchoolData data) async {
     if (data.schools.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No data to export.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export.')));
       return;
     }
     final byUser = <String, List<SchoolModel>>{};
@@ -52,16 +52,17 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
       if (uid.isEmpty) continue;
       byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
     }
-    final rows = data.users
-        .map(
-          (u) => OnboardedExportRow(
-            user: u,
-            items: byUser[u.id] ?? const <SchoolModel>[],
-          ),
-        )
-        .where((r) => r.items.isNotEmpty)
-        .toList()
-      ..sort((a, b) => b.items.length.compareTo(a.items.length));
+    final rows =
+        data.users
+            .map(
+              (u) => OnboardedExportRow(
+                user: u,
+                items: byUser[u.id] ?? const <SchoolModel>[],
+              ),
+            )
+            .where((r) => r.items.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
     try {
       await OnboardedExportService.exportPerUserBreakdown(
@@ -74,9 +75,9 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -137,9 +138,7 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
               .toList(growable: false);
           final today = DateTime.now();
           final todaySchools = data.schools
-              .where(
-                (s) => _isSameDay(s.createdAt, today),
-              )
+              .where((s) => _isSameDay(s.createdAt, today))
               .toList(growable: false);
 
           final schoolsByUser = <String, List<SchoolModel>>{};
@@ -151,11 +150,12 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
                 .add(school);
           }
 
-          final userRows = data.users.map((user) {
-            final userSchools = schoolsByUser[user.id] ?? <SchoolModel>[];
-            return _UserSchoolRow(user: user, schools: userSchools);
-          }).toList()
-            ..sort((a, b) => b.schools.length.compareTo(a.schools.length));
+          final userRows =
+              data.users.map((user) {
+                  final userSchools = schoolsByUser[user.id] ?? <SchoolModel>[];
+                  return _UserSchoolRow(user: user, schools: userSchools);
+                }).toList()
+                ..sort((a, b) => b.schools.length.compareTo(a.schools.length));
 
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
@@ -193,13 +193,10 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
                   context,
                   icon: Icons.today_outlined,
                   title: "Today's Onboarded",
-                  subtitle:
-                      'Schools, institutions & bookshops added today',
+                  subtitle: 'Schools, institutions & bookshops added today',
                   count: todaySchools.length,
                   color: AppColors.primaryGreen,
-                  destination: UserSchoolTodayOnboardedPage(
-                    today: today,
-                  ),
+                  destination: UserSchoolTodayOnboardedPage(today: today),
                 ),
                 const SizedBox(height: 20),
                 const _SectionLabel('Per-user breakdown'),
@@ -253,7 +250,10 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+        ),
       ],
     );
   }
@@ -306,10 +306,7 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),

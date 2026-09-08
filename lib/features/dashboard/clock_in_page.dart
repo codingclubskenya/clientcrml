@@ -118,9 +118,10 @@ class _ClockInPageState extends State<ClockInPage> {
                                 children: [
                                   Icon(
                                     Icons.location_on,
-                                    color: _isClockedIn
-                                        ? AppColors.primaryGreen
-                                        : Colors.grey,
+                                    color:
+                                        _isClockedIn
+                                            ? AppColors.primaryGreen
+                                            : Colors.grey,
                                   ),
                                   const SizedBox(width: 8),
                                   const Text(
@@ -144,9 +145,10 @@ class _ClockInPageState extends State<ClockInPage> {
                               style: TextStyle(
                                 letterSpacing: 1.5,
                                 fontWeight: FontWeight.bold,
-                                color: _isClockedIn
-                                    ? AppColors.primaryGreen
-                                    : Colors.grey,
+                                color:
+                                    _isClockedIn
+                                        ? AppColors.primaryGreen
+                                        : Colors.grey,
                               ),
                             ),
                           ],
@@ -190,9 +192,10 @@ class _ClockInPageState extends State<ClockInPage> {
             ),
           ],
           border: Border.all(
-            color: _isClockedIn
-                ? AppColors.secondaryOrange
-                : AppColors.primaryGreen,
+            color:
+                _isClockedIn
+                    ? AppColors.secondaryOrange
+                    : AppColors.primaryGreen,
             width: diameter * 0.04,
           ),
         ),
@@ -202,18 +205,20 @@ class _ClockInPageState extends State<ClockInPage> {
             Icon(
               _isClockedIn ? Icons.stop_rounded : Icons.play_arrow_rounded,
               size: diameter * 0.4,
-              color: _isClockedIn
-                  ? AppColors.secondaryOrange
-                  : AppColors.primaryGreen,
+              color:
+                  _isClockedIn
+                      ? AppColors.secondaryOrange
+                      : AppColors.primaryGreen,
             ),
             Text(
               _isClockedIn ? "CHECK OUT" : "CHECK IN",
               style: TextStyle(
                 fontSize: diameter * 0.08,
                 fontWeight: FontWeight.bold,
-                color: _isClockedIn
-                    ? AppColors.secondaryOrange
-                    : AppColors.primaryGreen,
+                color:
+                    _isClockedIn
+                        ? AppColors.secondaryOrange
+                        : AppColors.primaryGreen,
               ),
             ),
           ],

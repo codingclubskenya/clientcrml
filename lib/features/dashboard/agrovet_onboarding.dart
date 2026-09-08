@@ -196,8 +196,9 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
 
     try {
       if (defaultTargetPlatform == TargetPlatform.android) {
-        final permission =
-            await FlutterContacts.permissions.request(PermissionType.read);
+        final permission = await FlutterContacts.permissions.request(
+          PermissionType.read,
+        );
         if (permission != PermissionStatus.granted) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -230,7 +231,8 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       final pickedPhone = contact.phones.first.number.trim();
 
       setState(() {
-        if (_contactNameController.text.trim().isEmpty && pickedName.isNotEmpty) {
+        if (_contactNameController.text.trim().isEmpty &&
+            pickedName.isNotEmpty) {
           _contactNameController.text = pickedName;
         }
         _contactPhoneController.text = pickedPhone;
@@ -239,7 +241,9 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not open contacts picker: ${e.message ?? e.code}'),
+          content: Text(
+            'Could not open contacts picker: ${e.message ?? e.code}',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -359,8 +363,12 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       samplesLeft: _samplesLeft,
       samplesToBeReturned: _samplesToBeReturned,
       sampleBooks: _selectedSampleBooks.isEmpty ? null : _selectedSampleBooks,
-      learningMaterials: _selectedLearningMaterials.isEmpty ? null : _selectedLearningMaterials,
-      bookPrograms: _selectedBookPrograms.isEmpty ? null : _selectedBookPrograms,
+      learningMaterials:
+          _selectedLearningMaterials.isEmpty
+              ? null
+              : _selectedLearningMaterials,
+      bookPrograms:
+          _selectedBookPrograms.isEmpty ? null : _selectedBookPrograms,
       institutionCategoryOther:
           _dealerType == 'Institution'
               ? _institutionCategoryOtherController.text.trim()

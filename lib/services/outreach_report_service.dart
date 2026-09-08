@@ -118,50 +118,79 @@ class OutreachReportService {
 
     final weeklyTargetMap = <String, int>{};
     for (final t in targets) {
-      if (t.targetType != 'product_sales' || t.targetPeriod != 'weekly') continue;
+      if (t.targetType != 'product_sales' || t.targetPeriod != 'weekly')
+        continue;
       final agentId = t.assignedTo;
       if (agentId == null || agentId.isEmpty) continue;
-      final productTarget = t.targetData['product'] ?? t.targetData['total'] ?? 0;
-      final qty = productTarget is int
-          ? productTarget
-          : productTarget is double
+      final productTarget =
+          t.targetData['product'] ?? t.targetData['total'] ?? 0;
+      final qty =
+          productTarget is int
+              ? productTarget
+              : productTarget is double
               ? productTarget.toInt()
               : int.tryParse(productTarget.toString()) ?? 0;
       weeklyTargetMap[agentId] = qty;
     }
 
-    final selectedAgentIds = selectedAgentId == null ? null : <String>{selectedAgentId};
-    final selectedRegionIds = selectedRegionId == null
-        ? null
-        : <String>{selectedRegionId};
+    final selectedAgentIds =
+        selectedAgentId == null ? null : <String>{selectedAgentId};
+    final selectedRegionIds =
+        selectedRegionId == null ? null : <String>{selectedRegionId};
 
     final rows = <Map<String, dynamic>>[];
     for (final agent in agents) {
-      if (selectedAgentIds != null && !selectedAgentIds.contains(agent.id)) continue;
+      if (selectedAgentIds != null && !selectedAgentIds.contains(agent.id))
+        continue;
       final agentSchools = agentSchoolMap[agent.id] ?? <SchoolModel>[];
       if (selectedRegionIds != null && selectedRegionIds.isNotEmpty) {
         final agentRegionId = agent.regionId;
-        if (agentRegionId == null || !selectedRegionIds.contains(agentRegionId)) continue;
+        if (agentRegionId == null || !selectedRegionIds.contains(agentRegionId))
+          continue;
       }
 
       final region = agent.regionId != null ? regionMap[agent.regionId] : null;
       final regionName = region?.region ?? agent.region ?? '';
 
       for (final school in agentSchools) {
-        final schoolVisits = visits.where((v) => v['school_id'] == school.id).toList();
-        final schoolCalls = activities.where((a) => a['school_id'] == school.id && (a['activity_type'] ?? '').toString().toLowerCase() == 'call').toList();
-        final interactionType = schoolVisits.isNotEmpty ? 'Visit' : schoolCalls.isNotEmpty ? 'Phone Call' : '';
+        final schoolVisits =
+            visits.where((v) => v['school_id'] == school.id).toList();
+        final schoolCalls =
+            activities
+                .where(
+                  (a) =>
+                      a['school_id'] == school.id &&
+                      (a['activity_type'] ?? '').toString().toLowerCase() ==
+                          'call',
+                )
+                .toList();
+        final interactionType =
+            schoolVisits.isNotEmpty
+                ? 'Visit'
+                : schoolCalls.isNotEmpty
+                ? 'Phone Call'
+                : '';
 
-        final schoolSalesList = sales.where((s) => s.schoolId == school.id).toList();
-        final closedWonQty = schoolSalesList.where((s) => s.stage == PipelineStage.won).length;
+        final schoolSalesList =
+            sales.where((s) => s.schoolId == school.id).toList();
+        final closedWonQty =
+            schoolSalesList.where((s) => s.stage == PipelineStage.won).length;
 
         final schoolDebtsList = debts.where((d) => d['school_id'] == school.id);
-        final schoolDebtTotal = schoolDebtsList.fold<double>(0.0, (sum, d) => sum + ((d['amount'] as num?)?.toDouble() ?? 0.0));
+        final schoolDebtTotal = schoolDebtsList.fold<double>(
+          0.0,
+          (sum, d) => sum + ((d['amount'] as num?)?.toDouble() ?? 0.0),
+        );
 
         final lastVisit = lastVisitBySchool[school.id];
-        final lastVisitStr = lastVisit != null ? _formatDateTime(lastVisit) : 'No visits';
-        final capturedAtStr = school.capturedAt != null ? _formatDateTime(school.capturedAt!) : 'N/A';
-        final isActiveLast5Days = lastVisit != null && generatedAt.difference(lastVisit).inDays <= 5;
+        final lastVisitStr =
+            lastVisit != null ? _formatDateTime(lastVisit) : 'No visits';
+        final capturedAtStr =
+            school.capturedAt != null
+                ? _formatDateTime(school.capturedAt!)
+                : 'N/A';
+        final isActiveLast5Days =
+            lastVisit != null && generatedAt.difference(lastVisit).inDays <= 5;
 
         rows.add({
           'region': regionName,
@@ -172,7 +201,8 @@ class OutreachReportService {
           'status': school.captureStatus ?? 'Active',
           'lastVisit': lastVisitStr,
           'activeLast5Days': isActiveLast5Days ? 'Yes' : 'No',
-          'type': '${school.dealerType ?? ''}${school.dealerType != null && school.bookCategory != null ? ' / ' : ''}${school.bookCategory ?? ''}',
+          'type':
+              '${school.dealerType ?? ''}${school.dealerType != null && school.bookCategory != null ? ' / ' : ''}${school.bookCategory ?? ''}',
           'level': school.schoolLevel ?? '',
           'population': school.schoolPopulation?.toString() ?? '',
           'interaction': interactionType,
@@ -184,7 +214,10 @@ class OutreachReportService {
           'agentSchoolsCount': agentSchools.length.toString(),
           'agentVisits': (agentVisitsMap[agent.id] ?? 0).toString(),
           'agentCalls': (agentCallsMap[agent.id] ?? 0).toString(),
-          'agentProjectedQty': agentSchools.fold<int>(0, (sum, s) => sum + (s.projectedQuantity ?? 0)).toString(),
+          'agentProjectedQty':
+              agentSchools
+                  .fold<int>(0, (sum, s) => sum + (s.projectedQuantity ?? 0))
+                  .toString(),
           'agentClosedQty': (agentClosedQtyMap[agent.id] ?? 0).toString(),
           'agentDebtKes': (agentDebtMap[agent.id] ?? 0.0).toStringAsFixed(0),
           'weeklyTarget': (weeklyTargetMap[agent.id] ?? 0).toString(),
@@ -231,7 +264,13 @@ class OutreachReportService {
         ),
         build: (context) {
           return [
-            _buildHeader(generatedAt, selectedRegionId, selectedAgentId, regionMap, userMap),
+            _buildHeader(
+              generatedAt,
+              selectedRegionId,
+              selectedAgentId,
+              regionMap,
+              userMap,
+            ),
             pw.SizedBox(height: 16),
             _buildSummaryTable(rows),
             pw.SizedBox(height: 20),
@@ -244,16 +283,34 @@ class OutreachReportService {
     return pdf.save();
   }
 
-  pw.Widget _buildHeader(DateTime generatedAt, String? selectedRegionId, String? selectedAgentId, Map<String, RegionModel> regionMap, Map<String, UserModel> userMap) {
-    final regionName = selectedRegionId != null ? regionMap[selectedRegionId]?.region ?? 'All Regions' : 'All Regions';
-    final agentName = selectedAgentId != null ? userMap[selectedAgentId]?.fullName ?? 'All Agents' : 'All Agents';
+  pw.Widget _buildHeader(
+    DateTime generatedAt,
+    String? selectedRegionId,
+    String? selectedAgentId,
+    Map<String, RegionModel> regionMap,
+    Map<String, UserModel> userMap,
+  ) {
+    final regionName =
+        selectedRegionId != null
+            ? regionMap[selectedRegionId]?.region ?? 'All Regions'
+            : 'All Regions';
+    final agentName =
+        selectedAgentId != null
+            ? userMap[selectedAgentId]?.fullName ?? 'All Agents'
+            : 'All Agents';
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Schools Outreach Report', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          'Schools Outreach Report',
+          style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+        ),
         pw.SizedBox(height: 8),
-        pw.Text('Generated: ${_formatDateTime(generatedAt)}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+        pw.Text(
+          'Generated: ${_formatDateTime(generatedAt)}',
+          style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+        ),
         pw.SizedBox(height: 4),
         pw.Text('Region: $regionName', style: pw.TextStyle(fontSize: 10)),
         pw.Text('Agent: $agentName', style: pw.TextStyle(fontSize: 10)),
@@ -282,7 +339,10 @@ class OutreachReportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Outreach Details', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          'Outreach Details',
+          style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+        ),
         pw.SizedBox(height: 8),
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -305,7 +365,21 @@ class OutreachReportService {
           children: [
             pw.TableRow(
               decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-              children: headers.map((h) => pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(h, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)))).toList(),
+              children:
+                  headers
+                      .map(
+                        (h) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            h,
+                            style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
             ),
             for (final row in rows)
               pw.TableRow(
@@ -323,7 +397,11 @@ class OutreachReportService {
                   _cell(row['agentCalls'].toString()),
                   _cell(row['weeklyTarget'].toString()),
                   _cell(row['achieved'].toString()),
-                  _cell((((int.tryParse(row['weeklyTarget'].toString()) ?? 0) - (int.tryParse(row['achieved'].toString()) ?? 0))).toString()),
+                  _cell(
+                    (((int.tryParse(row['weeklyTarget'].toString()) ?? 0) -
+                            (int.tryParse(row['achieved'].toString()) ?? 0)))
+                        .toString(),
+                  ),
                 ],
               ),
           ],
@@ -349,18 +427,33 @@ class OutreachReportService {
       }
       final summary = agentSummary[agent]!;
       summary['schools'] = (summary['schools'] as int) + 1;
-      summary['visits'] = (summary['visits'] as int) + (int.tryParse(row['agentVisits'].toString()) ?? 0);
-      summary['calls'] = (summary['calls'] as int) + (int.tryParse(row['agentCalls'].toString()) ?? 0);
-      summary['closed'] = (summary['closed'] as int) + (int.tryParse(row['closedWonQty'].toString()) ?? 0);
-      summary['debt'] = (summary['debt'] as double) + (double.tryParse(row['debtKes'].toString()) ?? 0.0);
-      summary['target'] = (summary['target'] as int) + (int.tryParse(row['weeklyTarget'].toString()) ?? 0);
-      summary['achieved'] = (summary['achieved'] as int) + (int.tryParse(row['achieved'].toString()) ?? 0);
+      summary['visits'] =
+          (summary['visits'] as int) +
+          (int.tryParse(row['agentVisits'].toString()) ?? 0);
+      summary['calls'] =
+          (summary['calls'] as int) +
+          (int.tryParse(row['agentCalls'].toString()) ?? 0);
+      summary['closed'] =
+          (summary['closed'] as int) +
+          (int.tryParse(row['closedWonQty'].toString()) ?? 0);
+      summary['debt'] =
+          (summary['debt'] as double) +
+          (double.tryParse(row['debtKes'].toString()) ?? 0.0);
+      summary['target'] =
+          (summary['target'] as int) +
+          (int.tryParse(row['weeklyTarget'].toString()) ?? 0);
+      summary['achieved'] =
+          (summary['achieved'] as int) +
+          (int.tryParse(row['achieved'].toString()) ?? 0);
     }
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Agent Summary', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          'Agent Summary',
+          style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+        ),
         pw.SizedBox(height: 8),
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -377,7 +470,30 @@ class OutreachReportService {
           children: [
             pw.TableRow(
               decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-              children: ['Agent', 'Schools', 'Visits', 'Calls', 'Closed Qty', 'Debt (KES)', 'Target', 'Achieved'].map((h) => pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(h, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)))).toList(),
+              children:
+                  [
+                        'Agent',
+                        'Schools',
+                        'Visits',
+                        'Calls',
+                        'Closed Qty',
+                        'Debt (KES)',
+                        'Target',
+                        'Achieved',
+                      ]
+                      .map(
+                        (h) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            h,
+                            style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
             ),
             for (final entry in agentSummary.entries)
               pw.TableRow(

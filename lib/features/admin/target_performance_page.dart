@@ -623,7 +623,10 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                 _pdfMetricCard('Assignees', '${summary.totalAssignees}'),
                 _pdfMetricCard('Targets Matched', '${summary.totalTargets}'),
                 _pdfMetricCard('Total Sales', _formatCount(summary.totalSales)),
-                _pdfMetricCard('Total Visits', _formatCount(summary.totalVisits)),
+                _pdfMetricCard(
+                  'Total Visits',
+                  _formatCount(summary.totalVisits),
+                ),
                 _pdfMetricCard(
                   'Schools Visited',
                   _formatCount(summary.totalCustomers),
@@ -762,7 +765,9 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
     } on UnsupportedError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download not supported on this device.')),
+          const SnackBar(
+            content: Text('Download not supported on this device.'),
+          ),
         );
       }
     } catch (e) {
@@ -1192,7 +1197,10 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
                 icon: const Icon(Icons.smart_toy, color: AppColors.primaryDark),
                 onPressed: _showAiAssistant,
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
                 padding: EdgeInsets.zero,
               ),
             IconButton(
@@ -1266,10 +1274,7 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
           children: [
             title,
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: actions,
-            ),
+            Align(alignment: Alignment.centerLeft, child: actions),
           ],
         );
       },

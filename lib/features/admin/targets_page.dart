@@ -14,7 +14,8 @@ class TargetsPage extends StatefulWidget {
   State<TargetsPage> createState() => _TargetsPageState();
 }
 
-class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStateMixin {
+class _TargetsPageState extends State<TargetsPage>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = true;
   String _selectedScope = 'regional';
@@ -70,7 +71,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading targets: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error loading targets: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -109,7 +113,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving target: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error saving target: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -132,13 +139,19 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
       await _loadInitialData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Targets saved'), backgroundColor: AppColors.primaryGreen),
+          const SnackBar(
+            content: Text('Targets saved'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving targets: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error saving targets: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -158,16 +171,18 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
             final key = product.toLowerCase().replaceAll(' ', '_');
             final value = existing?.targetData[key];
             if (value != null) {
-              result.add(TargetModel(
-                id: existing?.id ?? '',
-                scope: _selectedScope,
-                regionId: _selectedRegionId,
-                subRegion: _selectedSubRegion,
-                assignedTo: _selectedAssigneeId,
-                targetType: 'product_sales',
-                targetPeriod: period,
-                targetData: {...(existing?.targetData ?? {})},
-              ));
+              result.add(
+                TargetModel(
+                  id: existing?.id ?? '',
+                  scope: _selectedScope,
+                  regionId: _selectedRegionId,
+                  subRegion: _selectedSubRegion,
+                  assignedTo: _selectedAssigneeId,
+                  targetType: 'product_sales',
+                  targetPeriod: period,
+                  targetData: {...(existing?.targetData ?? {})},
+                ),
+              );
             }
           }
         }
@@ -176,16 +191,18 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
         for (final period in ['daily', 'weekly', 'monthly']) {
           final existing = _getExistingTarget('customer_visits', period);
           if (existing != null && existing.targetData.isNotEmpty) {
-            result.add(TargetModel(
-              id: existing.id,
-              scope: _selectedScope,
-              regionId: _selectedRegionId,
-              subRegion: _selectedSubRegion,
-              assignedTo: _selectedAssigneeId,
-              targetType: 'customer_visits',
-              targetPeriod: period,
-              targetData: {...existing.targetData},
-            ));
+            result.add(
+              TargetModel(
+                id: existing.id,
+                scope: _selectedScope,
+                regionId: _selectedRegionId,
+                subRegion: _selectedSubRegion,
+                assignedTo: _selectedAssigneeId,
+                targetType: 'customer_visits',
+                targetPeriod: period,
+                targetData: {...existing.targetData},
+              ),
+            );
           }
         }
         break;
@@ -193,16 +210,18 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
         for (final period in ['daily', 'weekly', 'monthly']) {
           final existing = _getExistingTarget('collections', period);
           if (existing != null && existing.targetData['amount'] != null) {
-            result.add(TargetModel(
-              id: existing.id,
-              scope: _selectedScope,
-              regionId: _selectedRegionId,
-              subRegion: _selectedSubRegion,
-              assignedTo: _selectedAssigneeId,
-              targetType: 'collections',
-              targetPeriod: period,
-              targetData: {...existing.targetData},
-            ));
+            result.add(
+              TargetModel(
+                id: existing.id,
+                scope: _selectedScope,
+                regionId: _selectedRegionId,
+                subRegion: _selectedSubRegion,
+                assignedTo: _selectedAssigneeId,
+                targetType: 'collections',
+                targetPeriod: period,
+                targetData: {...existing.targetData},
+              ),
+            );
           }
         }
         break;
@@ -210,16 +229,18 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
         for (final period in ['daily', 'weekly', 'monthly']) {
           final existing = _getExistingTarget('new_customers', period);
           if (existing != null && existing.targetData['count'] != null) {
-            result.add(TargetModel(
-              id: existing.id,
-              scope: _selectedScope,
-              regionId: _selectedRegionId,
-              subRegion: _selectedSubRegion,
-              assignedTo: _selectedAssigneeId,
-              targetType: 'new_customers',
-              targetPeriod: period,
-              targetData: {...existing.targetData},
-            ));
+            result.add(
+              TargetModel(
+                id: existing.id,
+                scope: _selectedScope,
+                regionId: _selectedRegionId,
+                subRegion: _selectedSubRegion,
+                assignedTo: _selectedAssigneeId,
+                targetType: 'new_customers',
+                targetPeriod: period,
+                targetData: {...existing.targetData},
+              ),
+            );
           }
         }
         break;
@@ -227,32 +248,36 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
         for (final period in ['weekly', 'monthly']) {
           final existing = _getExistingTarget('sample_distribution', period);
           if (existing != null && existing.targetData.isNotEmpty) {
-            result.add(TargetModel(
-              id: existing.id,
-              scope: _selectedScope,
-              regionId: _selectedRegionId,
-              subRegion: _selectedSubRegion,
-              assignedTo: _selectedAssigneeId,
-              targetType: 'sample_distribution',
-              targetPeriod: period,
-              targetData: {...existing.targetData},
-            ));
+            result.add(
+              TargetModel(
+                id: existing.id,
+                scope: _selectedScope,
+                regionId: _selectedRegionId,
+                subRegion: _selectedSubRegion,
+                assignedTo: _selectedAssigneeId,
+                targetType: 'sample_distribution',
+                targetPeriod: period,
+                targetData: {...existing.targetData},
+              ),
+            );
           }
         }
         break;
       case 5:
         final existing = _getExistingTarget('consignment', 'custom');
         if (existing != null && existing.targetData.isNotEmpty) {
-          result.add(TargetModel(
-            id: existing.id,
-            scope: _selectedScope,
-            regionId: _selectedRegionId,
-            subRegion: _selectedSubRegion,
-            assignedTo: _selectedAssigneeId,
-            targetType: 'consignment',
-            targetPeriod: 'custom',
-            targetData: {...existing.targetData},
-          ));
+          result.add(
+            TargetModel(
+              id: existing.id,
+              scope: _selectedScope,
+              regionId: _selectedRegionId,
+              subRegion: _selectedSubRegion,
+              assignedTo: _selectedAssigneeId,
+              targetType: 'consignment',
+              targetPeriod: 'custom',
+              targetData: {...existing.targetData},
+            ),
+          );
         }
         break;
     }
@@ -267,7 +292,8 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
             t.targetPeriod == targetPeriod &&
             t.scope == _selectedScope &&
             (_selectedScope == 'regional'
-                ? t.regionId == _selectedRegionId && t.subRegion == _selectedSubRegion
+                ? t.regionId == _selectedRegionId &&
+                    t.subRegion == _selectedSubRegion
                 : t.assignedTo == _selectedAssigneeId),
       );
     } catch (_) {
@@ -290,16 +316,17 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildFilterCard(),
-                _buildTargetTabs(),
-                Expanded(child: _buildTabBarView()),
-                _buildSaveBar(),
-              ],
-            ),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                children: [
+                  _buildFilterCard(),
+                  _buildTargetTabs(),
+                  Expanded(child: _buildTabBarView()),
+                  _buildSaveBar(),
+                ],
+              ),
     );
   }
 
@@ -307,11 +334,15 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 600;
-        final crossAxis = isCompact ? CrossAxisAlignment.start : CrossAxisAlignment.center;
+        final crossAxis =
+            isCompact ? CrossAxisAlignment.start : CrossAxisAlignment.center;
         final rowSpacing = isCompact ? 0.0 : 12.0;
 
         return Container(
-          margin: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 12, vertical: isCompact ? 8 : 12),
+          margin: EdgeInsets.symmetric(
+            horizontal: isCompact ? 8 : 12,
+            vertical: isCompact ? 8 : 12,
+          ),
           padding: EdgeInsets.all(isCompact ? 12 : 16),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -323,12 +354,19 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
             children: [
               Row(
                 children: [
-                  Icon(Icons.tune, size: isCompact ? 18 : 20, color: AppColors.primaryDark),
+                  Icon(
+                    Icons.tune,
+                    size: isCompact ? 18 : 20,
+                    color: AppColors.primaryDark,
+                  ),
                   SizedBox(width: isCompact ? 6 : 8),
                   Flexible(
                     child: Text(
                       'Configure Targets',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: isCompact ? 14 : 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: isCompact ? 14 : 16,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -336,19 +374,29 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                     const Spacer(),
                     if (_selectedScope == 'regional')
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryDark.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           _selectedSubRegion ?? 'Select region',
-                          style: TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       )
                     else if (_selectedAssigneeId != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryDark.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
@@ -357,9 +405,13 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                           _selectedScope == 'agent'
                               ? 'Agent'
                               : _selectedScope == 'business_advisor'
-                                  ? 'Business Advisor'
-                                  : 'Sales Rep',
-                          style: TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
+                              ? 'Business Advisor'
+                              : 'Sales Rep',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                   ],
@@ -375,13 +427,25 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                         labelText: 'Scope',
                         border: OutlineInputBorder(),
                         isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'regional', child: Text('Regional')),
+                        DropdownMenuItem(
+                          value: 'regional',
+                          child: Text('Regional'),
+                        ),
                         DropdownMenuItem(value: 'agent', child: Text('Agent')),
-                        DropdownMenuItem(value: 'business_advisor', child: Text('Business Advisor')),
-                        DropdownMenuItem(value: 'sales_rep', child: Text('Sales Rep')),
+                        DropdownMenuItem(
+                          value: 'business_advisor',
+                          child: Text('Business Advisor'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'sales_rep',
+                          child: Text('Sales Rep'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -401,11 +465,20 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                           labelText: 'Region',
                           border: OutlineInputBorder(),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
-                        items: _regions
-                            .map((r) => DropdownMenuItem(value: r.id, child: Text(r.region)))
-                            .toList(),
+                        items:
+                            _regions
+                                .map(
+                                  (r) => DropdownMenuItem(
+                                    value: r.id,
+                                    child: Text(r.region),
+                                  ),
+                                )
+                                .toList(),
                         onChanged: (value) {
                           setState(() {
                             _selectedRegionId = value;
@@ -417,25 +490,39 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                       DropdownButtonFormField<String>(
                         value: _selectedAssigneeId,
                         decoration: InputDecoration(
-                          labelText: _selectedScope == 'agent'
-                              ? 'Agent'
-                              : _selectedScope == 'business_advisor'
+                          labelText:
+                              _selectedScope == 'agent'
+                                  ? 'Agent'
+                                  : _selectedScope == 'business_advisor'
                                   ? 'Business Advisor'
                                   : 'Sales Rep',
                           border: const OutlineInputBorder(),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
                         items: [
-                          const DropdownMenuItem<String>(value: null, child: Text('Select...')),
+                          const DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Select...'),
+                          ),
                           ...(_selectedScope == 'agent'
-                              ? _agents
-                              : _selectedScope == 'business_advisor'
+                                  ? _agents
+                                  : _selectedScope == 'business_advisor'
                                   ? _businessAdvisors
                                   : _salesReps)
-                              .map((u) => DropdownMenuItem(value: u.id, child: Text(u.fullName ?? u.email))),
+                              .map(
+                                (u) => DropdownMenuItem(
+                                  value: u.id,
+                                  child: Text(u.fullName ?? u.email),
+                                ),
+                              ),
                         ],
-                        onChanged: (value) => setState(() => _selectedAssigneeId = value),
+                        onChanged:
+                            (value) =>
+                                setState(() => _selectedAssigneeId = value),
                       ),
                   ],
                 )
@@ -449,13 +536,28 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                           labelText: 'Scope',
                           border: OutlineInputBorder(),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
                         items: const [
-                          DropdownMenuItem(value: 'regional', child: Text('Regional')),
-                          DropdownMenuItem(value: 'agent', child: Text('Agent')),
-                          DropdownMenuItem(value: 'business_advisor', child: Text('Business Advisor')),
-                          DropdownMenuItem(value: 'sales_rep', child: Text('Sales Rep')),
+                          DropdownMenuItem(
+                            value: 'regional',
+                            child: Text('Regional'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'agent',
+                            child: Text('Agent'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'business_advisor',
+                            child: Text('Business Advisor'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'sales_rep',
+                            child: Text('Sales Rep'),
+                          ),
                         ],
                         onChanged: (value) {
                           if (value == null) return;
@@ -477,11 +579,20 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                             labelText: 'Region',
                             border: OutlineInputBorder(),
                             isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
-                          items: _regions
-                              .map((r) => DropdownMenuItem(value: r.id, child: Text(r.region)))
-                              .toList(),
+                          items:
+                              _regions
+                                  .map(
+                                    (r) => DropdownMenuItem(
+                                      value: r.id,
+                                      child: Text(r.region),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (value) {
                             setState(() {
                               _selectedRegionId = value;
@@ -495,30 +606,45 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                         child: DropdownButtonFormField<String>(
                           value: _selectedAssigneeId,
                           decoration: InputDecoration(
-                            labelText: _selectedScope == 'agent'
-                                ? 'Agent'
-                                : _selectedScope == 'business_advisor'
+                            labelText:
+                                _selectedScope == 'agent'
+                                    ? 'Agent'
+                                    : _selectedScope == 'business_advisor'
                                     ? 'Business Advisor'
                                     : 'Sales Rep',
                             border: const OutlineInputBorder(),
                             isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           items: [
-                            const DropdownMenuItem<String>(value: null, child: Text('Select...')),
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('Select...'),
+                            ),
                             ...(_selectedScope == 'agent'
-                                ? _agents
-                                : _selectedScope == 'business_advisor'
+                                    ? _agents
+                                    : _selectedScope == 'business_advisor'
                                     ? _businessAdvisors
                                     : _salesReps)
-                                .map((u) => DropdownMenuItem(value: u.id, child: Text(u.fullName ?? u.email))),
+                                .map(
+                                  (u) => DropdownMenuItem(
+                                    value: u.id,
+                                    child: Text(u.fullName ?? u.email),
+                                  ),
+                                ),
                           ],
-                          onChanged: (value) => setState(() => _selectedAssigneeId = value),
+                          onChanged:
+                              (value) =>
+                                  setState(() => _selectedAssigneeId = value),
                         ),
                       ),
                   ],
                 ),
-              if (_selectedScope == 'regional' && _selectedRegionId != null) ...[
+              if (_selectedScope == 'regional' &&
+                  _selectedRegionId != null) ...[
                 SizedBox(height: isCompact ? 10 : 12),
                 DropdownButtonFormField<String>(
                   value: _selectedSubRegion,
@@ -526,13 +652,27 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                     labelText: 'Sub Region',
                     border: const OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: isCompact ? 10 : 12),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 10 : 12,
+                      vertical: isCompact ? 10 : 12,
+                    ),
                   ),
-                  items: _regions
-                      .where((r) => r.id == _selectedRegionId && r.subRegion.trim().isNotEmpty)
-                      .map((r) => DropdownMenuItem(value: r.subRegion.trim(), child: Text(r.subRegion.trim())))
-                      .toList(),
-                  onChanged: (value) => setState(() => _selectedSubRegion = value),
+                  items:
+                      _regions
+                          .where(
+                            (r) =>
+                                r.id == _selectedRegionId &&
+                                r.subRegion.trim().isNotEmpty,
+                          )
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r.subRegion.trim(),
+                              child: Text(r.subRegion.trim()),
+                            ),
+                          )
+                          .toList(),
+                  onChanged:
+                      (value) => setState(() => _selectedSubRegion = value),
                 ),
               ],
             ],
@@ -556,7 +696,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
           color: AppColors.primaryGreen,
           borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
         ),
-        labelPadding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: isCompact ? 10 : 12),
+        labelPadding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 12 : 16,
+          vertical: isCompact ? 10 : 12,
+        ),
         tabs: const [
           Tab(text: 'Products'),
           Tab(text: 'Visits'),
@@ -585,7 +728,9 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
 
   Widget _buildSaveBar() {
     return Container(
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
+      padding: EdgeInsets.all(
+        MediaQuery.of(context).size.width < 600 ? 12 : 16,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
@@ -596,24 +741,34 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _isSaving ? null : _saveAllTargets,
-            icon: _isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.save_outlined),
+            icon:
+                _isSaving
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Icon(Icons.save_outlined),
             label: Text(_isSaving ? 'Saving...' : 'Save All Targets'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: MediaQuery.of(context).size.width < 600 ? 12 : 14),
-              textStyle: TextStyle(fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16),
-            ).copyWith(
-              overlayColor: WidgetStateProperty.resolveWith<Color?>(
-                (states) {
-                  if (states.contains(WidgetState.hovered)) {
-                    return AppColors.primaryGreen.withValues(alpha: 0.85);
-                  }
-                  return null;
-                },
+              padding: EdgeInsets.symmetric(
+                vertical: MediaQuery.of(context).size.width < 600 ? 12 : 14,
               ),
+              textStyle: TextStyle(
+                fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
+              ),
+            ).copyWith(
+              overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                if (states.contains(WidgetState.hovered)) {
+                  return AppColors.primaryGreen.withValues(alpha: 0.85);
+                }
+                return null;
+              }),
             ),
           ),
         ),
@@ -628,7 +783,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Product Sales Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'Product Sales Targets',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...products.map((product) {
           return Card(
@@ -638,44 +796,74 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(product, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  Text(
+                    product,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: periods.map((period) {
-                        final existing = _getExistingTarget('product_sales', period);
-                        final currentValue = existing?.targetData[product.toLowerCase().replaceAll(' ', '_')]?.toString() ?? '';
-                        return Container(
-                          width: 110,
-                          margin: EdgeInsets.only(right: period != 'ytd' ? 8 : 0),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              labelText: period.toUpperCase(),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                            ),
-                            keyboardType: TextInputType.number,
-                            controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
-                            onChanged: (value) {
-                              final target = TargetModel(
-                                scope: _selectedScope,
-                                regionId: _selectedRegionId,
-                                subRegion: _selectedSubRegion,
-                                assignedTo: _selectedAssigneeId,
-                                targetType: 'product_sales',
-                                targetPeriod: period,
-                                targetData: {
-                                  ...(existing?.targetData ?? {}),
-                                  product.toLowerCase().replaceAll(' ', '_'): value.isEmpty ? null : int.tryParse(value),
+                      children:
+                          periods.map((period) {
+                            final existing = _getExistingTarget(
+                              'product_sales',
+                              period,
+                            );
+                            final currentValue =
+                                existing
+                                    ?.targetData[product
+                                        .toLowerCase()
+                                        .replaceAll(' ', '_')]
+                                    ?.toString() ??
+                                '';
+                            return Container(
+                              width: 110,
+                              margin: EdgeInsets.only(
+                                right: period != 'ytd' ? 8 : 0,
+                              ),
+                              child: TextField(
+                                decoration: InputDecoration(
+                                  labelText: period.toUpperCase(),
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                controller: TextEditingController(
+                                    text: currentValue,
+                                  )
+                                  ..selection = TextSelection.fromPosition(
+                                    TextPosition(offset: currentValue.length),
+                                  ),
+                                onChanged: (value) {
+                                  final target = TargetModel(
+                                    scope: _selectedScope,
+                                    regionId: _selectedRegionId,
+                                    subRegion: _selectedSubRegion,
+                                    assignedTo: _selectedAssigneeId,
+                                    targetType: 'product_sales',
+                                    targetPeriod: period,
+                                    targetData: {
+                                      ...(existing?.targetData ?? {}),
+                                      product
+                                          .toLowerCase()
+                                          .replaceAll(' ', '_'): value.isEmpty
+                                              ? null
+                                              : int.tryParse(value),
+                                    },
+                                  );
+                                  _saveTarget(target);
                                 },
-                              );
-                              _saveTarget(target);
-                            },
-                          ),
-                        );
-                      }).toList(),
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ],
@@ -694,7 +882,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Customer Visit Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'Customer Visit Targets',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...customerTypes.map((type) {
           return Card(
@@ -704,45 +895,69 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(type, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  Text(
+                    type,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: periods.map((period) {
-                        final existing = _getExistingTarget('customer_visits', period);
-                        final key = type.toLowerCase();
-                        final currentValue = existing?.targetData[key]?.toString() ?? '';
-                        return Container(
-                          width: 110,
-                          margin: EdgeInsets.only(right: period != 'monthly' ? 8 : 0),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              labelText: period.toUpperCase(),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                            ),
-                            keyboardType: TextInputType.number,
-                            controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
-                            onChanged: (value) {
-                              final target = TargetModel(
-                                scope: _selectedScope,
-                                regionId: _selectedRegionId,
-                                subRegion: _selectedSubRegion,
-                                assignedTo: _selectedAssigneeId,
-                                targetType: 'customer_visits',
-                                targetPeriod: period,
-                                targetData: {
-                                  ...(existing?.targetData ?? {}),
-                                  key: value.isEmpty ? null : int.tryParse(value),
+                      children:
+                          periods.map((period) {
+                            final existing = _getExistingTarget(
+                              'customer_visits',
+                              period,
+                            );
+                            final key = type.toLowerCase();
+                            final currentValue =
+                                existing?.targetData[key]?.toString() ?? '';
+                            return Container(
+                              width: 110,
+                              margin: EdgeInsets.only(
+                                right: period != 'monthly' ? 8 : 0,
+                              ),
+                              child: TextField(
+                                decoration: InputDecoration(
+                                  labelText: period.toUpperCase(),
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                controller: TextEditingController(
+                                    text: currentValue,
+                                  )
+                                  ..selection = TextSelection.fromPosition(
+                                    TextPosition(offset: currentValue.length),
+                                  ),
+                                onChanged: (value) {
+                                  final target = TargetModel(
+                                    scope: _selectedScope,
+                                    regionId: _selectedRegionId,
+                                    subRegion: _selectedSubRegion,
+                                    assignedTo: _selectedAssigneeId,
+                                    targetType: 'customer_visits',
+                                    targetPeriod: period,
+                                    targetData: {
+                                      ...(existing?.targetData ?? {}),
+                                      key:
+                                          value.isEmpty
+                                              ? null
+                                              : int.tryParse(value),
+                                    },
+                                  );
+                                  _saveTarget(target);
                                 },
-                              );
-                              _saveTarget(target);
-                            },
-                          ),
-                        );
-                      }).toList(),
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ],
@@ -760,7 +975,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Collection Targets (KES)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'Collection Targets (KES)',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...periods.map((period) {
           final existing = _getExistingTarget('collections', period);
@@ -774,10 +992,16 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                   labelText: '${period.toUpperCase()} Target (KES)',
                   border: const OutlineInputBorder(),
                   prefixText: 'KES ',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 keyboardType: TextInputType.number,
-                controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
+                controller: TextEditingController(text: currentValue)
+                  ..selection = TextSelection.fromPosition(
+                    TextPosition(offset: currentValue.length),
+                  ),
                 onChanged: (value) {
                   final target = TargetModel(
                     scope: _selectedScope,
@@ -807,7 +1031,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('New Customer Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'New Customer Targets',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...periods.map((period) {
           final existing = _getExistingTarget('new_customers', period);
@@ -821,10 +1048,16 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                   labelText: '${period.toUpperCase()} Target (customers)',
                   border: const OutlineInputBorder(),
                   suffixText: 'customers',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 keyboardType: TextInputType.number,
-                controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
+                controller: TextEditingController(text: currentValue)
+                  ..selection = TextSelection.fromPosition(
+                    TextPosition(offset: currentValue.length),
+                  ),
                 onChanged: (value) {
                   final target = TargetModel(
                     scope: _selectedScope,
@@ -855,7 +1088,10 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Sample Distribution Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'Sample Distribution Targets',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...items.map((item) {
           return Card(
@@ -865,45 +1101,69 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: periods.map((period) {
-                        final existing = _getExistingTarget('sample_distribution', period);
-                        final key = item.toLowerCase().replaceAll(' ', '_');
-                        final currentValue = existing?.targetData[key]?.toString() ?? '';
-                        return Container(
-                          width: 140,
-                          margin: EdgeInsets.only(right: period != 'monthly' ? 8 : 0),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              labelText: period.toUpperCase(),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                            ),
-                            keyboardType: TextInputType.number,
-                            controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
-                            onChanged: (value) {
-                              final target = TargetModel(
-                                scope: _selectedScope,
-                                regionId: _selectedRegionId,
-                                subRegion: _selectedSubRegion,
-                                assignedTo: _selectedAssigneeId,
-                                targetType: 'sample_distribution',
-                                targetPeriod: period,
-                                targetData: {
-                                  ...(existing?.targetData ?? {}),
-                                  key: value.isEmpty ? null : int.tryParse(value),
+                      children:
+                          periods.map((period) {
+                            final existing = _getExistingTarget(
+                              'sample_distribution',
+                              period,
+                            );
+                            final key = item.toLowerCase().replaceAll(' ', '_');
+                            final currentValue =
+                                existing?.targetData[key]?.toString() ?? '';
+                            return Container(
+                              width: 140,
+                              margin: EdgeInsets.only(
+                                right: period != 'monthly' ? 8 : 0,
+                              ),
+                              child: TextField(
+                                decoration: InputDecoration(
+                                  labelText: period.toUpperCase(),
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                controller: TextEditingController(
+                                    text: currentValue,
+                                  )
+                                  ..selection = TextSelection.fromPosition(
+                                    TextPosition(offset: currentValue.length),
+                                  ),
+                                onChanged: (value) {
+                                  final target = TargetModel(
+                                    scope: _selectedScope,
+                                    regionId: _selectedRegionId,
+                                    subRegion: _selectedSubRegion,
+                                    assignedTo: _selectedAssigneeId,
+                                    targetType: 'sample_distribution',
+                                    targetPeriod: period,
+                                    targetData: {
+                                      ...(existing?.targetData ?? {}),
+                                      key:
+                                          value.isEmpty
+                                              ? null
+                                              : int.tryParse(value),
+                                    },
+                                  );
+                                  _saveTarget(target);
                                 },
-                              );
-                              _saveTarget(target);
-                            },
-                          ),
-                        );
-                      }).toList(),
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ],
@@ -925,11 +1185,15 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Consignment Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          'Consignment Targets',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         ...fields.map((field) {
           final existing = _getExistingTarget('consignment', 'custom');
-          final currentValue = existing?.targetData[field['key']]?.toString() ?? '';
+          final currentValue =
+              existing?.targetData[field['key']]?.toString() ?? '';
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: Padding(
@@ -938,11 +1202,18 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                 decoration: InputDecoration(
                   labelText: field['label'] as String,
                   border: const OutlineInputBorder(),
-                  suffixText: field['key'] == 'max_consignment_value' ? 'KES' : null,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  suffixText:
+                      field['key'] == 'max_consignment_value' ? 'KES' : null,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 keyboardType: TextInputType.number,
-                controller: TextEditingController(text: currentValue)..selection = TextSelection.fromPosition(TextPosition(offset: currentValue.length)),
+                controller: TextEditingController(text: currentValue)
+                  ..selection = TextSelection.fromPosition(
+                    TextPosition(offset: currentValue.length),
+                  ),
                 onChanged: (value) {
                   final target = TargetModel(
                     scope: _selectedScope,
@@ -953,7 +1224,8 @@ class _TargetsPageState extends State<TargetsPage> with SingleTickerProviderStat
                     targetPeriod: 'custom',
                     targetData: {
                       ...(existing?.targetData ?? {}),
-                      field['key'] as String: value.isEmpty ? null : int.tryParse(value),
+                      field['key'] as String:
+                          value.isEmpty ? null : int.tryParse(value),
                     },
                   );
                   _saveTarget(target);

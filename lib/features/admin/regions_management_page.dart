@@ -68,7 +68,9 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
     super.initState();
     _loadData();
     _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+      setState(
+        () => _searchQuery = _searchController.text.trim().toLowerCase(),
+      );
     });
   }
 
@@ -78,27 +80,36 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
     super.dispose();
   }
 
-    List<RegionModel> get _filteredRegions {
+  List<RegionModel> get _filteredRegions {
     if (_searchQuery.isEmpty) return _regions;
     return _regions.where((region) {
-      final supervisorMatches = _agents.where((a) => a.id == region.supervisorId).toList();
-      final supervisorName = supervisorMatches.isNotEmpty ? (supervisorMatches.first.fullName ?? '') : '';
-      final agentMatches = _agents.where((a) => a.id == region.assignedTo).toList();
-      final agentName = agentMatches.isNotEmpty ? (agentMatches.first.fullName ?? '') : '';
-      final haystack = [
-        region.region,
-        region.subRegion,
-        region.counties ?? '',
-        agentName,
-        supervisorName,
-      ].join(' ').toLowerCase();
+      final supervisorMatches =
+          _agents.where((a) => a.id == region.supervisorId).toList();
+      final supervisorName =
+          supervisorMatches.isNotEmpty
+              ? (supervisorMatches.first.fullName ?? '')
+              : '';
+      final agentMatches =
+          _agents.where((a) => a.id == region.assignedTo).toList();
+      final agentName =
+          agentMatches.isNotEmpty ? (agentMatches.first.fullName ?? '') : '';
+      final haystack =
+          [
+            region.region,
+            region.subRegion,
+            region.counties ?? '',
+            agentName,
+            supervisorName,
+          ].join(' ').toLowerCase();
       return haystack.contains(_searchQuery);
     }).toList();
   }
 
   int get _totalRegions => _regions.length;
   int get _assignedRegions =>
-      _regions.where((r) => r.assignedTo != null && r.assignedTo!.isNotEmpty).length;
+      _regions
+          .where((r) => r.assignedTo != null && r.assignedTo!.isNotEmpty)
+          .length;
   int get _unassignedRegions => _totalRegions - _assignedRegions;
   int get _totalMembers => _members.length;
 
@@ -132,7 +143,9 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
   Future<void> _showRegionForm({RegionModel? region}) async {
     final isEdit = region != null;
     final controllerRegion = TextEditingController(text: region?.region ?? '');
-    final controllerSubRegion = TextEditingController(text: region?.subRegion ?? '');
+    final controllerSubRegion = TextEditingController(
+      text: region?.subRegion ?? '',
+    );
     final selectedCounties = <String>{};
     final existingCounties = region?.counties;
     if (existingCounties != null && existingCounties.isNotEmpty) {
@@ -154,7 +167,8 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             Future<void> pickCounties() async {
-              final pickerWidth = screenWidth > 420 ? 420.0 : screenWidth - 32.0;
+              final pickerWidth =
+                  screenWidth > 420 ? 420.0 : screenWidth - 32.0;
               final picked = await showDialog<Set<String>>(
                 context: context,
                 builder: (context) {
@@ -267,7 +281,9 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                           controllerSubRegion.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Please fill in both region and sub region'),
+                            content: Text(
+                              'Please fill in both region and sub region',
+                            ),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -281,14 +297,18 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                       final duplicate = _regions.any(
                         (r) =>
                             r.id != region.id &&
-                            r.region.toLowerCase() == updated.region.toLowerCase() &&
-                            r.subRegion.toLowerCase() == updated.subRegion.toLowerCase(),
+                            r.region.toLowerCase() ==
+                                updated.region.toLowerCase() &&
+                            r.subRegion.toLowerCase() ==
+                                updated.subRegion.toLowerCase(),
                       );
                       if (duplicate) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('A region with this sub-region already exists.'),
+                            content: Text(
+                              'A region with this sub-region already exists.',
+                            ),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -324,7 +344,9 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                           controllerSubRegion.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Please fill in both region and sub region'),
+                            content: Text(
+                              'Please fill in both region and sub region',
+                            ),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -337,14 +359,18 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                       );
                       final duplicate = _regions.any(
                         (r) =>
-                            r.region.toLowerCase() == newRegion.region.toLowerCase() &&
-                            r.subRegion.toLowerCase() == newRegion.subRegion.toLowerCase(),
+                            r.region.toLowerCase() ==
+                                newRegion.region.toLowerCase() &&
+                            r.subRegion.toLowerCase() ==
+                                newRegion.subRegion.toLowerCase(),
                       );
                       if (duplicate) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('A region with this sub-region already exists.'),
+                            content: Text(
+                              'A region with this sub-region already exists.',
+                            ),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -387,7 +413,9 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No supervisors available. Create a Role 3 user first.'),
+          content: Text(
+            'No supervisors available. Create a Role 3 user first.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -405,7 +433,10 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
           .map((u) => u.id),
     );
     final currentRegionIds = Set<String>.from(
-      _regions.where((r) => r.id != null && r.id!.isNotEmpty).map((r) => r.id!).toList(),
+      _regions
+          .where((r) => r.id != null && r.id!.isNotEmpty)
+          .map((r) => r.id!)
+          .toList(),
     );
     final selected = Set<String>.from(currentIds);
     final selectedRegions = <String>{region.id ?? ''};
@@ -546,18 +577,29 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final safeRegions = selectedRegions
-                        .where((id) => currentRegionIds.contains(id))
-                        .toList();
+                    final safeRegions =
+                        selectedRegions
+                            .where((id) => currentRegionIds.contains(id))
+                            .toList();
                     for (final regionId in safeRegions) {
                       for (final supervisor in availableSupervisors) {
-                        final wasAssigned =
-                            (assignmentsByUser[supervisor.id] ?? {}).contains(regionId);
-                        final shouldBeAssigned = selected.contains(supervisor.id);
+                        final wasAssigned = (assignmentsByUser[supervisor.id] ??
+                                {})
+                            .contains(regionId);
+                        final shouldBeAssigned = selected.contains(
+                          supervisor.id,
+                        );
                         if (shouldBeAssigned && !wasAssigned) {
-                          await _dbService.assignUserToRegion(regionId, supervisor.id, 3);
+                          await _dbService.assignUserToRegion(
+                            regionId,
+                            supervisor.id,
+                            3,
+                          );
                         } else if (!shouldBeAssigned && wasAssigned) {
-                          await _dbService.unassignUserFromRegion(regionId, supervisor.id);
+                          await _dbService.unassignUserFromRegion(
+                            regionId,
+                            supervisor.id,
+                          );
                         }
                       }
                     }
@@ -605,7 +647,10 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
           .map((u) => u.id),
     );
     final currentRegionIds = Set<String>.from(
-      _regions.where((r) => r.id != null && r.id!.isNotEmpty).map((r) => r.id!).toList(),
+      _regions
+          .where((r) => r.id != null && r.id!.isNotEmpty)
+          .map((r) => r.id!)
+          .toList(),
     );
     final selected = Set<String>.from(currentIds);
     final selectedRegions = <String>{region.id ?? ''};
@@ -746,18 +791,26 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final safeRegions = selectedRegions
-                        .where((id) => currentRegionIds.contains(id))
-                        .toList();
+                    final safeRegions =
+                        selectedRegions
+                            .where((id) => currentRegionIds.contains(id))
+                            .toList();
                     for (final regionId in safeRegions) {
                       for (final agent in availableAgents) {
-                        final wasAssigned =
-                            (assignmentsByUser[agent.id] ?? {}).contains(regionId);
+                        final wasAssigned = (assignmentsByUser[agent.id] ?? {})
+                            .contains(regionId);
                         final shouldBeAssigned = selected.contains(agent.id);
                         if (shouldBeAssigned && !wasAssigned) {
-                          await _dbService.assignUserToRegion(regionId, agent.id, 4);
+                          await _dbService.assignUserToRegion(
+                            regionId,
+                            agent.id,
+                            4,
+                          );
                         } else if (!shouldBeAssigned && wasAssigned) {
-                          await _dbService.unassignUserFromRegion(regionId, agent.id);
+                          await _dbService.unassignUserFromRegion(
+                            regionId,
+                            agent.id,
+                          );
                         }
                       }
                     }
@@ -794,59 +847,60 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
           title: Text('Add Member to ${region.subRegion}'),
           content: SizedBox(
             width: dialogWidth,
-            child: availableMembers.isEmpty
-                ? const SizedBox(
-                    height: 120,
-                    child: Center(
-                      child: Text('No available members for this region.'),
+            child:
+                availableMembers.isEmpty
+                    ? const SizedBox(
+                      height: 120,
+                      child: Center(
+                        child: Text('No available members for this region.'),
+                      ),
+                    )
+                    : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: availableMembers.length,
+                      itemBuilder: (context, index) {
+                        final member = availableMembers[index];
+                        return _MemberTile(
+                          member: member,
+                          region: region,
+                          onAdd: () async {
+                            await _dbService.addMemberToRegion(
+                              region.id!,
+                              member.id,
+                            );
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            _loadData();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${member.fullName ?? member.email} added to ${region.subRegion}',
+                                ),
+                                backgroundColor: AppColors.primaryGreen,
+                              ),
+                            );
+                          },
+                          onPromote: (role) async {
+                            await _dbService.promoteRegionMemberToAgent(
+                              region.id!,
+                              member.id,
+                              role: role,
+                            );
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            _loadData();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${member.fullName ?? member.email} promoted to role $role in ${region.subRegion}',
+                                ),
+                                backgroundColor: AppColors.primaryGreen,
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: availableMembers.length,
-                    itemBuilder: (context, index) {
-                      final member = availableMembers[index];
-                      return _MemberTile(
-                        member: member,
-                        region: region,
-                        onAdd: () async {
-                          await _dbService.addMemberToRegion(
-                            region.id!,
-                            member.id,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(context);
-                          _loadData();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '${member.fullName ?? member.email} added to ${region.subRegion}',
-                              ),
-                              backgroundColor: AppColors.primaryGreen,
-                            ),
-                          );
-                        },
-                        onPromote: (role) async {
-                          await _dbService.promoteRegionMemberToAgent(
-                            region.id!,
-                            member.id,
-                            role: role,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(context);
-                          _loadData();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '${member.fullName ?? member.email} promoted to role $role in ${region.subRegion}',
-                              ),
-                              backgroundColor: AppColors.primaryGreen,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
           ),
           actions: [
             TextButton(
@@ -863,24 +917,25 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
     if (region.id == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Region'),
-        content: Text('Delete ${region.subRegion}? This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Region'),
+            content: Text('Delete ${region.subRegion}? This cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     try {
@@ -930,76 +985,82 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          child: Row(
-                            children: [
-                              _StatCard(
-                                label: 'Regions',
-                                value: '$_totalRegions',
-                                color: AppColors.primaryDark,
-                              ),
-                              const SizedBox(width: 12),
-                              _StatCard(
-                                label: 'Assigned',
-                                value: '$_assignedRegions',
-                                color: AppColors.primaryGreen,
-                              ),
-                              const SizedBox(width: 12),
-                              _StatCard(
-                                label: 'Unassigned',
-                                value: '$_unassignedRegions',
-                                color: Colors.orange,
-                              ),
-                              const SizedBox(width: 12),
-                              _StatCard(
-                                label: 'Members',
-                                value: '$_totalMembers',
-                                color: Colors.indigo,
-                              ),
-                              const SizedBox(width: 16),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'Search regions, counties, or agent...',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                      },
-                                    )
-                                  : null,
-                              border: const OutlineInputBorder(),
-                              filled: true,
-                              fillColor: Colors.white,
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadData,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            child: Row(
+                              children: [
+                                _StatCard(
+                                  label: 'Regions',
+                                  value: '$_totalRegions',
+                                  color: AppColors.primaryDark,
+                                ),
+                                const SizedBox(width: 12),
+                                _StatCard(
+                                  label: 'Assigned',
+                                  value: '$_assignedRegions',
+                                  color: AppColors.primaryGreen,
+                                ),
+                                const SizedBox(width: 12),
+                                _StatCard(
+                                  label: 'Unassigned',
+                                  value: '$_unassignedRegions',
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 12),
+                                _StatCard(
+                                  label: 'Members',
+                                  value: '$_totalMembers',
+                                  color: Colors.indigo,
+                                ),
+                                const SizedBox(width: 16),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText:
+                                    'Search regions, counties, or agent...',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon:
+                                    _searchQuery.isNotEmpty
+                                        ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                          },
+                                        )
+                                        : null,
+                                border: const OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                     ),
-                  ),
-                  _filteredRegions.isEmpty
-                      ? SliverFillRemaining(
+                    _filteredRegions.isEmpty
+                        ? SliverFillRemaining(
                           child: Center(
                             child: Padding(
                               padding: const EdgeInsets.all(32),
@@ -1037,71 +1098,71 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                             ),
                           ),
                         )
-                      : SliverPadding(
+                        : SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                           sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final region = _filteredRegions[index];
-                                final assignedUsers =
-                                    _regionAssignments[region.id ?? ''] ?? [];
-                                final assignedAgents = assignedUsers
-                                    .where((u) => u.role == 4)
-                                    .toList();
-                                final assignedSupervisors = assignedUsers
-                                    .where((u) => u.role == 3)
-                                    .toList();
-                                final legacyAssignedUser =
-                                    region.assignedTo == null
-                                        ? null
-                                        : _agents
-                                            .cast<UserModel?>()
-                                            .firstWhere(
-                                              (a) =>
-                                                  a != null &&
-                                                  a.id == region.assignedTo,
-                                              orElse: () => null,
-                                            );
-                                final legacySupervisorUser =
-                                    region.supervisorId == null
-                                        ? null
-                                        : _agents
-                                            .cast<UserModel?>()
-                                            .firstWhere(
-                                              (a) =>
-                                                  a != null &&
-                                                  a.id == region.supervisorId,
-                                              orElse: () => null,
-                                            );
-                                final displayAgents =
-                                    assignedAgents.isEmpty && legacyAssignedUser != null
-                                        ? [legacyAssignedUser]
-                                        : assignedAgents;
-                                final displaySupervisors =
-                                    assignedSupervisors.isEmpty && legacySupervisorUser != null
-                                        ? [legacySupervisorUser]
-                                        : assignedSupervisors;
-                                return _RegionCard(
-                                  region: region,
-                                  assignedAgents: displayAgents,
-                                  assignedSupervisors: displaySupervisors,
-                                  countyColor: _countyChipColor,
-                                  onEdit: () => _showRegionForm(region: region),
-                                  onDelete: () => _deleteRegion(region),
-                                  onAssignAgent: () =>
-                                      _showAssignAgentDialog(region),
-                                  onAssignSupervisor: () =>
-                                      _showAssignSupervisorDialog(region),
-                                  onMembers: () => _showAddMemberDialog(region),
-                                );
-                              },
-                              childCount: _filteredRegions.length,
-                            ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final region = _filteredRegions[index];
+                              final assignedUsers =
+                                  _regionAssignments[region.id ?? ''] ?? [];
+                              final assignedAgents =
+                                  assignedUsers
+                                      .where((u) => u.role == 4)
+                                      .toList();
+                              final assignedSupervisors =
+                                  assignedUsers
+                                      .where((u) => u.role == 3)
+                                      .toList();
+                              final legacyAssignedUser =
+                                  region.assignedTo == null
+                                      ? null
+                                      : _agents.cast<UserModel?>().firstWhere(
+                                        (a) =>
+                                            a != null &&
+                                            a.id == region.assignedTo,
+                                        orElse: () => null,
+                                      );
+                              final legacySupervisorUser =
+                                  region.supervisorId == null
+                                      ? null
+                                      : _agents.cast<UserModel?>().firstWhere(
+                                        (a) =>
+                                            a != null &&
+                                            a.id == region.supervisorId,
+                                        orElse: () => null,
+                                      );
+                              final displayAgents =
+                                  assignedAgents.isEmpty &&
+                                          legacyAssignedUser != null
+                                      ? [legacyAssignedUser]
+                                      : assignedAgents;
+                              final displaySupervisors =
+                                  assignedSupervisors.isEmpty &&
+                                          legacySupervisorUser != null
+                                      ? [legacySupervisorUser]
+                                      : assignedSupervisors;
+                              return _RegionCard(
+                                region: region,
+                                assignedAgents: displayAgents,
+                                assignedSupervisors: displaySupervisors,
+                                countyColor: _countyChipColor,
+                                onEdit: () => _showRegionForm(region: region),
+                                onDelete: () => _deleteRegion(region),
+                                onAssignAgent:
+                                    () => _showAssignAgentDialog(region),
+                                onAssignSupervisor:
+                                    () => _showAssignSupervisorDialog(region),
+                                onMembers: () => _showAddMemberDialog(region),
+                              );
+                            }, childCount: _filteredRegions.length),
                           ),
                         ),
-                ],
+                  ],
+                ),
               ),
-            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showRegionForm(),
         backgroundColor: AppColors.primaryGreen,
@@ -1279,9 +1340,10 @@ class _RegionCard extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: hasAgents
-                            ? AppColors.primaryGreen.withValues(alpha: 0.1)
-                            : Colors.orange.withValues(alpha: 0.1),
+                        color:
+                            hasAgents
+                                ? AppColors.primaryGreen.withValues(alpha: 0.1)
+                                : Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -1289,9 +1351,10 @@ class _RegionCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: hasAgents
-                              ? AppColors.primaryGreen
-                              : Colors.orange.shade700,
+                          color:
+                              hasAgents
+                                  ? AppColors.primaryGreen
+                                  : Colors.orange.shade700,
                         ),
                       ),
                     ),
@@ -1304,21 +1367,24 @@ class _RegionCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: counties
-                    .map(
-                      (county) => Chip(
-                        label: Text(
-                          county,
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        backgroundColor: countyColor(county).withValues(alpha: 0.1),
-                        side: BorderSide(
-                          color: countyColor(county).withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                    )
-                    .toList(),
+                children:
+                    counties
+                        .map(
+                          (county) => Chip(
+                            label: Text(
+                              county,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            backgroundColor: countyColor(
+                              county,
+                            ).withValues(alpha: 0.1),
+                            side: BorderSide(
+                              color: countyColor(county).withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                        )
+                        .toList(),
               ),
             ],
             if (assignedSupervisors.isNotEmpty) ...[
@@ -1344,24 +1410,21 @@ class _RegionCard extends StatelessWidget {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: assignedSupervisors
-                            .map(
-                              (user) {
-                                final displayName =
-                                    (user.fullName ?? '').trim().isNotEmpty
-                                        ? user.fullName!
-                                        : user.email;
-                                return Text(
-                                  displayName,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.purple.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                );
-                              },
-                            )
-                            .toList(),
+                        children:
+                            assignedSupervisors.map((user) {
+                              final displayName =
+                                  (user.fullName ?? '').trim().isNotEmpty
+                                      ? user.fullName!
+                                      : user.email;
+                              return Text(
+                                displayName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.purple.shade800,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ),
                   ],
@@ -1370,10 +1433,7 @@ class _RegionCard extends StatelessWidget {
             ],
             const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
@@ -1391,25 +1451,26 @@ class _RegionCard extends StatelessWidget {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final displayNames = assignedAgents
-                            .map((user) {
+                        final displayNames =
+                            assignedAgents.map((user) {
                               final displayName =
                                   (user.fullName ?? '').trim().isNotEmpty
                                       ? user.fullName!
                                       : user.email;
                               return displayName;
-                            })
-                            .toList();
-                        final text = displayNames.isEmpty
-                            ? 'No agents assigned'
-                            : displayNames.join(', ');
+                            }).toList();
+                        final text =
+                            displayNames.isEmpty
+                                ? 'No agents assigned'
+                                : displayNames.join(', ');
                         return Text(
                           text,
                           style: TextStyle(
                             fontSize: 13,
-                            color: hasAgents
-                                ? Colors.grey.shade800
-                                : Colors.grey.shade500,
+                            color:
+                                hasAgents
+                                    ? Colors.grey.shade800
+                                    : Colors.grey.shade500,
                             fontWeight:
                                 hasAgents ? FontWeight.w500 : FontWeight.normal,
                           ),
@@ -1500,7 +1561,10 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = (member.fullName ?? '').trim().isEmpty ? member.email : member.fullName!;
+    final name =
+        (member.fullName ?? '').trim().isEmpty
+            ? member.email
+            : member.fullName!;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1517,12 +1581,18 @@ class _MemberTile extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         member.email,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -1550,14 +1620,20 @@ class _MemberTile extends StatelessWidget {
                       children: [
                         Text(
                           name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           member.email,
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

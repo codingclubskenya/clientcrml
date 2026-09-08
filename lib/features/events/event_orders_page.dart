@@ -25,9 +25,10 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
   UserModel? _currentUserModel;
   bool _loading = true;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   CatalogService get _catalog => CatalogService.instance;
 
@@ -52,7 +53,8 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   String? get _currentBusinessAssociate {
     final user = _supabase.auth.currentUser;
-    final name = _currentUserModel?.fullName ??
+    final name =
+        _currentUserModel?.fullName ??
         user?.userMetadata?['full_name']?.toString() ??
         user?.userMetadata?['name']?.toString() ??
         user?.email?.split('@').first;
@@ -82,9 +84,8 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     setState(() => _loading = true);
     try {
       final currentUser = _supabase.auth.currentUser;
-      final currentUserModel = currentUser == null
-          ? null
-          : await _dbService.getUser(currentUser.id);
+      final currentUserModel =
+          currentUser == null ? null : await _dbService.getUser(currentUser.id);
       final orders = await _dbService.getEventOrders(id);
       final available = await _getAvailableOrders(id);
       final products = await _loadProducts();
@@ -98,7 +99,9 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
       }
     } finally {
       setState(() => _loading = false);
@@ -174,14 +177,17 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
           .select('order_id')
           .eq('event_id', eventId);
 
-      final linkedIds = (linkedOrderIds as List)
-          .map((e) => e['order_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toList();
+      final linkedIds =
+          (linkedOrderIds as List)
+              .map((e) => e['order_id']?.toString() ?? '')
+              .where((id) => id.isNotEmpty)
+              .toList();
 
       var query = _supabase
           .from('orders')
-          .select('id, order_number, school_id, checkout_amount, status, created_at, schools(name)')
+          .select(
+            'id, order_number, school_id, checkout_amount, status, created_at, schools(name)',
+          )
           .order('created_at', ascending: false)
           .limit(50);
 
@@ -210,16 +216,16 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order linked to event')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Order linked to event')));
       }
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to link order: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to link order: $e')));
       }
     }
   }
@@ -235,18 +241,18 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to unlink: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to unlink: $e')));
       }
     }
   }
 
   Future<void> _showRecordSaleDialog() async {
     if (_products.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No products available')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No products available')));
       return;
     }
 
@@ -256,27 +262,26 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
     // Filter to products that are both in stock and still allocated
     // to the current seller's consignment.
-    final sellable = _products.where((p) {
-      final id = p['id']?.toString() ?? '';
-      if (id.isEmpty) return false;
-      final stock = p['current_stock'];
-      if (stock is num && stock <= 0) return false;
-      final live = _catalog.productById(id);
-      if (live == null || live.currentStock <= 0) return false;
-      final remaining = _catalog.remainingAllocationFor(
-        businessAssociateId: sellerId,
-        businessAssociateName: sellerName,
-        productId: id,
-      );
-      return remaining > 0;
-    }).toList();
+    final sellable =
+        _products.where((p) {
+          final id = p['id']?.toString() ?? '';
+          if (id.isEmpty) return false;
+          final stock = p['current_stock'];
+          if (stock is num && stock <= 0) return false;
+          final live = _catalog.productById(id);
+          if (live == null || live.currentStock <= 0) return false;
+          final remaining = _catalog.remainingAllocationFor(
+            businessAssociateId: sellerId,
+            businessAssociateName: sellerName,
+            productId: id,
+          );
+          return remaining > 0;
+        }).toList();
 
     if (sellable.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'No products are assigned to your consignment yet.',
-          ),
+          content: Text('No products are assigned to your consignment yet.'),
         ),
       );
       return;
@@ -291,195 +296,215 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          int? remainingForSelected() {
-            if (selectedProductId == null) return null;
-            if (sellerId == null && sellerName == null) return null;
-            return _catalog.remainingAllocationFor(
-              businessAssociateId: sellerId,
-              businessAssociateName: sellerName,
-              productId: selectedProductId!,
-            );
-          }
-
-          void recomputeOversellWarning() {
-            final r = remainingForSelected();
-            final qty = int.tryParse(quantityController.text) ?? 0;
-            oversellWarning = r != null && qty > r;
-          }
-
-          void recomputeAmount() {
-            final id = selectedProductId;
-            if (id == null) return;
-            Map<String, dynamic>? product;
-            for (final p in _products) {
-              if (p['id']?.toString() == id) {
-                product = p;
-                break;
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              int? remainingForSelected() {
+                if (selectedProductId == null) return null;
+                if (sellerId == null && sellerName == null) return null;
+                return _catalog.remainingAllocationFor(
+                  businessAssociateId: sellerId,
+                  businessAssociateName: sellerName,
+                  productId: selectedProductId!,
+                );
               }
-            }
-            final price = product?['unit_price'];
-            final qty = int.tryParse(quantityController.text) ?? 1;
-            if (price is num) {
-              amountController.text = (price * qty).toStringAsFixed(0);
-            }
-          }
 
-          return AlertDialog(
-            title: const Text('Record Sale'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (sellerLabel != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
+              void recomputeOversellWarning() {
+                final r = remainingForSelected();
+                final qty = int.tryParse(quantityController.text) ?? 0;
+                oversellWarning = r != null && qty > r;
+              }
+
+              void recomputeAmount() {
+                final id = selectedProductId;
+                if (id == null) return;
+                Map<String, dynamic>? product;
+                for (final p in _products) {
+                  if (p['id']?.toString() == id) {
+                    product = p;
+                    break;
+                  }
+                }
+                final price = product?['unit_price'];
+                final qty = int.tryParse(quantityController.text) ?? 1;
+                if (price is num) {
+                  amountController.text = (price * qty).toStringAsFixed(0);
+                }
+              }
+
+              return AlertDialog(
+                title: const Text('Record Sale'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (sellerLabel != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.assignment_ind_outlined,
+                                size: 16,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Linked to consignment for: $sellerLabel',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const Text(
+                        'Product:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
                       ),
-                      child: Row(
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: selectedProductId,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: 'Select product',
+                        ),
+                        items:
+                            sellable.map((p) {
+                              final name = p['name']?.toString() ?? 'Unknown';
+                              final price = p['unit_price']?.toString() ?? '0';
+                              final stock = p['current_stock'];
+                              final stockLabel =
+                                  stock is num ? ' • stock $stock' : '';
+                              return DropdownMenuItem(
+                                value: p['id']?.toString(),
+                                child: Text(
+                                  '$name (KES $price$stockLabel)',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedProductId = val;
+                            oversellWarning = false;
+                            recomputeAmount();
+                            recomputeOversellWarning();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: quantityController,
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          helperText:
+                              (() {
+                                final r = remainingForSelected();
+                                if (r == null) return null;
+                                return 'Consignment remaining: $r';
+                              })(),
+                          errorText:
+                              oversellWarning
+                                  ? 'Exceeds available consignment allocation'
+                                  : null,
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            recomputeAmount();
+                            recomputeOversellWarning();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Amount (KES)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Payment Method:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
                         children: [
-                          const Icon(Icons.assignment_ind_outlined,
-                              size: 16, color: Colors.green),
-                          const SizedBox(width: 6),
                           Expanded(
-                            child: Text(
-                              'Linked to consignment for: $sellerLabel',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.green),
+                            child: RadioListTile<String>(
+                              title: const Text('Cash'),
+                              value: 'cash',
+                              groupValue: paymentMethod,
+                              onChanged:
+                                  (val) => setDialogState(
+                                    () => paymentMethod = val!,
+                                  ),
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: const Text('Mpesa'),
+                              value: 'mpesa',
+                              groupValue: paymentMethod,
+                              onChanged:
+                                  (val) => setDialogState(
+                                    () => paymentMethod = val!,
+                                  ),
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  const Text('Product:',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedProductId,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Select product',
-                    ),
-                    items: sellable.map((p) {
-                      final name = p['name']?.toString() ?? 'Unknown';
-                      final price = p['unit_price']?.toString() ?? '0';
-                      final stock = p['current_stock'];
-                      final stockLabel =
-                          stock is num ? ' • stock $stock' : '';
-                      return DropdownMenuItem(
-                        value: p['id']?.toString(),
-                        child: Text(
-                          '$name (KES $price$stockLabel)',
-                          overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (optional)',
+                          border: OutlineInputBorder(),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        selectedProductId = val;
-                        oversellWarning = false;
-                        recomputeAmount();
-                        recomputeOversellWarning();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: quantityController,
-                    decoration: InputDecoration(
-                      labelText: 'Quantity',
-                      helperText: (() {
-                        final r = remainingForSelected();
-                        if (r == null) return null;
-                        return 'Consignment remaining: $r';
-                      })(),
-                      errorText: oversellWarning
-                          ? 'Exceeds available consignment allocation'
-                          : null,
-                      border: const OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (val) {
-                      setDialogState(() {
-                        recomputeAmount();
-                        recomputeOversellWarning();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Amount (KES)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Payment Method:',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Cash'),
-                          value: 'cash',
-                          groupValue: paymentMethod,
-                          onChanged: (val) =>
-                              setDialogState(() => paymentMethod = val!),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Mpesa'),
-                          value: 'mpesa',
-                          groupValue: paymentMethod,
-                          onChanged: (val) =>
-                              setDialogState(() => paymentMethod = val!),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
+                        maxLines: 2,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (optional)',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 2,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed:
+                        selectedProductId != null &&
+                                amountController.text.isNotEmpty &&
+                                !oversellWarning
+                            ? () => Navigator.pop(ctx, true)
+                            : null,
+                    child: const Text('Record Sale'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: selectedProductId != null &&
-                        amountController.text.isNotEmpty &&
-                        !oversellWarning
-                    ? () => Navigator.pop(ctx, true)
-                    : null,
-                child: const Text('Record Sale'),
-              ),
-            ],
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
 
     if (result == true && selectedProductId != null) {
@@ -522,14 +547,15 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     final sellerId = _currentBusinessAssociateId;
     final sellerName = _currentBusinessAssociate;
     final hasSeller = sellerId != null || sellerName != null;
-    final consignmentUpdated = hasSeller
-        ? _catalog.recordSale(
-            businessAssociateId: sellerId,
-            businessAssociateName: sellerName,
-            productId: productId,
-            units: quantity,
-          )
-        : null;
+    final consignmentUpdated =
+        hasSeller
+            ? _catalog.recordSale(
+              businessAssociateId: sellerId,
+              businessAssociateName: sellerName,
+              productId: productId,
+              units: quantity,
+            )
+            : null;
 
     if (hasSeller && consignmentUpdated == null) {
       // Allocation missing or insufficient. Bail out before writing
@@ -571,9 +597,9 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
         return false;
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to record sale: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to record sale: $e')));
       }
       return false;
     }
@@ -603,146 +629,211 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       appBar: AppBar(
         title: const Text('Event Orders & Sales'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                _buildSummaryCard(totalRevenue),
-                const SizedBox(height: 12),
-                Card(
-                  color: Colors.green.withValues(alpha: 0.05),
-                  child: ListTile(
-                    leading: const Icon(Icons.add_shopping_cart, color: Colors.green),
-                    title: const Text('Record New Sale', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Record a product sale with cash or Mpesa'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: _showRecordSaleDialog,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_sales.isNotEmpty) ...[
-                  const Text('Recent Sales', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  ..._sales.map((sale) {
-                    final product = sale['catalog_items'] as Map<String, dynamic>?;
-                    final user = sale['users'] as Map<String, dynamic>?;
-                    final paymentMethod = sale['payment_method']?.toString() ?? 'cash';
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: paymentMethod == 'mpesa' ? Colors.green.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1),
-                          child: Icon(
-                            paymentMethod == 'mpesa' ? Icons.phone_android : Icons.money,
-                            color: paymentMethod == 'mpesa' ? Colors.green : Colors.blue,
-                          ),
-                        ),
-                        title: Text(product?['name']?.toString() ?? 'Product'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Qty: ${sale['quantity'] ?? 1} • ${paymentMethod.toUpperCase()}'),
-                            if (user != null)
-                              Text('By: ${user['full_name']}', style: const TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                        trailing: Text(
-                          'KES ${sale['amount'] ?? 0}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    );
-                  }),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  _buildSummaryCard(totalRevenue),
                   const SizedBox(height: 12),
-                ],
-                ExpansionTile(
-                  title: const Text('Linked Consignments'),
-                  leading: const Icon(Icons.inventory_2_outlined,
-                      color: AppColors.primaryGreen),
-                  children: _buildConsignmentChildren(),
-                ),
-                const SizedBox(height: 12),
-                ExpansionTile(
-                  title: const Text('Linked Orders'),
-                  leading: const Icon(Icons.link, color: Colors.blue),
-                  children: _availableOrders.isEmpty
-                      ? [
-                          const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text('No unlinked orders available'),
-                          ),
-                        ]
-                      : _availableOrders.map((order) {
-                          final school = order['schools'] as Map<String, dynamic>?;
-                          return ListTile(
-                            title: Text(order['order_number']?.toString() ?? 'Order'),
-                            subtitle: Text(school?['name']?.toString() ?? ''),
-                            trailing: Text(
-                              'KES ${order['checkout_amount'] ?? 0}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            onTap: () => _linkOrder(order['id']?.toString() ?? ''),
-                          );
-                        }).toList(),
-                ),
-                const SizedBox(height: 12),
-                if (_eventOrders.isNotEmpty) ...[
-                  const Text('Event Orders', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  ..._eventOrders.map((eo) {
-                    final order = eo['orders'] as Map<String, dynamic>?;
-                    final user = eo['users'] as Map<String, dynamic>?;
-                    final school = order?['schools'] as Map<String, dynamic>?;
-
-                    if (order == null) return const SizedBox.shrink();
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.green.withValues(alpha: 0.1),
-                          child: const Icon(Icons.shopping_cart, color: Colors.green),
-                        ),
-                        title: Text(
-                          order['order_number']?.toString() ?? 'Order',
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (school != null) Text('School: ${school['name']}'),
-                            Text('Status: ${order['status'] ?? 'unknown'}'),
-                            if (user != null)
-                              Text('Agent: ${user['full_name']}', style: const TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'KES ${order['checkout_amount'] ?? 0}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle, color: Colors.red),
-                              onPressed: () => _unlinkOrder(eo['id']?.toString() ?? ''),
-                            ),
-                          ],
-                        ),
-                        isThreeLine: true,
+                  Card(
+                    color: Colors.green.withValues(alpha: 0.05),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.add_shopping_cart,
+                        color: Colors.green,
                       ),
-                    );
-                  }),
+                      title: const Text(
+                        'Record New Sale',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'Record a product sale with cash or Mpesa',
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: _showRecordSaleDialog,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_sales.isNotEmpty) ...[
+                    const Text(
+                      'Recent Sales',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._sales.map((sale) {
+                      final product =
+                          sale['catalog_items'] as Map<String, dynamic>?;
+                      final user = sale['users'] as Map<String, dynamic>?;
+                      final paymentMethod =
+                          sale['payment_method']?.toString() ?? 'cash';
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                paymentMethod == 'mpesa'
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.blue.withValues(alpha: 0.1),
+                            child: Icon(
+                              paymentMethod == 'mpesa'
+                                  ? Icons.phone_android
+                                  : Icons.money,
+                              color:
+                                  paymentMethod == 'mpesa'
+                                      ? Colors.green
+                                      : Colors.blue,
+                            ),
+                          ),
+                          title: Text(
+                            product?['name']?.toString() ?? 'Product',
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Qty: ${sale['quantity'] ?? 1} • ${paymentMethod.toUpperCase()}',
+                              ),
+                              if (user != null)
+                                Text(
+                                  'By: ${user['full_name']}',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                            ],
+                          ),
+                          trailing: Text(
+                            'KES ${sale['amount'] ?? 0}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                  ],
+                  ExpansionTile(
+                    title: const Text('Linked Consignments'),
+                    leading: const Icon(
+                      Icons.inventory_2_outlined,
+                      color: AppColors.primaryGreen,
+                    ),
+                    children: _buildConsignmentChildren(),
+                  ),
+                  const SizedBox(height: 12),
+                  ExpansionTile(
+                    title: const Text('Linked Orders'),
+                    leading: const Icon(Icons.link, color: Colors.blue),
+                    children:
+                        _availableOrders.isEmpty
+                            ? [
+                              const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text('No unlinked orders available'),
+                              ),
+                            ]
+                            : _availableOrders.map((order) {
+                              final school =
+                                  order['schools'] as Map<String, dynamic>?;
+                              return ListTile(
+                                title: Text(
+                                  order['order_number']?.toString() ?? 'Order',
+                                ),
+                                subtitle: Text(
+                                  school?['name']?.toString() ?? '',
+                                ),
+                                trailing: Text(
+                                  'KES ${order['checkout_amount'] ?? 0}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onTap:
+                                    () => _linkOrder(
+                                      order['id']?.toString() ?? '',
+                                    ),
+                              );
+                            }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_eventOrders.isNotEmpty) ...[
+                    const Text(
+                      'Event Orders',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._eventOrders.map((eo) {
+                      final order = eo['orders'] as Map<String, dynamic>?;
+                      final user = eo['users'] as Map<String, dynamic>?;
+                      final school = order?['schools'] as Map<String, dynamic>?;
+
+                      if (order == null) return const SizedBox.shrink();
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.green.withValues(
+                              alpha: 0.1,
+                            ),
+                            child: const Icon(
+                              Icons.shopping_cart,
+                              color: Colors.green,
+                            ),
+                          ),
+                          title: Text(
+                            order['order_number']?.toString() ?? 'Order',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (school != null)
+                                Text('School: ${school['name']}'),
+                              Text('Status: ${order['status'] ?? 'unknown'}'),
+                              if (user != null)
+                                Text(
+                                  'Agent: ${user['full_name']}',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'KES ${order['checkout_amount'] ?? 0}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.remove_circle,
+                                  color: Colors.red,
+                                ),
+                                onPressed:
+                                    () => _unlinkOrder(
+                                      eo['id']?.toString() ?? '',
+                                    ),
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    }),
+                  ],
                 ],
-              ],
-            ),
+              ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showRecordSaleDialog,
         icon: const Icon(Icons.point_of_sale),
@@ -771,7 +862,10 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                     color: Colors.green,
                   ),
                 ),
-                Text('Total Sales', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  'Total Sales',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ],
             ),
             Column(
@@ -784,7 +878,10 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                     color: Colors.green,
                   ),
                 ),
-                Text('Revenue', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  'Revenue',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ],
             ),
           ],
@@ -795,15 +892,18 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   List<Widget> _buildConsignmentChildren() {
     final ba = _currentBusinessAssociate;
-    final List<Consignment> consignments = ba == null
-        ? <Consignment>[]
-        : _catalog.consignments
-            .where((c) =>
-                (c.businessAssociateId == _currentBusinessAssociateId ||
-                    c.businessAssociateName.trim().toLowerCase() ==
-                        ba.trim().toLowerCase()) &&
-                c.status != ConsignmentStatus.cancelled)
-            .toList();
+    final List<Consignment> consignments =
+        ba == null
+            ? <Consignment>[]
+            : _catalog.consignments
+                .where(
+                  (c) =>
+                      (c.businessAssociateId == _currentBusinessAssociateId ||
+                          c.businessAssociateName.trim().toLowerCase() ==
+                              ba.trim().toLowerCase()) &&
+                      c.status != ConsignmentStatus.cancelled,
+                )
+                .toList();
 
     if (consignments.isEmpty) {
       return [
@@ -852,42 +952,50 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                  Text(_consignmentStatusLabel(c.status),
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.primaryGreen)),
+                  Text(
+                    _consignmentStatusLabel(c.status),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primaryGreen,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
-              ...c.items.map((i) => Padding(
-                    padding: const EdgeInsets.only(left: 4, top: 2),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            i.product.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
+              ...c.items.map(
+                (i) => Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 2),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          i.product.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
                         ),
-                        Text(
-                          '${i.unitsSold}/${i.unitsToAssign} sold',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey),
+                      ),
+                      Text(
+                        '${i.unitsSold}/${i.unitsToAssign} sold',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
                         ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 60,
-                          child: LinearProgressIndicator(
-                            value: i.progress,
-                            minHeight: 4,
-                            backgroundColor: Colors.grey.shade200,
-                            color: AppColors.primaryGreen,
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 60,
+                        child: LinearProgressIndicator(
+                          value: i.progress,
+                          minHeight: 4,
+                          backgroundColor: Colors.grey.shade200,
+                          color: AppColors.primaryGreen,
                         ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );

@@ -82,7 +82,10 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
             onPressed: _selectedIds.isEmpty ? null : _done,
             child: const Text(
               'Done',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -117,11 +120,15 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                   ),
                   items: [
                     const DropdownMenuItem<String>(
-                      value: null, child: Text('All Categories')),
-                    ..._categories.map((c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(c, overflow: TextOverflow.ellipsis),
-                        )),
+                      value: null,
+                      child: Text('All Categories'),
+                    ),
+                    ..._categories.map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
                   ],
                   onChanged: (v) => setState(() => _categoryFilter = v),
                 );
@@ -138,7 +145,9 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                         child: Text(
                           '$selectedCount selected',
                           style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF64748B)),
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                     ],
@@ -155,7 +164,9 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                       child: Text(
                         '$selectedCount selected',
                         style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF64748B)),
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
                         textAlign: TextAlign.right,
                       ),
                     ),
@@ -165,56 +176,66 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
             ),
           ),
           Expanded(
-            child: selectable.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No products match your filters',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: selectable.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) {
-                      final p = selectable[i];
-                      final selected = _selectedIds.contains(p.id);
-                      return CheckboxListTile(
-                        value: selected,
-                        onChanged: (v) => _toggle(p, v),
-                        activeColor: CatalogColors.primaryAccent,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        secondary: CircleAvatar(
-                          radius: 20,
-                          backgroundColor:
-                              CatalogColors.primaryAccent.withValues(alpha: 0.1),
-                          child: p.imageUrl != null && p.imageUrl!.isNotEmpty
-                              ? CircleAvatar(
-                                  radius: 18,
-                                  backgroundImage: NetworkImage(p.imageUrl!),
-                                )
-                              : Text(
-                                  p.name.isNotEmpty
-                                      ? p.name[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                      color: CatalogColors.primaryAccent,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                        title: Text(p.name,
+            child:
+                selectable.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'No products match your filters',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                    : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: selectable.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (ctx, i) {
+                        final p = selectable[i];
+                        final selected = _selectedIds.contains(p.id);
+                        return CheckboxListTile(
+                          value: selected,
+                          onChanged: (v) => _toggle(p, v),
+                          activeColor: CatalogColors.primaryAccent,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          secondary: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: CatalogColors.primaryAccent
+                                .withValues(alpha: 0.1),
+                            child:
+                                p.imageUrl != null && p.imageUrl!.isNotEmpty
+                                    ? CircleAvatar(
+                                      radius: 18,
+                                      backgroundImage: NetworkImage(
+                                        p.imageUrl!,
+                                      ),
+                                    )
+                                    : Text(
+                                      p.name.isNotEmpty
+                                          ? p.name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: CatalogColors.primaryAccent,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                          ),
+                          title: Text(
+                            p.name,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        subtitle: Text(
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
                             '${p.category} • KSh ${p.unitPrice.toStringAsFixed(2)} • ${p.currentStock} ${p.unit}',
                             style: const TextStyle(fontSize: 12),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      );
-                    },
-                  ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

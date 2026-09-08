@@ -6,15 +6,17 @@ class RegionRepository {
   final DatabaseService _dbService;
 
   RegionRepository({DatabaseService? dbService})
-      : _dbService = dbService ?? DatabaseService();
+    : _dbService = dbService ?? DatabaseService();
 
   Future<List<RegionModel>> getAllRegions() => _dbService.getAllRegions();
 
   Future<RegionModel?> getRegion(String id) => _dbService.getRegion(id);
 
-  Future<void> createRegion(RegionModel region) => _dbService.createRegion(region);
+  Future<void> createRegion(RegionModel region) =>
+      _dbService.createRegion(region);
 
-  Future<void> updateRegion(RegionModel region) => _dbService.updateRegion(region);
+  Future<void> updateRegion(RegionModel region) =>
+      _dbService.updateRegion(region);
 
   Future<void> deleteRegion(String id) => _dbService.deleteRegion(id);
 

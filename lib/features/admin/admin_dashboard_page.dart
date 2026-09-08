@@ -926,16 +926,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 }, isCollapsed: isCollapsed),
                 // TODO: Not to be accessible for admin role 1
                 if (_currentRole != 1)
-                _buildSidebarItem(
-                  context,
-                  Icons.insights_outlined,
-                  'Individual Performance',
-                  () => _openFromSidebar(
+                  _buildSidebarItem(
                     context,
-                    const AdminIndividualPerformancePage(),
+                    Icons.insights_outlined,
+                    'Individual Performance',
+                    () => _openFromSidebar(
+                      context,
+                      const AdminIndividualPerformancePage(),
+                    ),
+                    isCollapsed: isCollapsed,
                   ),
-                  isCollapsed: isCollapsed,
-                ),
                 _buildSidebarItem(
                   context,
                   Icons.analytics_outlined,
@@ -967,13 +967,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 // TODO: Not to be accessible for admin role 1
                 if (_currentRole != 1)
-                _buildSidebarItem(
-                  context,
-                  Icons.public,
-                  'Regions',
-                  () => _openFromSidebar(context, const RegionsPage()),
-                  isCollapsed: isCollapsed,
-                ),
+                  _buildSidebarItem(
+                    context,
+                    Icons.public,
+                    'Regions',
+                    () => _openFromSidebar(context, const RegionsPage()),
+                    isCollapsed: isCollapsed,
+                  ),
                 _buildSidebarItem(
                   context,
                   Icons.manage_accounts,
@@ -1110,16 +1110,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 // TODO: Not to be accessible for admin role 1
                 if (_currentRole != 1)
-                _buildSidebarItem(
-                  context,
-                  Icons.campaign_outlined,
-                  'FB & WhatsApp Pipeline',
-                  () => _openFromSidebar(
+                  _buildSidebarItem(
                     context,
-                    const AdminSocialPipelinePage(),
+                    Icons.campaign_outlined,
+                    'FB & WhatsApp Pipeline',
+                    () => _openFromSidebar(
+                      context,
+                      const AdminSocialPipelinePage(),
+                    ),
+                    isCollapsed: isCollapsed,
                   ),
-                  isCollapsed: isCollapsed,
-                ),
                 _buildSidebarSection('Events', isCollapsed: isCollapsed),
                 _buildSidebarItem(
                   context,

@@ -76,18 +76,36 @@ class EventModel {
       venue: map['venue']?.toString(),
       region: map['region']?.toString(),
       subregion: map['subregion']?.toString(),
-      startAt: map['start_at'] != null ? DateTime.tryParse(map['start_at'].toString()) : null,
-      endAt: map['end_at'] != null ? DateTime.tryParse(map['end_at'].toString()) : null,
-      expectedAttendance: map['expected_attendance'] is int ? map['expected_attendance'] : int.tryParse(map['expected_attendance']?.toString() ?? ''),
-      budget: map['budget'] is num ? (map['budget'] as num).toDouble() : double.tryParse(map['budget']?.toString() ?? ''),
+      startAt:
+          map['start_at'] != null
+              ? DateTime.tryParse(map['start_at'].toString())
+              : null,
+      endAt:
+          map['end_at'] != null
+              ? DateTime.tryParse(map['end_at'].toString())
+              : null,
+      expectedAttendance:
+          map['expected_attendance'] is int
+              ? map['expected_attendance']
+              : int.tryParse(map['expected_attendance']?.toString() ?? ''),
+      budget:
+          map['budget'] is num
+              ? (map['budget'] as num).toDouble()
+              : double.tryParse(map['budget']?.toString() ?? ''),
       objectives: map['objectives']?.toString(),
       products: map['products'] is List ? map['products'] : [],
       notes: map['notes']?.toString(),
       status: map['status']?.toString() ?? 'scheduled',
       createdBy: map['created_by']?.toString(),
       isSynced: map['isSynced'] == true,
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) : null,
+      createdAt:
+          map['created_at'] != null
+              ? DateTime.tryParse(map['created_at'].toString())
+              : null,
+      updatedAt:
+          map['updated_at'] != null
+              ? DateTime.tryParse(map['updated_at'].toString())
+              : null,
     );
   }
 
@@ -136,7 +154,10 @@ class EventModel {
   }
 
   bool get isActive => status == 'active' || status == 'in_progress';
-  bool get isUpcoming => status == 'scheduled' && startAt != null && startAt!.isAfter(DateTime.now());
+  bool get isUpcoming =>
+      status == 'scheduled' &&
+      startAt != null &&
+      startAt!.isAfter(DateTime.now());
   bool get isCompleted => status == 'completed' || status == 'cancelled';
 }
 
@@ -192,14 +213,27 @@ class EventAssignmentModel {
       eventId: map['event_id']?.toString() ?? '',
       agentId: map['agent_id']?.toString() ?? '',
       assignedBy: map['assigned_by']?.toString(),
-      schedule: map['schedule'] is Map ? Map<String, dynamic>.from(map['schedule']) : {},
+      schedule:
+          map['schedule'] is Map
+              ? Map<String, dynamic>.from(map['schedule'])
+              : {},
       products: map['products'] is List ? map['products'] : [],
       samples: map['samples'] is List ? map['samples'] : [],
-      marketingMaterials: map['marketing_materials'] is List ? map['marketing_materials'] : [],
-      targets: map['targets'] is Map ? Map<String, dynamic>.from(map['targets']) : {},
+      marketingMaterials:
+          map['marketing_materials'] is List ? map['marketing_materials'] : [],
+      targets:
+          map['targets'] is Map
+              ? Map<String, dynamic>.from(map['targets'])
+              : {},
       notes: map['notes']?.toString(),
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) : null,
+      createdAt:
+          map['created_at'] != null
+              ? DateTime.tryParse(map['created_at'].toString())
+              : null,
+      updatedAt:
+          map['updated_at'] != null
+              ? DateTime.tryParse(map['updated_at'].toString())
+              : null,
     );
   }
 }
@@ -259,11 +293,18 @@ class EventLeadModel {
       schoolId: map['school_id']?.toString(),
       phone: map['phone']?.toString(),
       email: map['email']?.toString(),
-      interestedProducts: map['interested_products'] is List ? map['interested_products'] : [],
+      interestedProducts:
+          map['interested_products'] is List ? map['interested_products'] : [],
       purchaseTimeline: map['purchase_timeline']?.toString(),
       notes: map['notes']?.toString(),
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) : null,
+      createdAt:
+          map['created_at'] != null
+              ? DateTime.tryParse(map['created_at'].toString())
+              : null,
+      updatedAt:
+          map['updated_at'] != null
+              ? DateTime.tryParse(map['updated_at'].toString())
+              : null,
     );
   }
 }
@@ -323,15 +364,27 @@ class EventExpenseModel {
       eventId: map['event_id']?.toString() ?? '',
       submittedBy: map['submitted_by']?.toString(),
       expenseType: map['expense_type']?.toString(),
-      amount: map['amount'] is num ? (map['amount'] as num).toDouble() : double.tryParse(map['amount']?.toString() ?? '') ?? 0,
+      amount:
+          map['amount'] is num
+              ? (map['amount'] as num).toDouble()
+              : double.tryParse(map['amount']?.toString() ?? '') ?? 0,
       currency: map['currency']?.toString() ?? 'KES',
       receiptUrl: map['receipt_url']?.toString(),
       status: map['status']?.toString() ?? 'pending',
       approvedBy: map['approved_by']?.toString(),
-      approvedAt: map['approved_at'] != null ? DateTime.tryParse(map['approved_at'].toString()) : null,
+      approvedAt:
+          map['approved_at'] != null
+              ? DateTime.tryParse(map['approved_at'].toString())
+              : null,
       notes: map['notes']?.toString(),
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) : null,
+      createdAt:
+          map['created_at'] != null
+              ? DateTime.tryParse(map['created_at'].toString())
+              : null,
+      updatedAt:
+          map['updated_at'] != null
+              ? DateTime.tryParse(map['updated_at'].toString())
+              : null,
     );
   }
 }
@@ -412,22 +465,50 @@ class EventReportModel {
       eventId: map['event_id']?.toString() ?? '',
       createdBy: map['created_by']?.toString(),
       summary: map['summary']?.toString(),
-      attendanceCount: map['attendance_count'] is int ? map['attendance_count'] : int.tryParse(map['attendance_count']?.toString() ?? '') ?? 0,
-      visitorsCount: map['visitors_count'] is int ? map['visitors_count'] : int.tryParse(map['visitors_count']?.toString() ?? '') ?? 0,
-      schoolsCount: map['schools_count'] is int ? map['schools_count'] : int.tryParse(map['schools_count']?.toString() ?? '') ?? 0,
-      qualifiedLeadsCount: map['qualified_leads_count'] is int ? map['qualified_leads_count'] : int.tryParse(map['qualified_leads_count']?.toString() ?? '') ?? 0,
-      ordersCount: map['orders_count'] is int ? map['orders_count'] : int.tryParse(map['orders_count']?.toString() ?? '') ?? 0,
-      revenue: map['revenue'] is num ? (map['revenue'] as num).toDouble() : double.tryParse(map['revenue']?.toString() ?? '') ?? 0,
+      attendanceCount:
+          map['attendance_count'] is int
+              ? map['attendance_count']
+              : int.tryParse(map['attendance_count']?.toString() ?? '') ?? 0,
+      visitorsCount:
+          map['visitors_count'] is int
+              ? map['visitors_count']
+              : int.tryParse(map['visitors_count']?.toString() ?? '') ?? 0,
+      schoolsCount:
+          map['schools_count'] is int
+              ? map['schools_count']
+              : int.tryParse(map['schools_count']?.toString() ?? '') ?? 0,
+      qualifiedLeadsCount:
+          map['qualified_leads_count'] is int
+              ? map['qualified_leads_count']
+              : int.tryParse(map['qualified_leads_count']?.toString() ?? '') ??
+                  0,
+      ordersCount:
+          map['orders_count'] is int
+              ? map['orders_count']
+              : int.tryParse(map['orders_count']?.toString() ?? '') ?? 0,
+      revenue:
+          map['revenue'] is num
+              ? (map['revenue'] as num).toDouble()
+              : double.tryParse(map['revenue']?.toString() ?? '') ?? 0,
       photos: map['photos'] is List ? map['photos'] : [],
       gpsLogs: map['gps_logs'] is List ? map['gps_logs'] : [],
-      expensesSummary: map['expenses_summary'] is Map ? Map<String, dynamic>.from(map['expenses_summary']) : {},
+      expensesSummary:
+          map['expenses_summary'] is Map
+              ? Map<String, dynamic>.from(map['expenses_summary'])
+              : {},
       productsSold: map['products_sold'] is List ? map['products_sold'] : [],
       challenges: map['challenges']?.toString(),
       recommendations: map['recommendations']?.toString(),
       exportedPdfUrl: map['exported_pdf_url']?.toString(),
       exportedXlsxUrl: map['exported_xlsx_url']?.toString(),
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) : null,
+      createdAt:
+          map['created_at'] != null
+              ? DateTime.tryParse(map['created_at'].toString())
+              : null,
+      updatedAt:
+          map['updated_at'] != null
+              ? DateTime.tryParse(map['updated_at'].toString())
+              : null,
     );
   }
 }

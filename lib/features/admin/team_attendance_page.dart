@@ -46,10 +46,11 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
     if (_searchQuery.isEmpty) {
       _filteredDays = List.of(_teamDays);
     } else {
-      _filteredDays = _teamDays.where((d) {
-        return d.name.toLowerCase().contains(_searchQuery) ||
-            d.email.toLowerCase().contains(_searchQuery);
-      }).toList();
+      _filteredDays =
+          _teamDays.where((d) {
+            return d.name.toLowerCase().contains(_searchQuery) ||
+                d.email.toLowerCase().contains(_searchQuery);
+          }).toList();
     }
   }
 
@@ -97,20 +98,25 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
             records: [],
           ),
         );
-        day.records.add(_SessionRecord(
-          id: r['id']?.toString() ?? '',
-          checkIn: DateTime.parse(r['checkin_at'] as String).toLocal(),
-          checkOut: r['checkout_at'] != null
-              ? DateTime.parse(r['checkout_at'] as String).toLocal()
-              : null,
-          durationSeconds: (r['duration_seconds'] as num?)?.toInt() ?? 0,
-          autoCheckOut: r['auto_checkout'] == true,
-          locationText: r['location_text']?.toString(),
-        ));
+        day.records.add(
+          _SessionRecord(
+            id: r['id']?.toString() ?? '',
+            checkIn: DateTime.parse(r['checkin_at'] as String).toLocal(),
+            checkOut:
+                r['checkout_at'] != null
+                    ? DateTime.parse(r['checkout_at'] as String).toLocal()
+                    : null,
+            durationSeconds: (r['duration_seconds'] as num?)?.toInt() ?? 0,
+            autoCheckOut: r['auto_checkout'] == true,
+            locationText: r['location_text']?.toString(),
+          ),
+        );
       }
 
-      final list = byAgent.values.toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      final list =
+          byAgent.values.toList()..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
 
       for (final d in list) {
         d.records.sort((a, b) => b.checkIn.compareTo(a.checkIn));
@@ -258,47 +264,48 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
           _buildSearchBar(),
           const Divider(height: 1),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorMessage != null
                     ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.red),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadAttendance,
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadAttendance,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                      )
+                      ),
+                    )
                     : _teamDays.isEmpty
-                        ? _buildEmptyState()
-                        : _filteredDays.isEmpty
-                            ? _buildNoMatchesState()
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                                itemCount: _filteredDays.length,
-                                itemBuilder: (context, index) {
-                                  final day = _filteredDays[index];
-                                  return _buildAgentCard(day);
-                                },
-                              ),
+                    ? _buildEmptyState()
+                    : _filteredDays.isEmpty
+                    ? _buildNoMatchesState()
+                    : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                      itemCount: _filteredDays.length,
+                      itemBuilder: (context, index) {
+                        final day = _filteredDays[index];
+                        return _buildAgentCard(day);
+                      },
+                    ),
           ),
         ],
       ),
@@ -314,15 +321,18 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
         decoration: InputDecoration(
           hintText: 'Search by agent name…',
           prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _searchQuery.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () => _searchController.clear(),
-                ),
+          suffixIcon:
+              _searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: () => _searchController.clear(),
+                  ),
           isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.grey.shade300),
@@ -390,7 +400,11 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
           ),
           OutlinedButton.icon(
             onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_today, size: 16, color: Colors.white),
+            icon: const Icon(
+              Icons.calendar_today,
+              size: 16,
+              color: Colors.white,
+            ),
             label: const Text(
               'Pick date',
               style: TextStyle(color: Colors.white),
@@ -490,17 +504,13 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           leading: CircleAvatar(
             backgroundColor: color.withValues(alpha: 0.15),
             child: Text(
               initials,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
             ),
           ),
           title: Text(
@@ -561,12 +571,9 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
     final isOpen = r.checkOut == null;
     final timeFmt = _formatTime;
     final checkInStr = timeFmt(r.checkIn);
-    final checkOutStr =
-        r.checkOut != null ? timeFmt(r.checkOut!) : '—';
+    final checkOutStr = r.checkOut != null ? timeFmt(r.checkOut!) : '—';
     final color = isOpen ? AppColors.accentOrange : AppColors.primaryGreen;
-    final tag = r.autoCheckOut
-        ? 'AUTO'
-        : (isOpen ? 'ACTIVE' : 'MANUAL');
+    final tag = r.autoCheckOut ? 'AUTO' : (isOpen ? 'ACTIVE' : 'MANUAL');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

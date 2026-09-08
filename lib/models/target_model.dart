@@ -6,7 +6,8 @@ class TargetModel {
   final String? regionId;
   final String? subRegion;
   final String? assignedTo;
-  final String targetType; // product_sales, customer_visits, collections, new_customers, sample_distribution, consignment
+  final String
+  targetType; // product_sales, customer_visits, collections, new_customers, sample_distribution, consignment
   final String targetPeriod; // daily, weekly, monthly, quarterly, yearly, ytd
   final Map<String, dynamic> targetData;
   final DateTime createdAt;
@@ -88,9 +89,14 @@ class TargetModel {
       assignedTo: map['assigned_to']?.toString(),
       targetType: map['target_type']?.toString() ?? 'product_sales',
       targetPeriod: map['target_period']?.toString() ?? 'monthly',
-      targetData: targetData is Map ? Map<String, dynamic>.from(targetData) : {},
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updated_at']?.toString() ?? '') ?? DateTime.now(),
+      targetData:
+          targetData is Map ? Map<String, dynamic>.from(targetData) : {},
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 

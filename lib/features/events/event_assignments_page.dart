@@ -17,9 +17,10 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
   List<Map<String, dynamic>> _availableAgents = [];
   bool _loading = true;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -39,7 +40,9 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
         _availableAgents = agents;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
     } finally {
       setState(() => _loading = false);
     }
@@ -75,74 +78,89 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Assign Agent to Event'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Select Agent:', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedAgentId,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Choose an agent',
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: const Text('Assign Agent to Event'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Select Agent:',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedAgentId,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Choose an agent',
+                          ),
+                          items:
+                              _availableAgents.map((agent) {
+                                final name =
+                                    agent['full_name']?.toString() ??
+                                    agent['email']?.toString() ??
+                                    'Unknown';
+                                final role =
+                                    agent['role'] == 4 ? 'Agent' : 'Sales Rep';
+                                return DropdownMenuItem(
+                                  value: agent['id']?.toString(),
+                                  child: Text('$name ($role)'),
+                                );
+                              }).toList(),
+                          onChanged:
+                              (val) =>
+                                  setDialogState(() => selectedAgentId = val),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: scheduleController,
+                          decoration: const InputDecoration(
+                            labelText: 'Schedule Notes',
+                            border: OutlineInputBorder(),
+                            hintText: 'e.g., Morning shift 9am-1pm',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: targetController,
+                          decoration: const InputDecoration(
+                            labelText: 'Sales Target (KES)',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: notesController,
+                          decoration: const InputDecoration(
+                            labelText: 'Additional Notes',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
                   ),
-                  items: _availableAgents.map((agent) {
-                    final name = agent['full_name']?.toString() ?? agent['email']?.toString() ?? 'Unknown';
-                    final role = agent['role'] == 4 ? 'Agent' : 'Sales Rep';
-                    return DropdownMenuItem(
-                      value: agent['id']?.toString(),
-                      child: Text('$name ($role)'),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setDialogState(() => selectedAgentId = val),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed:
+                          selectedAgentId != null
+                              ? () => Navigator.pop(ctx, true)
+                              : null,
+                      child: const Text('Assign'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: scheduleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Schedule Notes',
-                    border: OutlineInputBorder(),
-                    hintText: 'e.g., Morning shift 9am-1pm',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: targetController,
-                  decoration: const InputDecoration(
-                    labelText: 'Sales Target (KES)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Additional Notes',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: selectedAgentId != null ? () => Navigator.pop(ctx, true) : null,
-              child: const Text('Assign'),
-            ),
-          ],
-        ),
-      ),
     );
 
     if (result == true && selectedAgentId != null) {
@@ -155,7 +173,12 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
     }
   }
 
-  Future<void> _assignAgent(String agentId, String schedule, String target, String notes) async {
+  Future<void> _assignAgent(
+    String agentId,
+    String schedule,
+    String target,
+    String notes,
+  ) async {
     final eventId = _eventId;
     if (eventId == null) return;
 
@@ -180,43 +203,46 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
       );
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Assignment failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Assignment failed: $e')));
     }
   }
 
   Future<void> _removeAssignment(String assignmentId) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove Assignment'),
-        content: const Text('Are you sure you want to remove this agent from the event?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Remove Assignment'),
+            content: const Text(
+              'Are you sure you want to remove this agent from the event?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
         await _dbService.removeEventAssignment(assignmentId);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Assignment removed')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Assignment removed')));
         _load();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to remove: $e')));
       }
     }
   }
@@ -227,54 +253,68 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
       appBar: AppBar(
         title: const Text('Event Assignments'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _assignments.isEmpty
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _assignments.isEmpty
               ? _buildEmptyState()
               : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _assignments.length,
-                  itemBuilder: (ctx, i) {
-                    final a = _assignments[i];
-                    final user = a['users'] as Map<String, dynamic>?;
-                    final name = user?['full_name']?.toString() ?? user?['email']?.toString() ?? 'Unknown Agent';
-                    final phone = user?['phone']?.toString() ?? '';
-                    final targets = a['targets'] as Map<String, dynamic>? ?? {};
-                    final schedule = a['schedule'] as Map<String, dynamic>? ?? {};
+                padding: const EdgeInsets.all(12),
+                itemCount: _assignments.length,
+                itemBuilder: (ctx, i) {
+                  final a = _assignments[i];
+                  final user = a['users'] as Map<String, dynamic>?;
+                  final name =
+                      user?['full_name']?.toString() ??
+                      user?['email']?.toString() ??
+                      'Unknown Agent';
+                  final phone = user?['phone']?.toString() ?? '';
+                  final targets = a['targets'] as Map<String, dynamic>? ?? {};
+                  final schedule = a['schedule'] as Map<String, dynamic>? ?? {};
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                          child: const Icon(Icons.person, color: Colors.blue),
-                        ),
-                        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (phone.isNotEmpty) Text('Phone: $phone'),
-                            if (schedule['notes'] != null)
-                              Text('Schedule: ${schedule['notes']}', style: const TextStyle(fontSize: 12)),
-                            if (targets['sales_target'] != null)
-                              Text('Target: KES ${targets['sales_target']}', style: const TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.remove_circle, color: Colors.red),
-                          onPressed: () => _removeAssignment(a['id']?.toString() ?? ''),
-                        ),
-                        isThreeLine: true,
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                        child: const Icon(Icons.person, color: Colors.blue),
                       ),
-                    );
-                  },
-                ),
+                      title: Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (phone.isNotEmpty) Text('Phone: $phone'),
+                          if (schedule['notes'] != null)
+                            Text(
+                              'Schedule: ${schedule['notes']}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          if (targets['sales_target'] != null)
+                            Text(
+                              'Target: KES ${targets['sales_target']}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.remove_circle,
+                          color: Colors.red,
+                        ),
+                        onPressed:
+                            () => _removeAssignment(a['id']?.toString() ?? ''),
+                      ),
+                      isThreeLine: true,
+                    ),
+                  );
+                },
+              ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAssignDialog,
         icon: const Icon(Icons.person_add),

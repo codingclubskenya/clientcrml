@@ -23,18 +23,20 @@ class ConsignmentItem {
   }
 
   Map<String, dynamic> toMap() => {
-        'product': product.toMap(),
-        'unitsToAssign': unitsToAssign,
-        'unitPrice': unitPrice,
-        'unitsSold': unitsSold,
-      };
+    'product': product.toMap(),
+    'unitsToAssign': unitsToAssign,
+    'unitPrice': unitPrice,
+    'unitsSold': unitsSold,
+  };
 
   factory ConsignmentItem.fromMap(Map<dynamic, dynamic> map) {
     final productMap = map['product'];
     return ConsignmentItem(
-      product: Product.fromMap(Map<String, dynamic>.from(
-        productMap is Map ? productMap : const <String, dynamic>{},
-      )),
+      product: Product.fromMap(
+        Map<String, dynamic>.from(
+          productMap is Map ? productMap : const <String, dynamic>{},
+        ),
+      ),
       unitsToAssign: _parseInt(map['unitsToAssign']),
       unitPrice: _parseDouble(map['unitPrice']),
       unitsSold: _parseInt(map['unitsSold']),

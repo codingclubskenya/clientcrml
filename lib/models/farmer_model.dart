@@ -164,8 +164,14 @@ class SchoolModel {
       designation: map['designation'],
       projectedQuantity: _toInt(map['projected_quantity']),
       samplesToBeReturned: map['samples_to_be_returned'],
-      learningMaterials: map['learning_materials'] is List ? List<String>.from(map['learning_materials']) : null,
-      bookPrograms: map['book_programs'] is List ? List<String>.from(map['book_programs']) : null,
+      learningMaterials:
+          map['learning_materials'] is List
+              ? List<String>.from(map['learning_materials'])
+              : null,
+      bookPrograms:
+          map['book_programs'] is List
+              ? List<String>.from(map['book_programs'])
+              : null,
       institutionCategoryOther: map['institution_category_other'],
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),

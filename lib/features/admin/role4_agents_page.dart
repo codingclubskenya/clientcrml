@@ -41,11 +41,12 @@ class _Role4AgentsPageState extends State<Role4AgentsPage> {
     }
 
     final agentRegion = (currentAgent.region ?? '').toLowerCase();
-    final members = agentRegion.isEmpty
-        ? <UserModel>[]
-        : (await _dbService.getRegionAssignments(currentAgent.region!))
-            .where((u) => u.role == 5)
-            .toList();
+    final members =
+        agentRegion.isEmpty
+            ? <UserModel>[]
+            : (await _dbService.getRegionAssignments(
+              currentAgent.region!,
+            )).where((u) => u.role == 5).toList();
 
     if (!mounted) return;
     setState(() {
@@ -59,7 +60,9 @@ class _Role4AgentsPageState extends State<Role4AgentsPage> {
     final agentRegion = (agent.region ?? '').toLowerCase();
     if (agentRegion.isEmpty) return const <UserModel>[];
     return _allUsers
-        .where((u) => u.role == 5 && (u.region ?? '').toLowerCase() == agentRegion)
+        .where(
+          (u) => u.role == 5 && (u.region ?? '').toLowerCase() == agentRegion,
+        )
         .toList();
   }
 
@@ -78,68 +81,70 @@ class _Role4AgentsPageState extends State<Role4AgentsPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _agents.isEmpty
-          ? const Center(
-              child: Text('No Role 4 agents found.'),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _agents.length,
-              itemBuilder: (context, index) {
-                final agent = _agents[index];
-                final members = _membersForAgent(agent);
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 0,
-                  color: AppColors.surfaceWhite,
-                  shape: RoundedRectangleBorder(
-                    side: const BorderSide(color: AppColors.borderGrey),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ExpansionTile(
-                    title: Text(
-                      agent.fullName ?? agent.email,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _agents.isEmpty
+              ? const Center(child: Text('No Role 4 agents found.'))
+              : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _agents.length,
+                itemBuilder: (context, index) {
+                  final agent = _agents[index];
+                  final members = _membersForAgent(agent);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 0,
+                    color: AppColors.surfaceWhite,
+                    shape: RoundedRectangleBorder(
+                      side: const BorderSide(color: AppColors.borderGrey),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    subtitle: Text(
-                      'Region: ${agent.region ?? "Unassigned"}',
-                    ),
-                    trailing: Chip(
-                      label: Text('${members.length} members'),
-                      backgroundColor: AppColors.primaryPale,
-                      labelStyle: const TextStyle(color: AppColors.primaryDark),
-                    ),
-                    children: [
-                      const Divider(height: 1),
-                      if (members.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('No members assigned to this agent.'),
-                        )
-                      else
-                        ...members.map((member) {
-                          return ListTile(
-                            dense: true,
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.primaryPale,
-                              child: Text(
-                                (member.fullName ?? member.email).isNotEmpty
-                                    ? (member.fullName ?? member.email)[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(color: AppColors.primaryDark),
+                    child: ExpansionTile(
+                      title: Text(
+                        agent.fullName ?? agent.email,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text('Region: ${agent.region ?? "Unassigned"}'),
+                      trailing: Chip(
+                        label: Text('${members.length} members'),
+                        backgroundColor: AppColors.primaryPale,
+                        labelStyle: const TextStyle(
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                      children: [
+                        const Divider(height: 1),
+                        if (members.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text('No members assigned to this agent.'),
+                          )
+                        else
+                          ...members.map((member) {
+                            return ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                backgroundColor: AppColors.primaryPale,
+                                child: Text(
+                                  (member.fullName ?? member.email).isNotEmpty
+                                      ? (member.fullName ?? member.email)[0]
+                                          .toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryDark,
+                                  ),
+                                ),
                               ),
-                            ),
-                            title: Text(member.fullName ?? member.email),
-                            subtitle: Text(member.email),
-                          );
-                        }),
-                    ],
-                  ),
-                );
-              },
-            ),
+                              title: Text(member.fullName ?? member.email),
+                              subtitle: Text(member.email),
+                            );
+                          }),
+                      ],
+                    ),
+                  );
+                },
+              ),
     );
   }
 }

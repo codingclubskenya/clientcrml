@@ -40,13 +40,19 @@ class _EventsListPageState extends State<EventsListPage> {
   Future<void> _loadEvents() async {
     setState(() => _loading = true);
     try {
-      final data = await _supabase.from('events').select().order('start_at', ascending: false);
+      final data = await _supabase
+          .from('events')
+          .select()
+          .order('start_at', ascending: false);
       setState(() {
-        _events = (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        _events =
+            (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed loading events: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed loading events: $e')));
       }
     } finally {
       setState(() => _loading = false);
@@ -66,31 +72,33 @@ class _EventsListPageState extends State<EventsListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Events')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadEvents,
-              child: ListView.builder(
-                itemCount: _events.length,
-                itemBuilder: (ctx, i) {
-                  final e = _events[i];
-                  final title = e['name'] ?? 'Untitled event';
-                  final region = e['region'] ?? '';
-                  final start = EventDateFormat.formatShort(e['start_at']);
-                  return ListTile(
-                    title: Text(title),
-                    subtitle: Text('$region • $start'),
-                    onTap: () => _openDetail(e['id']?.toString() ?? ''),
-                  );
-                },
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadEvents,
+                child: ListView.builder(
+                  itemCount: _events.length,
+                  itemBuilder: (ctx, i) {
+                    final e = _events[i];
+                    final title = e['name'] ?? 'Untitled event';
+                    final region = e['region'] ?? '';
+                    final start = EventDateFormat.formatShort(e['start_at']);
+                    return ListTile(
+                      title: Text(title),
+                      subtitle: Text('$region • $start'),
+                      onTap: () => _openDetail(e['id']?.toString() ?? ''),
+                    );
+                  },
+                ),
               ),
-            ),
-      floatingActionButton: _canCreate
-          ? FloatingActionButton(
-              onPressed: _openCreate,
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton:
+          _canCreate
+              ? FloatingActionButton(
+                onPressed: _openCreate,
+                child: const Icon(Icons.add),
+              )
+              : null,
     );
   }
 }

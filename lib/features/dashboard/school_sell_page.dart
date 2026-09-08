@@ -341,7 +341,10 @@ class _SchoolSellPageState extends State<SchoolSellPage> {
         if (contextNotes.isNotEmpty) contextNotes,
       ].join('\n');
       final currentUserId = _databaseService.getCurrentUserId();
-      final currentUser = currentUserId == null ? null : await _databaseService.getUser(currentUserId);
+      final currentUser =
+          currentUserId == null
+              ? null
+              : await _databaseService.getUser(currentUserId);
       final sale = SchoolSaleModel(
         id: _saleId,
         schoolId: schoolId,

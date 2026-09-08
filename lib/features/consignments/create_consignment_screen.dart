@@ -62,15 +62,15 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
     if (mounted) setState(() {});
   }
 
-  List<Product> get _products =>
-      widget.availableProducts ?? _service.products;
+  List<Product> get _products => widget.availableProducts ?? _service.products;
 
   /// Dynamic business-associate list — pulled from existing
   /// consignments in the service. An explicit list passed via
   /// [widget.businessAssociates] wins so the caller can pin the list
   /// when needed (e.g. from a test).
   List<String> get _businessAssociates {
-    if (widget.businessAssociates != null && widget.businessAssociates!.isNotEmpty) {
+    if (widget.businessAssociates != null &&
+        widget.businessAssociates!.isNotEmpty) {
       return widget.businessAssociates!;
     }
     return _service.businessAssociates;
@@ -104,10 +104,12 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       if (_businessAssociates.contains(label)) continue;
       byId.putIfAbsent(user.id, () => user);
     }
-    final list = byId.values.toList()
-      ..sort((a, b) => (a.fullName ?? a.email)
-          .toLowerCase()
-          .compareTo((b.fullName ?? b.email).toLowerCase()));
+    final list =
+        byId.values.toList()..sort(
+          (a, b) => (a.fullName ?? a.email).toLowerCase().compareTo(
+            (b.fullName ?? b.email).toLowerCase(),
+          ),
+        );
     return list;
   }
 
@@ -130,11 +132,11 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
   Future<void> _openProductSelection() async {
     final selectedIds = await Navigator.of(context).push<Set<String>>(
       MaterialPageRoute(
-        builder: (_) => ProductSelectionPage(
-          products: _service.products,
-          initiallySelectedIds:
-              _items.map((d) => d.product.id).toSet(),
-        ),
+        builder:
+            (_) => ProductSelectionPage(
+              products: _service.products,
+              initiallySelectedIds: _items.map((d) => d.product.id).toSet(),
+            ),
       ),
     );
     if (selectedIds == null || !mounted) return;
@@ -157,8 +159,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
 
   double get _totalValue =>
       _items.fold(0, (s, i) => s + i.unitsToAssign * i.unitPrice);
-  int get _totalUnits =>
-      _items.fold(0, (s, i) => s + i.unitsToAssign);
+  int get _totalUnits => _items.fold(0, (s, i) => s + i.unitsToAssign);
 
   String _generateConsignmentId() {
     final ts = DateTime.now().millisecondsSinceEpoch;
@@ -197,17 +198,21 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
     final consignmentItems = <ConsignmentItem>[];
     final failed = <String>[];
     for (final draft in _items) {
-      final consumed =
-          _service.consumeStock(draft.product.id, draft.unitsToAssign);
+      final consumed = _service.consumeStock(
+        draft.product.id,
+        draft.unitsToAssign,
+      );
       if (consumed == null) {
         failed.add(draft.product.name);
         continue;
       }
-      consignmentItems.add(ConsignmentItem(
-        product: consumed,
-        unitsToAssign: draft.unitsToAssign,
-        unitPrice: draft.unitPrice,
-      ));
+      consignmentItems.add(
+        ConsignmentItem(
+          product: consumed,
+          unitsToAssign: draft.unitsToAssign,
+          unitPrice: draft.unitPrice,
+        ),
+      );
     }
 
     if (consignmentItems.isEmpty) {
@@ -225,8 +230,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
 
     final consignment = Consignment(
       consignmentId: _generateConsignmentId(),
-      businessAssociateId:
-          _selectedUser?.id ?? _selectedBa ?? '',
+      businessAssociateId: _selectedUser?.id ?? _selectedBa ?? '',
       businessAssociateName: selectedBa,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       createdAt: DateTime.now(),
@@ -312,12 +316,15 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
         children: [
           Row(
             children: const [
-              Icon(Icons.shopping_basket_outlined,
-                  color: CatalogColors.primaryAccent),
+              Icon(
+                Icons.shopping_basket_outlined,
+                color: CatalogColors.primaryAccent,
+              ),
               SizedBox(width: 8),
-              Text('Select Products',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                'Select Products',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -352,12 +359,15 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
               itemBuilder: (ctx, i) {
                 final p = _items[i].product;
                 return ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   leading: CircleAvatar(
                     radius: 16,
-                    backgroundColor:
-                        CatalogColors.primaryAccent.withValues(alpha: 0.1),
+                    backgroundColor: CatalogColors.primaryAccent.withValues(
+                      alpha: 0.1,
+                    ),
                     child: Text(
                       p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
                       style: TextStyle(
@@ -367,18 +377,25 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                       ),
                     ),
                   ),
-                  title: Text(p.name,
-                      style: const TextStyle(fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  title: Text(
+                    p.name,
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   subtitle: Text(
-                      '${p.category} • KSh ${p.unitPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  trailing: Text('${p.currentStock} ${p.unit}',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF64748B))),
+                    '${p.category} • KSh ${p.unitPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Text(
+                    '${p.currentStock} ${p.unit}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
                 );
               },
             ),
@@ -400,13 +417,17 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Item Configuration',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            'Item Configuration',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
-          ..._items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _itemRow(item),
-              )),
+          ..._items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _itemRow(item),
+            ),
+          ),
         ],
       ),
     );
@@ -434,12 +455,16 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(p.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      p.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     Text(
                       'Available: ${p.currentStock} ${p.unit} • Supplier: ${p.supplierName ?? '—'}',
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF64748B)),
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),
@@ -458,17 +483,17 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
               final stacked = c.maxWidth < 480;
               final unitsField = TextField(
                 controller: item.unitsToAssignCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   labelText: 'Units to Assign',
                   helperText: 'Max ${p.currentStock}',
-                  errorText: overStock && overStockTried
-                      ? 'Exceeds available stock'
-                      : null,
+                  errorText:
+                      overStock && overStockTried
+                          ? 'Exceeds available stock'
+                          : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -478,8 +503,9 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
               );
               final priceField = TextField(
                 controller: item.unitPriceCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
@@ -547,12 +573,15 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
         children: [
           Row(
             children: const [
-              Icon(Icons.assignment_ind_outlined,
-                  color: CatalogColors.primaryAccent),
+              Icon(
+                Icons.assignment_ind_outlined,
+                color: CatalogColors.primaryAccent,
+              ),
               SizedBox(width: 8),
-              Text('Assignment Information',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                'Assignment Information',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -577,8 +606,10 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                 IconButton(
                   tooltip: 'Add',
                   onPressed: _addNewBusinessAssociate,
-                  icon: const Icon(Icons.check_circle,
-                      color: CatalogColors.primaryAccent),
+                  icon: const Icon(
+                    Icons.check_circle,
+                    color: CatalogColors.primaryAccent,
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Cancel',
@@ -591,8 +622,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
             FutureBuilder<List<UserModel>>(
               future: _usersFuture,
               builder: (context, snapshot) {
-                final users =
-                    snapshot.hasData ? snapshot.data! : <UserModel>[];
+                final users = snapshot.hasData ? snapshot.data! : <UserModel>[];
                 if (!snapshot.hasData) {
                   return const SizedBox(
                     height: 48,
@@ -608,24 +638,30 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                   decoration: InputDecoration(
                     labelText: 'Business Associate (Sales Rep) *',
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     isDense: true,
                   ),
                   items: [
-                    ...displayUsers.map((u) => DropdownMenuItem<String>(
-                          value: u.id,
-                          child: Text(
-                            u.fullName ?? u.email,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        )),
+                    ...displayUsers.map(
+                      (u) => DropdownMenuItem<String>(
+                        value: u.id,
+                        child: Text(
+                          u.fullName ?? u.email,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
                     const DropdownMenuItem<String>(
                       value: _addNewBaId,
                       child: Row(
                         children: [
-                          Icon(Icons.add,
-                              size: 16, color: CatalogColors.primaryAccent),
+                          Icon(
+                            Icons.add,
+                            size: 16,
+                            color: CatalogColors.primaryAccent,
+                          ),
                           SizedBox(width: 6),
                           Text('Add new business associate…'),
                         ],
@@ -637,8 +673,7 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
                       setState(() => _addingNewBa = true);
                       return;
                     }
-                    final match =
-                        displayUsers.firstWhere((u) => u.id == v);
+                    final match = displayUsers.firstWhere((u) => u.id == v);
                     setState(() {
                       _selectedUser = match;
                       _selectedBa = match.fullName ?? match.email;
@@ -657,8 +692,9 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
             decoration: InputDecoration(
               labelText: 'Notes (optional)',
               hintText: 'Add any instructions or context',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               isDense: true,
             ),
           ),
@@ -681,12 +717,15 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
         children: [
           Row(
             children: const [
-              Icon(Icons.receipt_long_outlined,
-                  color: CatalogColors.primaryAccent),
+              Icon(
+                Icons.receipt_long_outlined,
+                color: CatalogColors.primaryAccent,
+              ),
               SizedBox(width: 8),
-              Text('Consignment Preview',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                'Consignment Preview',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -705,27 +744,31 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
               style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
             )
           else
-            ..._items.map((i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          i.product.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
+            ..._items.map(
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        i.product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'KSh ${(i.unitsToAssign * i.unitPrice).toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'KSh ${(i.unitsToAssign * i.unitPrice).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -737,23 +780,20 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(label,
-                style: TextStyle(
-                  color: emphasize
-                      ? Colors.black
-                      : const Color(0xFF64748B),
-                  fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
-                )),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: emphasize ? Colors.black : const Color(0xFF64748B),
+                fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
           ),
           Text(
             value,
             style: TextStyle(
-              fontWeight:
-                  emphasize ? FontWeight.bold : FontWeight.w600,
+              fontWeight: emphasize ? FontWeight.bold : FontWeight.w600,
               fontSize: emphasize ? 16 : 14,
-              color: emphasize
-                  ? CatalogColors.primaryAccent
-                  : Colors.black,
+              color: emphasize ? CatalogColors.primaryAccent : Colors.black,
             ),
           ),
         ],
@@ -774,22 +814,22 @@ class _CreateConsignmentScreenState extends State<CreateConsignmentScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: CatalogColors.primaryAccent,
             foregroundColor: Colors.white,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          icon: _submitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Icon(Icons.check),
+          icon:
+              _submitting
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                  : const Icon(Icons.check),
           label: Text(_submitting ? 'Creating...' : 'Create Consignment'),
         ),
       ],
@@ -803,10 +843,10 @@ class _DraftItem {
   final TextEditingController unitPriceCtrl;
 
   _DraftItem({required this.product})
-      : unitsToAssignCtrl = TextEditingController(),
-        unitPriceCtrl = TextEditingController(
-          text: product.unitPrice.toStringAsFixed(2),
-        );
+    : unitsToAssignCtrl = TextEditingController(),
+      unitPriceCtrl = TextEditingController(
+        text: product.unitPrice.toStringAsFixed(2),
+      );
 
   int get unitsToAssign => int.tryParse(unitsToAssignCtrl.text) ?? 0;
   double get unitPrice => double.tryParse(unitPriceCtrl.text) ?? 0;

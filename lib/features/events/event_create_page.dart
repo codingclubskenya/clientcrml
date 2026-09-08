@@ -113,7 +113,13 @@ class _EventCreatePageState extends State<EventCreatePage> {
       initialTime: const TimeOfDay(hour: 9, minute: 0),
     );
     if (time == null) return;
-    final dt = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
+    final dt = DateTime(
+      picked.year,
+      picked.month,
+      picked.day,
+      time.hour,
+      time.minute,
+    );
     setState(() {
       if (isStart) {
         _start = dt;
@@ -184,7 +190,8 @@ class _EventCreatePageState extends State<EventCreatePage> {
         'created_by': currentUser?.id,
       };
 
-      if (_start != null) payload['start_at'] = _start!.toUtc().toIso8601String();
+      if (_start != null)
+        payload['start_at'] = _start!.toUtc().toIso8601String();
       if (_end != null) payload['end_at'] = _end!.toUtc().toIso8601String();
 
       final eventId = await _dbService.createEvent(payload);
@@ -205,14 +212,16 @@ class _EventCreatePageState extends State<EventCreatePage> {
     } on PostgrestException catch (e) {
       debugPrint('Event insert error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Save failed: ${e.message}'),
-        ));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Save failed: ${e.message}')));
       }
     } catch (e) {
       debugPrint('Save exception: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -238,9 +247,12 @@ class _EventCreatePageState extends State<EventCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final availableSubregions = _subregions
-        .where((s) => _selectedRegion == null || s['region'] == _selectedRegion)
-        .toList();
+    final availableSubregions =
+        _subregions
+            .where(
+              (s) => _selectedRegion == null || s['region'] == _selectedRegion,
+            )
+            .toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Event')),
@@ -293,8 +305,13 @@ class _EventCreatePageState extends State<EventCreatePage> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Select Region')),
-                  ..._regions.map((r) => DropdownMenuItem(value: r, child: Text(r))),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Select Region'),
+                  ),
+                  ..._regions.map(
+                    (r) => DropdownMenuItem(value: r, child: Text(r)),
+                  ),
                 ],
                 onChanged: (val) {
                   setState(() {
@@ -311,11 +328,16 @@ class _EventCreatePageState extends State<EventCreatePage> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Select Subregion')),
-                  ...availableSubregions.map((s) => DropdownMenuItem(
-                        value: s['sub_region'],
-                        child: Text(s['sub_region']?.toString() ?? ''),
-                      )),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Select Subregion'),
+                  ),
+                  ...availableSubregions.map(
+                    (s) => DropdownMenuItem(
+                      value: s['sub_region'],
+                      child: Text(s['sub_region']?.toString() ?? ''),
+                    ),
+                  ),
                 ],
                 onChanged: (val) => setState(() => _selectedSubregion = val),
               ),
@@ -327,11 +349,16 @@ class _EventCreatePageState extends State<EventCreatePage> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Select School (Optional)')),
-                  ..._schools.map((s) => DropdownMenuItem(
-                        value: s['id']?.toString(),
-                        child: Text(s['name']?.toString() ?? ''),
-                      )),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Select School (Optional)'),
+                  ),
+                  ..._schools.map(
+                    (s) => DropdownMenuItem(
+                      value: s['id']?.toString(),
+                      child: Text(s['name']?.toString() ?? ''),
+                    ),
+                  ),
                 ],
                 onChanged: (val) => setState(() => _selectedSchoolId = val),
               ),
@@ -340,7 +367,11 @@ class _EventCreatePageState extends State<EventCreatePage> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(_start == null ? 'Start Date/Time *' : EventDateFormat.format(_start)),
+                    child: Text(
+                      _start == null
+                          ? 'Start Date/Time *'
+                          : EventDateFormat.format(_start),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => _pickDate(context, true),
@@ -351,7 +382,11 @@ class _EventCreatePageState extends State<EventCreatePage> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(_end == null ? 'End Date/Time' : EventDateFormat.format(_end)),
+                    child: Text(
+                      _end == null
+                          ? 'End Date/Time'
+                          : EventDateFormat.format(_end),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => _pickDate(context, false),
@@ -396,10 +431,19 @@ class _EventCreatePageState extends State<EventCreatePage> {
                   border: OutlineInputBorder(),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
+                  DropdownMenuItem(
+                    value: 'scheduled',
+                    child: Text('Scheduled'),
+                  ),
                   DropdownMenuItem(value: 'active', child: Text('Active')),
-                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                  DropdownMenuItem(
+                    value: 'completed',
+                    child: Text('Completed'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'cancelled',
+                    child: Text('Cancelled'),
+                  ),
                 ],
                 onChanged: (val) => setState(() => _status = val!),
               ),
@@ -439,12 +483,15 @@ class _EventCreatePageState extends State<EventCreatePage> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
-                  children: _products.asMap().entries.map((entry) {
-                    return Chip(
-                      label: Text('${entry.value['product']} (${entry.value['qty']})'),
-                      onDeleted: () => _removeProduct(entry.key),
-                    );
-                  }).toList(),
+                  children:
+                      _products.asMap().entries.map((entry) {
+                        return Chip(
+                          label: Text(
+                            '${entry.value['product']} (${entry.value['qty']})',
+                          ),
+                          onDeleted: () => _removeProduct(entry.key),
+                        );
+                      }).toList(),
                 ),
               ],
               const SizedBox(height: 16),
@@ -509,9 +556,13 @@ class _EventCreatePageState extends State<EventCreatePage> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: _saving
-                    ? const CircularProgressIndicator()
-                    : const Text('Create Event', style: TextStyle(fontSize: 16)),
+                child:
+                    _saving
+                        ? const CircularProgressIndicator()
+                        : const Text(
+                          'Create Event',
+                          style: TextStyle(fontSize: 16),
+                        ),
               ),
               const SizedBox(height: 24),
             ],

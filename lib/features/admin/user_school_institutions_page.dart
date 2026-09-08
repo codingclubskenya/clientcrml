@@ -14,7 +14,8 @@ class UserSchoolInstitutionsPage extends StatefulWidget {
       _UserSchoolInstitutionsPageState();
 }
 
-class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage> {
+class _UserSchoolInstitutionsPageState
+    extends State<UserSchoolInstitutionsPage> {
   final DatabaseService _dbService = DatabaseService();
   late Future<_InstitutionData> _future;
 
@@ -26,9 +27,10 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
 
   Future<_InstitutionData> _loadData() async {
     final all = await _dbService.getAllSchools();
-    final items = all
-        .where((s) => (s.dealerType ?? '').toLowerCase() == 'institution')
-        .toList();
+    final items =
+        all
+            .where((s) => (s.dealerType ?? '').toLowerCase() == 'institution')
+            .toList();
     final users = await _dbService.getAllUsers();
     return _InstitutionData(items: items, users: users);
   }
@@ -52,16 +54,17 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
       if (uid.isEmpty) continue;
       byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
     }
-    final rows = data.users
-        .map(
-          (u) => OnboardedExportRow(
-            user: u,
-            items: byUser[u.id] ?? const <SchoolModel>[],
-          ),
-        )
-        .where((r) => r.items.isNotEmpty)
-        .toList()
-      ..sort((a, b) => b.items.length.compareTo(a.items.length));
+    final rows =
+        data.users
+            .map(
+              (u) => OnboardedExportRow(
+                user: u,
+                items: byUser[u.id] ?? const <SchoolModel>[],
+              ),
+            )
+            .where((r) => r.items.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
     try {
       await OnboardedExportService.exportPerUserBreakdown(
@@ -74,9 +77,9 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -124,7 +127,8 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
               child: Text('Failed to load institutions: ${snapshot.error}'),
             );
           }
-          final data = snapshot.data ??
+          final data =
+              snapshot.data ??
               const _InstitutionData(
                 items: <SchoolModel>[],
                 users: <UserModel>[],
@@ -137,16 +141,17 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
             byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
           }
 
-          final userRows = data.users
-              .map(
-                (u) => _UserBreakdownRow(
-                  user: u,
-                  items: byUser[u.id] ?? const <SchoolModel>[],
-                ),
-              )
-              .where((r) => r.items.isNotEmpty)
-              .toList()
-            ..sort((a, b) => b.items.length.compareTo(a.items.length));
+          final userRows =
+              data.users
+                  .map(
+                    (u) => _UserBreakdownRow(
+                      user: u,
+                      items: byUser[u.id] ?? const <SchoolModel>[],
+                    ),
+                  )
+                  .where((r) => r.items.isNotEmpty)
+                  .toList()
+                ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
@@ -217,8 +222,11 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.person_off_outlined,
-                            color: Colors.grey, size: 28),
+                        Icon(
+                          Icons.person_off_outlined,
+                          color: Colors.grey,
+                          size: 28,
+                        ),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -289,9 +297,7 @@ class _UserSchoolInstitutionsPageState extends State<UserSchoolInstitutionsPage>
                 trailing: Text(
                   s.isSynced ? 'Synced' : 'Pending',
                   style: TextStyle(
-                    color: s.isSynced
-                        ? AppColors.primaryGreen
-                        : Colors.orange,
+                    color: s.isSynced ? AppColors.primaryGreen : Colors.orange,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -333,4 +339,3 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-

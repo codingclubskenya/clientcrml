@@ -56,11 +56,14 @@ class _MessagesPageState extends State<MessagesPage> {
           if (userRegion.isEmpty) {
             users = allUsers.where((u) => u.id != currentUser.id).toList();
           } else {
-            users = allUsers
-                .where((u) =>
-                    u.id != currentUser.id &&
-                    (u.region ?? '').toLowerCase() == userRegion)
-                .toList();
+            users =
+                allUsers
+                    .where(
+                      (u) =>
+                          u.id != currentUser.id &&
+                          (u.region ?? '').toLowerCase() == userRegion,
+                    )
+                    .toList();
           }
         }
       } else {
@@ -76,12 +79,12 @@ class _MessagesPageState extends State<MessagesPage> {
                   ? u.fullName!.trim()
                   : u.email;
         }
-        _users = users
-          ..sort((a, b) {
-            final left = (a.fullName ?? a.email).toLowerCase();
-            final right = (b.fullName ?? b.email).toLowerCase();
-            return left.compareTo(right);
-          });
+        _users =
+            users..sort((a, b) {
+              final left = (a.fullName ?? a.email).toLowerCase();
+              final right = (b.fullName ?? b.email).toLowerCase();
+              return left.compareTo(right);
+            });
         _userDisplayById = userDisplayById;
         _messages = messages;
         _selectedRecipientId =

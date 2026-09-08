@@ -136,10 +136,7 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
           if (hasActiveSession)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               color: AppColors.primaryGreen.withValues(alpha: 0.1),
               child: Row(
                 children: [
@@ -165,14 +162,10 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
             height: 320,
             child: FlutterMap(
               mapController: _mapController,
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: 13.0,
-              ),
+              options: MapOptions(initialCenter: center, initialZoom: 13.0),
               children: [
                 TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.longhorn.dehus',
                 ),
                 if (_history.isNotEmpty) _buildHistoryMarkers(),
@@ -199,10 +192,7 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
           ),
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 const Text(
@@ -223,19 +213,19 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
                     ? const Center(child: CircularProgressIndicator())
                     : _history.isEmpty
                     ? const Center(
-                        child: Text(
-                          'No check-in history yet.\nUse the Check-In page to record your first visit.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _history.length,
-                        itemBuilder: (context, index) {
-                          final record = _history[index];
-                          return _buildHistoryTile(record, index);
-                        },
+                      child: Text(
+                        'No check-in history yet.\nUse the Check-In page to record your first visit.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
                       ),
+                    )
+                    : ListView.builder(
+                      itemCount: _history.length,
+                      itemBuilder: (context, index) {
+                        final record = _history[index];
+                        return _buildHistoryTile(record, index);
+                      },
+                    ),
           ),
         ],
       ),
@@ -272,9 +262,10 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
               padding: const EdgeInsets.all(4),
               child: Icon(
                 Icons.history,
-                color: r['checkout_at'] != null
-                    ? AppColors.primaryGreen
-                    : AppColors.accentOrange,
+                color:
+                    r['checkout_at'] != null
+                        ? AppColors.primaryGreen
+                        : AppColors.accentOrange,
                 size: 22,
               ),
             ),
@@ -286,22 +277,22 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
   }
 
   Widget _buildHistoryTile(Map<String, dynamic> record, int index) {
-    final checkinAt = record['checkin_at'] != null
-        ? DateTime.parse(record['checkin_at'] as String).toLocal()
-        : null;
-    final checkoutAt = record['checkout_at'] != null
-        ? DateTime.parse(record['checkout_at'] as String).toLocal()
-        : null;
+    final checkinAt =
+        record['checkin_at'] != null
+            ? DateTime.parse(record['checkin_at'] as String).toLocal()
+            : null;
+    final checkoutAt =
+        record['checkout_at'] != null
+            ? DateTime.parse(record['checkout_at'] as String).toLocal()
+            : null;
     final isOpen = checkoutAt == null;
     final duration = record['duration_seconds'] as int?;
     final auto = record['auto_checkout'] == true;
 
-    Color statusColor = isOpen
-        ? AppColors.accentOrange
-        : AppColors.primaryGreen;
-    String statusText = isOpen
-        ? 'ACTIVE'
-        : (auto ? 'AUTO CHECK-OUT' : 'COMPLETED');
+    Color statusColor =
+        isOpen ? AppColors.accentOrange : AppColors.primaryGreen;
+    String statusText =
+        isOpen ? 'ACTIVE' : (auto ? 'AUTO CHECK-OUT' : 'COMPLETED');
 
     return ListTile(
       leading: CircleAvatar(
@@ -326,10 +317,7 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),

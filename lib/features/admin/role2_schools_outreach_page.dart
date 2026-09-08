@@ -89,13 +89,14 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
           .order('created_at', ascending: false)
           .limit(500);
       final schoolsAll = (await schoolsQuery) as List;
-      final schools = schoolsAll
-          .map((s) => SchoolModel.fromMap(Map<String, dynamic>.from(s)))
-          .where((s) {
-            if (s.capturedBy == null || s.capturedBy!.isEmpty) return false;
-            return filteredAgentIds.contains(s.capturedBy);
-          })
-          .toList();
+      final schools =
+          schoolsAll
+              .map((s) => SchoolModel.fromMap(Map<String, dynamic>.from(s)))
+              .where((s) {
+                if (s.capturedBy == null || s.capturedBy!.isEmpty) return false;
+                return filteredAgentIds.contains(s.capturedBy);
+              })
+              .toList();
 
       final schoolIds = schools.map((s) => s.id).toList();
 
@@ -105,21 +106,27 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
           .order('created_at', ascending: false)
           .limit(1000);
       final ordersData = await ordersQuery;
-      final orders = (ordersData as List)
-          .map((o) => OrderModel.fromMap(Map<String, dynamic>.from(o)))
-          .where((o) => o.agentId == null ? false : filteredAgentIds.contains(o.agentId))
-          .toList();
+      final orders =
+          (ordersData as List)
+              .map((o) => OrderModel.fromMap(Map<String, dynamic>.from(o)))
+              .where(
+                (o) =>
+                    o.agentId == null
+                        ? false
+                        : filteredAgentIds.contains(o.agentId),
+              )
+              .toList();
 
       final orderIds = orders.map((o) => o.id).toList();
       final orderItems = <OrderItemModel>[];
       if (orderIds.isNotEmpty) {
-        final itemsQuery = _supabase
-            .from('order_items')
-            .select()
-            .limit(5000);
+        final itemsQuery = _supabase.from('order_items').select().limit(5000);
         final items = await itemsQuery;
         orderItems.addAll(
-          (items as List).map((i) => OrderItemModel.fromMap(Map<String, dynamic>.from(i))).where((i) => orderIds.contains(i.orderId)).toList(),
+          (items as List)
+              .map((i) => OrderItemModel.fromMap(Map<String, dynamic>.from(i)))
+              .where((i) => orderIds.contains(i.orderId))
+              .toList(),
         );
       }
 
@@ -132,7 +139,10 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
             .limit(1000);
         final salesData = await salesQuery;
         sales.addAll(
-          (salesData as List).map((s) => SchoolSaleModel.fromMap(Map<String, dynamic>.from(s))).where((s) => schoolIds.contains(s.schoolId)).toList(),
+          (salesData as List)
+              .map((s) => SchoolSaleModel.fromMap(Map<String, dynamic>.from(s)))
+              .where((s) => schoolIds.contains(s.schoolId))
+              .toList(),
         );
       }
 
@@ -143,7 +153,13 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
             .select()
             .order('visited_at', ascending: false)
             .limit(1000);
-        visits.addAll(List<Map<String, dynamic>>.from(visitsData as List).where((v) => schoolIds.contains((v['school_id'] ?? '').toString())).toList());
+        visits.addAll(
+          List<Map<String, dynamic>>.from(visitsData as List)
+              .where(
+                (v) => schoolIds.contains((v['school_id'] ?? '').toString()),
+              )
+              .toList(),
+        );
       }
 
       final activities = <Map<String, dynamic>>[];
@@ -153,7 +169,13 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
             .select()
             .order('created_at', ascending: false)
             .limit(1000);
-        activities.addAll(List<Map<String, dynamic>>.from(activitiesData as List).where((a) => schoolIds.contains((a['school_id'] ?? '').toString())).toList());
+        activities.addAll(
+          List<Map<String, dynamic>>.from(activitiesData as List)
+              .where(
+                (a) => schoolIds.contains((a['school_id'] ?? '').toString()),
+              )
+              .toList(),
+        );
       }
 
       final debts = <Map<String, dynamic>>[];
@@ -162,16 +184,22 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
             .from('debt_collections')
             .select()
             .limit(1000);
-        debts.addAll(List<Map<String, dynamic>>.from(debtsData as List).where((d) => schoolIds.contains((d['school_id'] ?? '').toString())).toList());
+        debts.addAll(
+          List<Map<String, dynamic>>.from(debtsData as List)
+              .where(
+                (d) => schoolIds.contains((d['school_id'] ?? '').toString()),
+              )
+              .toList(),
+        );
       }
 
-      final targetsData = await _supabase
-          .from('targets')
-          .select()
-          .limit(500);
-      final targets = (targetsData as List)
-          .map((item) => TargetModel.fromMap(Map<String, dynamic>.from(item)))
-          .toList();
+      final targetsData = await _supabase.from('targets').select().limit(500);
+      final targets =
+          (targetsData as List)
+              .map(
+                (item) => TargetModel.fromMap(Map<String, dynamic>.from(item)),
+              )
+              .toList();
 
       if (!mounted) return;
       setState(() {
@@ -289,55 +317,83 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
     final weeklyTargetMap = <String, int>{};
     for (final t in targets) {
-      if (t.targetType != 'product_sales' || t.targetPeriod != 'weekly') continue;
+      if (t.targetType != 'product_sales' || t.targetPeriod != 'weekly')
+        continue;
       final agentId = t.assignedTo;
       if (agentId == null || agentId.isEmpty) continue;
-      final productTarget = t.targetData['product'] ?? t.targetData['total'] ?? 0;
-      final qty = productTarget is int
-          ? productTarget
-          : productTarget is double
+      final productTarget =
+          t.targetData['product'] ?? t.targetData['total'] ?? 0;
+      final qty =
+          productTarget is int
+              ? productTarget
+              : productTarget is double
               ? productTarget.toInt()
               : int.tryParse(productTarget.toString()) ?? 0;
       weeklyTargetMap[agentId] = qty;
     }
 
-    final selectedAgentIds = _selectedAgentId == null ? null : <String>{_selectedAgentId!};
-    final selectedRegionIds = _selectedRegionId == null
-        ? null
-        : _regions
-            .where((r) => r.id == _selectedRegionId)
-            .map((r) => r.id!)
-            .toSet();
+    final selectedAgentIds =
+        _selectedAgentId == null ? null : <String>{_selectedAgentId!};
+    final selectedRegionIds =
+        _selectedRegionId == null
+            ? null
+            : _regions
+                .where((r) => r.id == _selectedRegionId)
+                .map((r) => r.id!)
+                .toSet();
 
     final rows = <Map<String, dynamic>>[];
     for (final agent in agents) {
-      if (selectedAgentIds != null && !selectedAgentIds.contains(agent.id)) continue;
+      if (selectedAgentIds != null && !selectedAgentIds.contains(agent.id))
+        continue;
       final agentSchools = agentSchoolMap[agent.id] ?? <SchoolModel>[];
       if (selectedRegionIds != null && selectedRegionIds.isNotEmpty) {
         final agentRegionId = agent.regionId;
-        if (agentRegionId == null || !selectedRegionIds.contains(agentRegionId)) continue;
+        if (agentRegionId == null || !selectedRegionIds.contains(agentRegionId))
+          continue;
       }
 
       final region = agent.regionId != null ? regionMap[agent.regionId] : null;
       final regionName = region?.region ?? agent.region ?? '';
 
       for (final school in agentSchools) {
-        final schoolVisits = visits.where((v) => v['school_id'] == school.id).toList();
-        final schoolCalls = activities.where((a) => a['school_id'] == school.id && (a['activity_type'] ?? '').toString().toLowerCase() == 'call').toList();
-        final interactionType = schoolVisits.isNotEmpty ? 'Visit' : schoolCalls.isNotEmpty ? 'Phone Call' : '';
+        final schoolVisits =
+            visits.where((v) => v['school_id'] == school.id).toList();
+        final schoolCalls =
+            activities
+                .where(
+                  (a) =>
+                      a['school_id'] == school.id &&
+                      (a['activity_type'] ?? '').toString().toLowerCase() ==
+                          'call',
+                )
+                .toList();
+        final interactionType =
+            schoolVisits.isNotEmpty
+                ? 'Visit'
+                : schoolCalls.isNotEmpty
+                ? 'Phone Call'
+                : '';
 
-        final schoolSalesList = sales.where((s) => s.schoolId == school.id).toList();
-        final closedWonQty = schoolSalesList.where((s) => s.stage == PipelineStage.won).length;
+        final schoolSalesList =
+            sales.where((s) => s.schoolId == school.id).toList();
+        final closedWonQty =
+            schoolSalesList.where((s) => s.stage == PipelineStage.won).length;
 
         final schoolDebtsList = debts.where((d) => d['school_id'] == school.id);
-        final schoolDebtTotal = schoolDebtsList.fold<double>(0.0, (sum, d) => sum + ((d['amount'] as num?)?.toDouble() ?? 0.0));
+        final schoolDebtTotal = schoolDebtsList.fold<double>(
+          0.0,
+          (sum, d) => sum + ((d['amount'] as num?)?.toDouble() ?? 0.0),
+        );
 
         rows.add({
           'region': regionName,
           'agent': agent.fullName ?? agent.email,
-          'date': school.capturedAt != null ? _formatDate(school.capturedAt!) : '',
+          'date':
+              school.capturedAt != null ? _formatDate(school.capturedAt!) : '',
           'school': school.name,
-          'type': '${school.dealerType ?? ''}${school.dealerType != null && school.bookCategory != null ? ' / ' : ''}${school.bookCategory ?? ''}',
+          'type':
+              '${school.dealerType ?? ''}${school.dealerType != null && school.bookCategory != null ? ' / ' : ''}${school.bookCategory ?? ''}',
           'competitor': school.competitorAnalysis ?? '',
           'level': school.schoolLevel ?? '',
           'status': school.captureStatus ?? '',
@@ -353,7 +409,10 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
           'agentSchoolsCount': agentSchools.length.toString(),
           'agentVisits': (agentVisitsMap[agent.id] ?? 0).toString(),
           'agentCalls': (agentCallsMap[agent.id] ?? 0).toString(),
-          'agentProjectedQty': agentSchools.fold<int>(0, (sum, s) => sum + (s.projectedQuantity ?? 0)).toString(),
+          'agentProjectedQty':
+              agentSchools
+                  .fold<int>(0, (sum, s) => sum + (s.projectedQuantity ?? 0))
+                  .toString(),
           'agentClosedQty': (agentClosedQtyMap[agent.id] ?? 0).toString(),
           'agentDebtKes': (agentDebtMap[agent.id] ?? 0.0).toStringAsFixed(0),
           'weeklyTarget': (weeklyTargetMap[agent.id] ?? 0).toString(),
@@ -403,9 +462,9 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
     final rows = _buildReportRows();
     if (rows.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No data to export.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export.')));
       return;
     }
 
@@ -478,19 +537,18 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
       buffer.writeln(values.map(_csvEscape).join(','));
     }
 
-    final fileName = 'schools_outreach_report_${_formatDate(DateTime.now())}.csv';
+    final fileName =
+        'schools_outreach_report_${_formatDate(DateTime.now())}.csv';
     try {
       await downloadCsvTemplate(fileName, buffer.toString());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved to Downloads: $fileName')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved to Downloads: $fileName')));
     } on UnsupportedError {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Download not supported on this device.'),
-        ),
+        const SnackBar(content: Text('Download not supported on this device.')),
       );
     }
   }
@@ -514,17 +572,18 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
         selectedAgentId: _selectedAgentId,
       );
 
-      final fileName = 'schools_outreach_report_${_formatDate(DateTime.now())}.pdf';
+      final fileName =
+          'schools_outreach_report_${_formatDate(DateTime.now())}.pdf';
       await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF exported: $fileName')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('PDF exported: $fileName')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to export PDF: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to export PDF: $e')));
     } finally {
       if (mounted) setState(() => _isExportingPdf = false);
     }
@@ -546,9 +605,17 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: _isExportingPdf
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.picture_as_pdf),
+            icon:
+                _isExportingPdf
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Icon(Icons.picture_as_pdf),
             onPressed: _isExportingPdf ? null : _exportPdf,
             tooltip: 'Export PDF',
           ),
@@ -564,26 +631,25 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
               ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text('Error: $_error', style: const TextStyle(color: Colors.red)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Error: $_error',
+                    style: const TextStyle(color: Colors.red),
                   ),
-                )
+                ),
+              )
               : _buildContent(),
     );
   }
 
   Widget _buildContent() {
-    return Column(
-      children: [
-        _buildFilters(),
-        Expanded(child: _buildTable()),
-      ],
-    );
+    return Column(children: [_buildFilters(), Expanded(child: _buildTable())]);
   }
 
   Widget _buildFilters() {
@@ -600,12 +666,23 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
               labelText: 'Region',
               border: OutlineInputBorder(),
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
             hint: const Text('All Regions'),
             items: [
-              const DropdownMenuItem<String>(value: null, child: Text('All Regions')),
-              ..._regions.map((r) => DropdownMenuItem<String>(value: r.id, child: Text(r.region))),
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('All Regions'),
+              ),
+              ..._regions.map(
+                (r) => DropdownMenuItem<String>(
+                  value: r.id,
+                  child: Text(r.region),
+                ),
+              ),
             ],
             onChanged: (value) => setState(() => _selectedRegionId = value),
           ),
@@ -615,12 +692,23 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
               labelText: 'Sales Agent',
               border: OutlineInputBorder(),
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
             hint: const Text('All Agents'),
             items: [
-              const DropdownMenuItem<String>(value: null, child: Text('All Agents')),
-              ..._agents.map((a) => DropdownMenuItem<String>(value: a.id, child: Text(a.fullName ?? a.email))),
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('All Agents'),
+              ),
+              ..._agents.map(
+                (a) => DropdownMenuItem<String>(
+                  value: a.id,
+                  child: Text(a.fullName ?? a.email),
+                ),
+              ),
             ],
             onChanged: (value) => setState(() => _selectedAgentId = value),
           ),
@@ -676,43 +764,45 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
             DataColumn(label: Text('Variance')),
             DataColumn(label: Text('Balance carried forward')),
           ],
-          rows: rows.map((row) {
-            final weeklyTarget = int.tryParse(row['weeklyTarget'].toString()) ?? 0;
-            final achieved = int.tryParse(row['achieved'].toString()) ?? 0;
-            final variance = weeklyTarget - achieved;
+          rows:
+              rows.map((row) {
+                final weeklyTarget =
+                    int.tryParse(row['weeklyTarget'].toString()) ?? 0;
+                final achieved = int.tryParse(row['achieved'].toString()) ?? 0;
+                final variance = weeklyTarget - achieved;
 
-            return DataRow(
-              cells: [
-                DataCell(Text(row['region'].toString())),
-                DataCell(Text(row['agent'].toString())),
-                DataCell(Text(row['date'].toString())),
-                DataCell(Text(row['school'].toString())),
-                DataCell(Text(row['type'].toString())),
-                DataCell(Text(row['competitor'].toString())),
-                DataCell(Text(row['level'].toString())),
-                DataCell(Text(row['status'].toString())),
-                DataCell(Text(row['population'].toString())),
-                DataCell(Text(row['interaction'].toString())),
-                DataCell(Text(row['contact'].toString())),
-                DataCell(Text(row['designation'].toString())),
-                DataCell(Text(row['contacts'].toString())),
-                DataCell(Text(_truncate(row['feedback'].toString(), 40))),
-                DataCell(Text(row['projectedQty'].toString())),
-                DataCell(Text(row['closedWonQty'].toString())),
-                DataCell(Text(row['debtKes'].toString())),
-                DataCell(Text(row['agentSchoolsCount'].toString())),
-                DataCell(Text(row['agentVisits'].toString())),
-                DataCell(Text(row['agentCalls'].toString())),
-                DataCell(Text(row['agentProjectedQty'].toString())),
-                DataCell(Text(row['agentClosedQty'].toString())),
-                DataCell(Text(row['agentDebtKes'].toString())),
-                DataCell(Text(weeklyTarget.toString())),
-                DataCell(Text(achieved.toString())),
-                DataCell(Text(variance.toString())),
-                DataCell(const Text('0')),
-              ],
-            );
-          }).toList(),
+                return DataRow(
+                  cells: [
+                    DataCell(Text(row['region'].toString())),
+                    DataCell(Text(row['agent'].toString())),
+                    DataCell(Text(row['date'].toString())),
+                    DataCell(Text(row['school'].toString())),
+                    DataCell(Text(row['type'].toString())),
+                    DataCell(Text(row['competitor'].toString())),
+                    DataCell(Text(row['level'].toString())),
+                    DataCell(Text(row['status'].toString())),
+                    DataCell(Text(row['population'].toString())),
+                    DataCell(Text(row['interaction'].toString())),
+                    DataCell(Text(row['contact'].toString())),
+                    DataCell(Text(row['designation'].toString())),
+                    DataCell(Text(row['contacts'].toString())),
+                    DataCell(Text(_truncate(row['feedback'].toString(), 40))),
+                    DataCell(Text(row['projectedQty'].toString())),
+                    DataCell(Text(row['closedWonQty'].toString())),
+                    DataCell(Text(row['debtKes'].toString())),
+                    DataCell(Text(row['agentSchoolsCount'].toString())),
+                    DataCell(Text(row['agentVisits'].toString())),
+                    DataCell(Text(row['agentCalls'].toString())),
+                    DataCell(Text(row['agentProjectedQty'].toString())),
+                    DataCell(Text(row['agentClosedQty'].toString())),
+                    DataCell(Text(row['agentDebtKes'].toString())),
+                    DataCell(Text(weeklyTarget.toString())),
+                    DataCell(Text(achieved.toString())),
+                    DataCell(Text(variance.toString())),
+                    DataCell(const Text('0')),
+                  ],
+                );
+              }).toList(),
         ),
       ),
     );

@@ -57,13 +57,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }).toList();
   }
 
-  List<String> get _suppliers => _products
-      .map((p) => p.supplierName)
-      .whereType<String>()
-      .where((s) => s.isNotEmpty)
-      .toSet()
-      .toList()
-    ..sort();
+  List<String> get _suppliers =>
+      _products
+          .map((p) => p.supplierName)
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
   List<String> get _categories =>
       _products.map((p) => p.category).toSet().toList()..sort();
 
@@ -442,9 +443,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  [p.category, p.supplierName]
-                      .whereType<String>()
-                      .join(' • '),
+                  [p.category, p.supplierName].whereType<String>().join(' • '),
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF64748B),

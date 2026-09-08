@@ -53,16 +53,27 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _agents = users.where((u) => u.role == 4).toList();
         _regions = regions;
         if (user != null) {
-          _userRegionId = user.regionId?.trim().isEmpty ?? true ? null : user.regionId;
-          _userRegion = user.region?.trim().isEmpty ?? true ? null : user.region;
-          _userSubRegion = user.subRegion?.trim().isEmpty ?? true ? null : user.subRegion;
+          _userRegionId =
+              user.regionId?.trim().isEmpty ?? true ? null : user.regionId;
+          _userRegion =
+              user.region?.trim().isEmpty ?? true ? null : user.region;
+          _userSubRegion =
+              user.subRegion?.trim().isEmpty ?? true ? null : user.subRegion;
           if (_userRegion != null && _userRegion!.trim().isNotEmpty) {
-            final match = _agents.where((a) => a.region == _userRegion && a.subRegion == _userSubRegion).toList();
+            final match =
+                _agents
+                    .where(
+                      (a) =>
+                          a.region == _userRegion &&
+                          a.subRegion == _userSubRegion,
+                    )
+                    .toList();
             _selectedSupervisorId = match.isNotEmpty ? match.first.id : null;
           }
           if (_userRegion != null) {
             _subRegions = _subRegionsForRegion(_userRegion);
-            if (_userSubRegion != null && !_subRegions.contains(_userSubRegion)) {
+            if (_userSubRegion != null &&
+                !_subRegions.contains(_userSubRegion)) {
               _subRegions = [_userSubRegion!, ..._subRegions];
             }
           }
@@ -93,8 +104,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
       final user = await _dbService.getUser(currentUser.id);
       if (user == null) return;
       final region = agent.region?.trim().isEmpty ?? true ? null : agent.region;
-      final subRegion = agent.subRegion?.trim().isEmpty ?? true ? null : agent.subRegion;
-      final updated = user.copyWith(regionId: agent.regionId, region: region, subRegion: subRegion);
+      final subRegion =
+          agent.subRegion?.trim().isEmpty ?? true ? null : agent.subRegion;
+      final updated = user.copyWith(
+        regionId: agent.regionId,
+        region: region,
+        subRegion: subRegion,
+      );
       await _dbService.saveUser(updated);
       if (!mounted) return;
       setState(() {
@@ -104,12 +120,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _subRegions = _subRegionsForRegion(region);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Supervisor assigned. Region set to ${region ?? 'none'}.${subRegion != null ? ' ($subRegion)' : ''}'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            'Supervisor assigned. Region set to ${region ?? 'none'}.${subRegion != null ? ' ($subRegion)' : ''}',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to assign supervisor: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Failed to assign supervisor: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -136,24 +160,42 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if (currentUser == null) return;
     final user = await _dbService.getUser(currentUser.id);
     if (user == null) return;
-    final updated = user.copyWith(regionId: _userRegionId, region: _userRegion, subRegion: subRegion);
+    final updated = user.copyWith(
+      regionId: _userRegionId,
+      region: _userRegion,
+      subRegion: subRegion,
+    );
     await _dbService.saveUser(updated);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sub Region updated'), backgroundColor: AppColors.primaryGreen),
+      const SnackBar(
+        content: Text('Sub Region updated'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
     );
   }
 
-  Future<void> _saveRegionOnly(String? region, String? subRegion, String? regionId) async {
+  Future<void> _saveRegionOnly(
+    String? region,
+    String? subRegion,
+    String? regionId,
+  ) async {
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (currentUser == null) return;
     final user = await _dbService.getUser(currentUser.id);
     if (user == null) return;
-    final updated = user.copyWith(regionId: regionId, region: region, subRegion: subRegion);
+    final updated = user.copyWith(
+      regionId: regionId,
+      region: region,
+      subRegion: subRegion,
+    );
     await _dbService.saveUser(updated);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Region updated to $region'), backgroundColor: AppColors.primaryGreen),
+      SnackBar(
+        content: Text('Region updated to $region'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
     );
   }
 
@@ -437,35 +479,70 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _selectedSupervisorId == null || _selectedSupervisorId!.isEmpty || !_agents.any((a) => a.id == _selectedSupervisorId) ? null : _selectedSupervisorId,
+                    value:
+                        _selectedSupervisorId == null ||
+                                _selectedSupervisorId!.isEmpty ||
+                                !_agents.any(
+                                  (a) => a.id == _selectedSupervisorId,
+                                )
+                            ? null
+                            : _selectedSupervisorId,
                     decoration: const InputDecoration(
                       labelText: 'Supervisor',
                       border: OutlineInputBorder(),
                     ),
-                    hint: Text(_loadingSupervisors ? 'Loading...' : 'Select Supervisor'),
-                    items: _agents.map((a) => DropdownMenuItem(value: a.id, child: Text(a.fullName ?? a.email))).toList(),
-                    onChanged: _loadingSupervisors ? null : _onSupervisorChanged,
+                    hint: Text(
+                      _loadingSupervisors ? 'Loading...' : 'Select Supervisor',
+                    ),
+                    items:
+                        _agents
+                            .map(
+                              (a) => DropdownMenuItem(
+                                value: a.id,
+                                child: Text(a.fullName ?? a.email),
+                              ),
+                            )
+                            .toList(),
+                    onChanged:
+                        _loadingSupervisors ? null : _onSupervisorChanged,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _userRegion == null || !allRegions.contains(_userRegion) ? null : _userRegion,
+                    value:
+                        _userRegion == null || !allRegions.contains(_userRegion)
+                            ? null
+                            : _userRegion,
                     decoration: const InputDecoration(
                       labelText: 'Region',
                       border: OutlineInputBorder(),
                     ),
                     hint: const Text('Select Region'),
-                    items: allRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                    items:
+                        allRegions
+                            .map(
+                              (r) => DropdownMenuItem(value: r, child: Text(r)),
+                            )
+                            .toList(),
                     onChanged: _onRegionChanged,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _userSubRegion == null || !_subRegions.contains(_userSubRegion) ? null : _userSubRegion,
+                    value:
+                        _userSubRegion == null ||
+                                !_subRegions.contains(_userSubRegion)
+                            ? null
+                            : _userSubRegion,
                     decoration: const InputDecoration(
                       labelText: 'Sub Region',
                       border: OutlineInputBorder(),
                     ),
                     hint: const Text('Select Sub Region'),
-                    items: _subRegions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    items:
+                        _subRegions
+                            .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)),
+                            )
+                            .toList(),
                     onChanged: _userRegion == null ? null : _onSubRegionChanged,
                   ),
                 ],
@@ -507,47 +584,87 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-                 const SizedBox(height: 16),
-                 DropdownButtonFormField<String>(
-                   value: _selectedSupervisorId == null || _selectedSupervisorId!.isEmpty || !_agents.any((a) => a.id == _selectedSupervisorId) ? null : _selectedSupervisorId,
-                   decoration: const InputDecoration(
-                     labelText: 'Supervisor',
-                     border: OutlineInputBorder(),
-                   ),
-                   hint: Text(_loadingSupervisors ? 'Loading...' : 'Select Supervisor'),
-                   items: _agents.map((a) => DropdownMenuItem(value: a.id, child: Text(a.fullName ?? a.email))).toList(),
-                   onChanged: _loadingSupervisors ? null : _onSupervisorChanged,
-                 ),
-                 const SizedBox(height: 16),
-                 Row(
-                   children: [
-                     Expanded(
-                       child: DropdownButtonFormField<String>(
-                         value: _userRegion == null || !allRegions.contains(_userRegion) ? null : _userRegion,
-                         decoration: const InputDecoration(
-                           labelText: 'Region',
-                           border: OutlineInputBorder(),
-                         ),
-                         hint: const Text('Select Region'),
-                         items: allRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                         onChanged: _onRegionChanged,
-                       ),
-                     ),
-                     const SizedBox(width: 16),
-                     Expanded(
-                       child: DropdownButtonFormField<String>(
-                         value: _userSubRegion == null || !_subRegions.contains(_userSubRegion) ? null : _userSubRegion,
-                         decoration: const InputDecoration(
-                           labelText: 'Sub Region',
-                           border: OutlineInputBorder(),
-                         ),
-                         hint: const Text('Select Sub Region'),
-                         items: _subRegions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                         onChanged: _userRegion == null ? null : _onSubRegionChanged,
-                       ),
-                     ),
-                   ],
-                 ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value:
+                      _selectedSupervisorId == null ||
+                              _selectedSupervisorId!.isEmpty ||
+                              !_agents.any((a) => a.id == _selectedSupervisorId)
+                          ? null
+                          : _selectedSupervisorId,
+                  decoration: const InputDecoration(
+                    labelText: 'Supervisor',
+                    border: OutlineInputBorder(),
+                  ),
+                  hint: Text(
+                    _loadingSupervisors ? 'Loading...' : 'Select Supervisor',
+                  ),
+                  items:
+                      _agents
+                          .map(
+                            (a) => DropdownMenuItem(
+                              value: a.id,
+                              child: Text(a.fullName ?? a.email),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: _loadingSupervisors ? null : _onSupervisorChanged,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value:
+                            _userRegion == null ||
+                                    !allRegions.contains(_userRegion)
+                                ? null
+                                : _userRegion,
+                        decoration: const InputDecoration(
+                          labelText: 'Region',
+                          border: OutlineInputBorder(),
+                        ),
+                        hint: const Text('Select Region'),
+                        items:
+                            allRegions
+                                .map(
+                                  (r) => DropdownMenuItem(
+                                    value: r,
+                                    child: Text(r),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: _onRegionChanged,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value:
+                            _userSubRegion == null ||
+                                    !_subRegions.contains(_userSubRegion)
+                                ? null
+                                : _userSubRegion,
+                        decoration: const InputDecoration(
+                          labelText: 'Sub Region',
+                          border: OutlineInputBorder(),
+                        ),
+                        hint: const Text('Select Sub Region'),
+                        items:
+                            _subRegions
+                                .map(
+                                  (s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged:
+                            _userRegion == null ? null : _onSubRegionChanged,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             );
           },

@@ -9,7 +9,12 @@ import 'catalog_seed.dart';
 import 'catalog_theme.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key, this.suppliers, this.categories, this.initialProduct});
+  const AddProductScreen({
+    super.key,
+    this.suppliers,
+    this.categories,
+    this.initialProduct,
+  });
 
   final List<String>? suppliers;
   final List<String>? categories;
@@ -172,18 +177,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not pick image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
     }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_category == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a category')));
       return;
     }
 
@@ -194,41 +199,45 @@ class _AddProductScreenState extends State<AddProductScreen> {
       id: const Uuid().v4(),
       name: _nameCtrl.text.trim(),
       sku: _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
-      description:
-          _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
       supplierId: _supplierId,
       supplierName: _supplierName,
       category: _category!,
-      barcode: _barcodeCtrl.text.trim().isEmpty
-          ? null
-          : _barcodeCtrl.text.trim(),
+      barcode:
+          _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
       unitPrice: double.parse(_unitPriceCtrl.text),
-      wholesalePrice: _wholesaleCtrl.text.isEmpty
-          ? double.parse(_unitPriceCtrl.text)
-          : double.parse(_wholesaleCtrl.text),
+      wholesalePrice:
+          _wholesaleCtrl.text.isEmpty
+              ? double.parse(_unitPriceCtrl.text)
+              : double.parse(_wholesaleCtrl.text),
       unit: _unit ?? _defaultUnit ?? 'pieces',
       currentStock: int.parse(_currentStockCtrl.text),
       minStock: int.parse(_minStockCtrl.text),
       maxStock: int.parse(_maxStockCtrl.text),
       imageUrl: _pickedImage?.path,
-      author: _isBook && _authorCtrl.text.trim().isNotEmpty
-          ? _authorCtrl.text.trim()
-          : null,
-      publisher: _isBook && _publisherCtrl.text.trim().isNotEmpty
-          ? _publisherCtrl.text.trim()
-          : null,
-      isbn: _isBook && _isbnCtrl.text.trim().isNotEmpty
-          ? _isbnCtrl.text.trim()
-          : null,
-      edition: _isBook && _editionCtrl.text.trim().isNotEmpty
-          ? _editionCtrl.text.trim()
-          : null,
+      author:
+          _isBook && _authorCtrl.text.trim().isNotEmpty
+              ? _authorCtrl.text.trim()
+              : null,
+      publisher:
+          _isBook && _publisherCtrl.text.trim().isNotEmpty
+              ? _publisherCtrl.text.trim()
+              : null,
+      isbn:
+          _isBook && _isbnCtrl.text.trim().isNotEmpty
+              ? _isbnCtrl.text.trim()
+              : null,
+      edition:
+          _isBook && _editionCtrl.text.trim().isNotEmpty
+              ? _editionCtrl.text.trim()
+              : null,
       gradeLevel: _isBook ? _gradeLevel : null,
       subject: _isBook ? _subject : null,
       language: _isBook ? _language : null,
-      pageCount: _isBook && _pageCountCtrl.text.trim().isNotEmpty
-          ? int.tryParse(_pageCountCtrl.text.trim())
-          : null,
+      pageCount:
+          _isBook && _pageCountCtrl.text.trim().isNotEmpty
+              ? int.tryParse(_pageCountCtrl.text.trim())
+              : null,
     );
 
     if (!mounted) return;
@@ -311,8 +320,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           label: 'Product Name',
           required: true,
           hint: 'e.g., Maize Seeds 2kg',
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+          validator:
+              (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Name is required' : null,
         ),
         const SizedBox(height: 12),
         _field(
@@ -333,27 +343,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
           value: _supplierId,
           items: [
             const DropdownMenuItem<String>(value: null, child: Text('None')),
-            ..._suppliers.map((s) => DropdownMenuItem<String>(
-                  value: s,
-                  child: Text(s, overflow: TextOverflow.ellipsis),
-                )),
+            ..._suppliers.map(
+              (s) => DropdownMenuItem<String>(
+                value: s,
+                child: Text(s, overflow: TextOverflow.ellipsis),
+              ),
+            ),
           ],
-          onChanged: (v) => setState(() {
-            _supplierId = v;
-            _supplierName = v;
-          }),
+          onChanged:
+              (v) => setState(() {
+                _supplierId = v;
+                _supplierName = v;
+              }),
         ),
         const SizedBox(height: 12),
         _dropdownField(
           label: 'Category',
           required: true,
           value: _category,
-          items: _categories
-              .map((c) => DropdownMenuItem<String>(
-                    value: c,
-                    child: Text(c),
-                  ))
-              .toList(),
+          items:
+              _categories
+                  .map(
+                    (c) => DropdownMenuItem<String>(value: c, child: Text(c)),
+                  )
+                  .toList(),
           onChanged: (v) => setState(() => _category = v),
           validator: (v) => v == null ? 'Please select a category' : null,
         ),
@@ -381,8 +394,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     controller: _unitPriceCtrl,
                     label: 'Unit Price (KSh)',
                     required: true,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     hint: '0.00',
                     validator: _amountValidator,
                   ),
@@ -392,8 +406,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: _field(
                     controller: _wholesaleCtrl,
                     label: 'Wholesale Price',
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     hint: '0.00',
                     validator: _amountValidator,
                   ),
@@ -404,12 +419,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
             _dropdownField(
               label: 'Unit of Measurement',
               value: _unit ?? _defaultUnit,
-              items: _units
-                  .map((u) => DropdownMenuItem<String>(
-                        value: u,
-                        child: Text(_unitLabel(u)),
-                      ))
-                  .toList(),
+              items:
+                  _units
+                      .map(
+                        (u) => DropdownMenuItem<String>(
+                          value: u,
+                          child: Text(_unitLabel(u)),
+                        ),
+                      )
+                      .toList(),
               onChanged: (v) => setState(() => _unit = v),
             ),
           ],
@@ -422,8 +440,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
             _field(
               controller: _currentStockCtrl,
               label: 'Current Stock',
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               validator: _intValidator,
             ),
             const SizedBox(height: 12),
@@ -433,8 +452,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: _field(
                     controller: _minStockCtrl,
                     label: 'Minimum Stock',
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: _intValidator,
                   ),
                 ),
@@ -443,8 +463,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: _field(
                     controller: _maxStockCtrl,
                     label: 'Maximum Stock',
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: _intValidator,
                   ),
                 ),
@@ -474,24 +495,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 style: BorderStyle.solid,
               ),
             ),
-            child: _pickedImage != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(_pickedImage!, fit: BoxFit.cover),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.cloud_upload_outlined,
-                          size: 32, color: CatalogColors.primaryAccent),
-                      SizedBox(height: 8),
-                      Text('Tap to upload product image'),
-                      SizedBox(height: 4),
-                      Text('PNG, JPG up to 5MB',
+            child:
+                _pickedImage != null
+                    ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(_pickedImage!, fit: BoxFit.cover),
+                    )
+                    : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 32,
+                          color: CatalogColors.primaryAccent,
+                        ),
+                        SizedBox(height: 8),
+                        Text('Tap to upload product image'),
+                        SizedBox(height: 4),
+                        Text(
+                          'PNG, JPG up to 5MB',
                           style: TextStyle(
-                              fontSize: 12, color: Color(0xFF64748B))),
-                    ],
-                  ),
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
         if (_pickedImage != null) ...[
@@ -522,22 +551,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: CatalogColors.primaryAccent,
             foregroundColor: Colors.white,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          icon: _submitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Icon(Icons.save_outlined),
+          icon:
+              _submitting
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                  : const Icon(Icons.save_outlined),
           label: Text(_submitting ? 'Saving...' : 'Save Product'),
         ),
       ],
@@ -563,9 +592,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
             children: [
               Icon(icon, color: CatalogColors.primaryAccent),
               const SizedBox(width: 8),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -626,43 +659,44 @@ class _AddProductScreenState extends State<AddProductScreen> {
             final grade = _dropdownField(
               label: 'Grade Level',
               value: _gradeLevel,
-              items: _gradeOptions
-                  .map((g) => DropdownMenuItem<String>(
-                        value: g,
-                        child: Text(g),
-                      ))
-                  .toList(),
+              items:
+                  _gradeOptions
+                      .map(
+                        (g) =>
+                            DropdownMenuItem<String>(value: g, child: Text(g)),
+                      )
+                      .toList(),
               onChanged: (v) => setState(() => _gradeLevel = v),
             );
             final subject = _dropdownField(
               label: 'Subject',
               value: _subject,
-              items: _subjectOptions
-                  .map((s) => DropdownMenuItem<String>(
-                        value: s,
-                        child: Text(s),
-                      ))
-                  .toList(),
+              items:
+                  _subjectOptions
+                      .map(
+                        (s) =>
+                            DropdownMenuItem<String>(value: s, child: Text(s)),
+                      )
+                      .toList(),
               onChanged: (v) => setState(() => _subject = v),
             );
             final language = _dropdownField(
               label: 'Language',
               value: _language,
-              items: _languageOptions
-                  .map((l) => DropdownMenuItem<String>(
-                        value: l,
-                        child: Text(l),
-                      ))
-                  .toList(),
+              items:
+                  _languageOptions
+                      .map(
+                        (l) =>
+                            DropdownMenuItem<String>(value: l, child: Text(l)),
+                      )
+                      .toList(),
               onChanged: (v) => setState(() => _language = v),
             );
             final pages = _field(
               controller: _pageCountCtrl,
               label: 'Pages',
               keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             );
             if (stacked) {
               return Column(
@@ -708,16 +742,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      inputFormatters: inputFormatters ??
+      inputFormatters:
+          inputFormatters ??
           (keyboardType == const TextInputType.numberWithOptions(decimal: true)
               ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]
               : null),
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
         hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         isDense: true,
       ),
       validator: validator,
@@ -764,9 +797,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       isExpanded: true,
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         isDense: true,
       ),
       items: items,

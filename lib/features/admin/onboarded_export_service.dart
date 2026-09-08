@@ -7,10 +7,7 @@ import '../../models/farmer_model.dart';
 import '../../models/user_model.dart';
 
 class OnboardedExportRow {
-  const OnboardedExportRow({
-    required this.user,
-    required this.items,
-  });
+  const OnboardedExportRow({required this.user, required this.items});
 
   final UserModel user;
   final List<SchoolModel> items;
@@ -72,10 +69,7 @@ class OnboardedExportService {
     required List<OnboardedExportRow> rows,
   }) async {
     final generatedAt = DateTime.now();
-    final doc = pw.Document(
-      title: reportTitle,
-      author: 'DeHeus',
-    );
+    final doc = pw.Document(title: reportTitle, author: 'DeHeus');
 
     final byType = <String, int>{'School': 0, 'Bookshop': 0, 'Institution': 0};
     for (final row in rows) {
@@ -90,14 +84,15 @@ class OnboardedExportService {
         margin: const pw.EdgeInsets.fromLTRB(32, 32, 32, 32),
         header: (ctx) => _buildHeader(reportTitle, reportSubtitle, generatedAt),
         footer: (ctx) => _buildFooter(ctx),
-        build: (ctx) => [
-          _buildSummary(totalItems, rows.length, byType),
-          pw.SizedBox(height: 16),
-          for (final row in rows) ...[
-            _buildUserSection(row),
-            pw.SizedBox(height: 10),
-          ],
-        ],
+        build:
+            (ctx) => [
+              _buildSummary(totalItems, rows.length, byType),
+              pw.SizedBox(height: 16),
+              for (final row in rows) ...[
+                _buildUserSection(row),
+                pw.SizedBox(height: 10),
+              ],
+            ],
       ),
     );
 
@@ -115,9 +110,7 @@ class OnboardedExportService {
     return pw.Container(
       padding: const pw.EdgeInsets.only(bottom: 12),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(
-          bottom: pw.BorderSide(color: _green, width: 1.5),
-        ),
+        border: pw.Border(bottom: pw.BorderSide(color: _green, width: 1.5)),
       ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -153,9 +146,7 @@ class OnboardedExportService {
     return pw.Container(
       padding: const pw.EdgeInsets.only(top: 8),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(
-          top: pw.BorderSide(color: _lightGrey, width: 0.5),
-        ),
+        border: pw.Border(top: pw.BorderSide(color: _lightGrey, width: 0.5)),
       ),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -190,11 +181,7 @@ class OnboardedExportService {
           _summaryTile('Users', '$userCount', _dark),
           _summaryTile('Schools', '${byType['School'] ?? 0}', _dark),
           _summaryTile('Bookshops', '${byType['Bookshop'] ?? 0}', _orange),
-          _summaryTile(
-            'Institutions',
-            '${byType['Institution'] ?? 0}',
-            _blue,
-          ),
+          _summaryTile('Institutions', '${byType['Institution'] ?? 0}', _blue),
         ],
       ),
     );
@@ -213,19 +200,17 @@ class OnboardedExportService {
               color: color,
             ),
           ),
-          pw.Text(
-            label,
-            style: const pw.TextStyle(fontSize: 8, color: _grey),
-          ),
+          pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: _grey)),
         ],
       ),
     );
   }
 
   static pw.Widget _buildUserSection(OnboardedExportRow row) {
-    final name = (row.user.fullName?.trim().isNotEmpty ?? false)
-        ? row.user.fullName!.trim()
-        : row.user.email;
+    final name =
+        (row.user.fullName?.trim().isNotEmpty ?? false)
+            ? row.user.fullName!.trim()
+            : row.user.email;
     final typeCounts = <String, int>{};
     for (final s in row.items) {
       final t = _typeOf(s);
@@ -241,10 +226,7 @@ class OnboardedExportService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Container(
-            padding: const pw.EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 8,
-            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: const pw.BoxDecoration(
               color: _lightGrey,
               borderRadius: pw.BorderRadius.only(
@@ -300,32 +282,33 @@ class OnboardedExportService {
               child: pw.Wrap(
                 spacing: 6,
                 runSpacing: 4,
-                children: typeCounts.entries
-                    .map(
-                      (e) => pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: pw.BoxDecoration(
-                          color: _lightGrey,
-                          borderRadius: pw.BorderRadius.circular(3),
-                          border: pw.Border.all(
-                            color: _typeColor(e.key),
-                            width: 0.5,
+                children:
+                    typeCounts.entries
+                        .map(
+                          (e) => pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: pw.BoxDecoration(
+                              color: _lightGrey,
+                              borderRadius: pw.BorderRadius.circular(3),
+                              border: pw.Border.all(
+                                color: _typeColor(e.key),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: pw.Text(
+                              '${e.value} ${e.key}${e.value == 1 ? '' : 's'}',
+                              style: pw.TextStyle(
+                                fontSize: 7,
+                                fontWeight: pw.FontWeight.bold,
+                                color: _typeColor(e.key),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: pw.Text(
-                          '${e.value} ${e.key}${e.value == 1 ? '' : 's'}',
-                          style: pw.TextStyle(
-                            fontSize: 7,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _typeColor(e.key),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                        )
+                        .toList(),
               ),
             ),
           pw.Table(
@@ -411,28 +394,22 @@ class OnboardedExportService {
   static pw.Widget _bodyCell(String text) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: pw.Text(
-        text,
-        style: const pw.TextStyle(fontSize: 8),
-      ),
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 8)),
     );
   }
 
   static String _safeFileName(String input) {
-    final cleaned = input
-        .replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '')
-        .replaceAll(RegExp(r'\s+'), '_')
-        .toLowerCase();
+    final cleaned =
+        input
+            .replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '')
+            .replaceAll(RegExp(r'\s+'), '_')
+            .toLowerCase();
     return 'dehus_${cleaned.isEmpty ? 'report' : cleaned}_${DateTime.now().millisecondsSinceEpoch}';
   }
 }
 
 extension on PdfColor {
   PdfColor shade(double factor) {
-    return PdfColor(
-      red * factor,
-      green * factor,
-      blue * factor,
-    );
+    return PdfColor(red * factor, green * factor, blue * factor);
   }
 }

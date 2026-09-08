@@ -276,22 +276,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                 ),
-                _buildNavItem(Icons.inventory_2_outlined, 'Product Catalog', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProductListScreen(),
-                    ),
-                  );
-                }),
-                _buildNavItem(Icons.local_shipping_outlined, 'Stock Assignments', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ConsignmentListScreen(),
-                    ),
-                  );
-                }),
+                _buildNavItem(
+                  Icons.inventory_2_outlined,
+                  'Product Catalog',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProductListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildNavItem(
+                  Icons.local_shipping_outlined,
+                  'Stock Assignments',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ConsignmentListScreen(),
+                      ),
+                    );
+                  },
+                ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
@@ -572,22 +580,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                 ),
-                _buildNavItem(Icons.inventory_2_outlined, 'Product Catalog', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProductListScreen(),
-                    ),
-                  );
-                }),
-                _buildNavItem(Icons.local_shipping_outlined, 'Stock Assignments', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ConsignmentListScreen(),
-                    ),
-                  );
-                }),
+                _buildNavItem(
+                  Icons.inventory_2_outlined,
+                  'Product Catalog',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProductListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildNavItem(
+                  Icons.local_shipping_outlined,
+                  'Stock Assignments',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ConsignmentListScreen(),
+                      ),
+                    );
+                  },
+                ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(

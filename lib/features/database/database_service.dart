@@ -91,8 +91,11 @@ class DatabaseService {
       final box = await _reportsCacheBox;
       final entry = box.get(key);
       if (entry is Map) {
-        final cachedAt = DateTime.tryParse(entry['cached_at']?.toString() ?? '');
-        if (cachedAt != null && DateTime.now().difference(cachedAt).inHours < 24) {
+        final cachedAt = DateTime.tryParse(
+          entry['cached_at']?.toString() ?? '',
+        );
+        if (cachedAt != null &&
+            DateTime.now().difference(cachedAt).inHours < 24) {
           return Map<String, dynamic>.from(entry['report'] ?? {});
         }
         await box.delete(key);
@@ -201,8 +204,9 @@ class DatabaseService {
     }
   }
 
-  Future<List<Map<String, String>>>
-      getAssignableUsersByRoles(List<int> roles) async {
+  Future<List<Map<String, String>>> getAssignableUsersByRoles(
+    List<int> roles,
+  ) async {
     try {
       final data = await _supabase
           .from('users')
@@ -210,12 +214,14 @@ class DatabaseService {
       final roleSet = roles.toSet();
       return (data as List)
           .where((item) => roleSet.contains((item['role'] as int?) ?? 5))
-          .map((item) => {
-                'id': item['id']?.toString() ?? '',
-                'label':
-                    '${item['full_name']?.toString() ?? item['email']?.toString() ?? 'Unknown'} (${_roleLabel(item['role'] ?? 5)})',
-                'role': item['role']?.toString() ?? '5',
-              })
+          .map(
+            (item) => {
+              'id': item['id']?.toString() ?? '',
+              'label':
+                  '${item['full_name']?.toString() ?? item['email']?.toString() ?? 'Unknown'} (${_roleLabel(item['role'] ?? 5)})',
+              'role': item['role']?.toString() ?? '5',
+            },
+          )
           .toList();
     } catch (e) {
       debugPrint('Error getting assignable users: $e');
@@ -231,11 +237,12 @@ class DatabaseService {
           .order('region')
           .order('sub_region');
       return (data as List)
-          .map((item) => {
-                'id': item['id']?.toString() ?? '',
-                'label':
-                    '${item['region']} - ${item['sub_region']}',
-              })
+          .map(
+            (item) => {
+              'id': item['id']?.toString() ?? '',
+              'label': '${item['region']} - ${item['sub_region']}',
+            },
+          )
           .toList();
     } catch (e) {
       debugPrint('Error getting region options: $e');
@@ -262,11 +269,8 @@ class DatabaseService {
 
   Future<RegionModel?> getRegion(String id) async {
     try {
-      final data = await _supabase
-          .from('regions')
-          .select()
-          .eq('id', id)
-          .maybeSingle();
+      final data =
+          await _supabase.from('regions').select().eq('id', id).maybeSingle();
       if (data != null) {
         return RegionModel.fromMap(data);
       }
@@ -288,7 +292,10 @@ class DatabaseService {
 
   Future<void> updateRegion(RegionModel region) async {
     try {
-      await _supabase.from('regions').update(region.toMap()).eq('id', region.id!);
+      await _supabase
+          .from('regions')
+          .update(region.toMap())
+          .eq('id', region.id!);
       debugPrint("Region updated: ${region.region} - ${region.subRegion}");
     } catch (e) {
       debugPrint("Error updating region: $e");
@@ -302,10 +309,16 @@ class DatabaseService {
       final region = await getRegion(id);
       await _supabase.from('regions').delete().eq('id', id);
       if (region != null) {
-        await _supabase.from('users').update({'region': null, 'region_id': null}).eq('region_id', id);
+        await _supabase
+            .from('users')
+            .update({'region': null, 'region_id': null})
+            .eq('region_id', id);
         final regionName = region.region;
         if (regionName.isNotEmpty) {
-          await _supabase.from('users').update({'region': null}).or('region.eq.$regionName,sub_region.eq.${region.subRegion}');
+          await _supabase
+              .from('users')
+              .update({'region': null})
+              .or('region.eq.$regionName,sub_region.eq.${region.subRegion}');
         }
       }
       debugPrint("Region deleted: $id");
@@ -321,10 +334,17 @@ class DatabaseService {
       if (region == null) {
         throw Exception('Region not found');
       }
-      await _supabase.from('regions').update({'assigned_to': agentId}).eq('id', regionId);
+      await _supabase
+          .from('regions')
+          .update({'assigned_to': agentId})
+          .eq('id', regionId);
       await _supabase
           .from('users')
-          .update({'role_ref': 'agent', 'region': region.region, 'region_id': regionId})
+          .update({
+            'role_ref': 'agent',
+            'region': region.region,
+            'region_id': regionId,
+          })
           .eq('id', agentId);
       try {
         await _supabase.from('region_assignments').insert({
@@ -334,7 +354,9 @@ class DatabaseService {
         });
       } catch (e) {
         debugPrint('region_assignments insert failed: $e');
-        throw Exception('Legacy assignment succeeded, but multi-region assignment failed: $e');
+        throw Exception(
+          'Legacy assignment succeeded, but multi-region assignment failed: $e',
+        );
       }
       debugPrint("Region $regionId assigned to agent $agentId");
     } catch (e) {
@@ -343,7 +365,10 @@ class DatabaseService {
     }
   }
 
-  Future<void> assignRegionSupervisor(String regionId, String supervisorId) async {
+  Future<void> assignRegionSupervisor(
+    String regionId,
+    String supervisorId,
+  ) async {
     try {
       final region = await getRegion(regionId);
       if (region == null) {
@@ -355,7 +380,11 @@ class DatabaseService {
           .eq('id', regionId);
       await _supabase
           .from('users')
-          .update({'role_ref': 'supervisor', 'region': region.region, 'region_id': regionId})
+          .update({
+            'role_ref': 'supervisor',
+            'region': region.region,
+            'region_id': regionId,
+          })
           .eq('id', supervisorId);
       try {
         await _supabase.from('region_assignments').insert({
@@ -365,7 +394,9 @@ class DatabaseService {
         });
       } catch (e) {
         debugPrint('region_assignments insert failed: $e');
-        throw Exception('Legacy assignment succeeded, but multi-region assignment failed: $e');
+        throw Exception(
+          'Legacy assignment succeeded, but multi-region assignment failed: $e',
+        );
       }
       debugPrint("Region $regionId assigned to supervisor $supervisorId");
     } catch (e) {
@@ -396,7 +427,9 @@ class DatabaseService {
             .eq('role', 3);
       } catch (e) {
         debugPrint('region_assignments delete failed: $e');
-        throw Exception('Legacy unassignment succeeded, but multi-region cleanup failed: $e');
+        throw Exception(
+          'Legacy unassignment succeeded, but multi-region cleanup failed: $e',
+        );
       }
       debugPrint("Region $regionId unassigned from supervisor");
     } catch (e) {
@@ -422,7 +455,11 @@ class DatabaseService {
     }
   }
 
-  Future<void> promoteRegionMemberToAgent(String regionId, String memberId, {int role = 4}) async {
+  Future<void> promoteRegionMemberToAgent(
+    String regionId,
+    String memberId, {
+    int role = 4,
+  }) async {
     try {
       final region = await getRegion(regionId);
       if (region == null) {
@@ -465,7 +502,9 @@ class DatabaseService {
             .eq('role', 4);
       } catch (e) {
         debugPrint('region_assignments delete failed: $e');
-        throw Exception('Legacy unassignment succeeded, but multi-region cleanup failed: $e');
+        throw Exception(
+          'Legacy unassignment succeeded, but multi-region cleanup failed: $e',
+        );
       }
       debugPrint("Region $regionId unassigned from agent");
     } catch (e) {
@@ -480,11 +519,12 @@ class DatabaseService {
           .from('region_assignments')
           .select('user_id, role')
           .eq('region_id', regionId);
-      final userIds = (data as List)
-          .map((e) => (e['user_id'] ?? '').toString())
-          .where((id) => id.isNotEmpty)
-          .toSet()
-          .toList();
+      final userIds =
+          (data as List)
+              .map((e) => (e['user_id'] ?? '').toString())
+              .where((id) => id.isNotEmpty)
+              .toSet()
+              .toList();
       if (userIds.isEmpty) return <UserModel>[];
       final users = <UserModel>[];
       for (final id in userIds) {
@@ -498,7 +538,11 @@ class DatabaseService {
     }
   }
 
-  Future<void> assignUserToRegion(String regionId, String userId, int role) async {
+  Future<void> assignUserToRegion(
+    String regionId,
+    String userId,
+    int role,
+  ) async {
     try {
       await _supabase.from('region_assignments').insert({
         'region_id': regionId,
@@ -526,7 +570,10 @@ class DatabaseService {
     }
   }
 
-  Future<void> addSupervisorToRegion(String regionId, String supervisorId) async {
+  Future<void> addSupervisorToRegion(
+    String regionId,
+    String supervisorId,
+  ) async {
     try {
       await _supabase.from('region_assignments').insert({
         'region_id': regionId,
@@ -928,10 +975,14 @@ class DatabaseService {
         double value = 0.0;
         final product = targetData['product'];
         final total = targetData['total'];
-        if (product is num) value = product.toDouble();
-        else if (total is num) value = total.toDouble();
-        else if (product is String) value = double.tryParse(product) ?? 0.0;
-        else if (total is String) value = double.tryParse(total) ?? 0.0;
+        if (product is num)
+          value = product.toDouble();
+        else if (total is num)
+          value = total.toDouble();
+        else if (product is String)
+          value = double.tryParse(product) ?? 0.0;
+        else if (total is String)
+          value = double.tryParse(total) ?? 0.0;
 
         if (targetType != null) {
           targets[targetType] = value;
@@ -1087,17 +1138,16 @@ class DatabaseService {
     }
 
     String classifySchoolType(Map<String, dynamic> school) {
-      final buffer =
-          [
-                school['dealer_type'],
-                school['shop_category'],
-                school['school_level'],
-                school['partner_subtype'],
-                school['name'],
-              ]
-              .where((value) => value != null)
-              .map((value) => value.toString().toLowerCase())
-              .join(' ');
+      final buffer = [
+            school['dealer_type'],
+            school['shop_category'],
+            school['school_level'],
+            school['partner_subtype'],
+            school['name'],
+          ]
+          .where((value) => value != null)
+          .map((value) => value.toString().toLowerCase())
+          .join(' ');
 
       if (buffer.contains('bookshop') ||
           buffer.contains('book shop') ||
@@ -1117,36 +1167,33 @@ class DatabaseService {
       return 'school';
     }
 
-    final visitsFuture = (() async {
-      final response = await _supabase
-          .from('school_visits')
-          .select('school_id')
-          .eq('agent_id', agentId)
-          .gte('visited_at', startIso)
-          .lte('visited_at', nowIso);
-      return List<Map<String, dynamic>>.from(response as List<dynamic>);
-    })();
-    final onboardedFuture = (() async {
-      final response = await _supabase
-          .from('schools')
-          .select(
-            'id, dealer_type, shop_category, school_level, partner_subtype, name',
-          )
-          .eq('captured_by', agentId)
-          .gte('captured_at', startIso)
-          .lte('captured_at', nowIso);
-      return List<Map<String, dynamic>>.from(response as List<dynamic>);
-    })();
+    final visitsFuture =
+        (() async {
+          final response = await _supabase
+              .from('school_visits')
+              .select('school_id')
+              .eq('agent_id', agentId)
+              .gte('visited_at', startIso)
+              .lte('visited_at', nowIso);
+          return List<Map<String, dynamic>>.from(response as List<dynamic>);
+        })();
+    final onboardedFuture =
+        (() async {
+          final response = await _supabase
+              .from('schools')
+              .select(
+                'id, dealer_type, shop_category, school_level, partner_subtype, name',
+              )
+              .eq('captured_by', agentId)
+              .gte('captured_at', startIso)
+              .lte('captured_at', nowIso);
+          return List<Map<String, dynamic>>.from(response as List<dynamic>);
+        })();
 
     final results = await Future.wait<dynamic>([
       visitsFuture,
       onboardedFuture,
-      countRows(
-        'orders',
-        'created_at',
-        status: 'paid',
-        statusColumn: 'status',
-      ),
+      countRows('orders', 'created_at', status: 'paid', statusColumn: 'status'),
       countRows(
         'school_sales',
         'created_at',
@@ -1155,10 +1202,12 @@ class DatabaseService {
       ),
     ]);
 
-    final visitRows =
-        List<Map<String, dynamic>>.from(results[0] as List<dynamic>);
-    final onboardedSchools =
-        List<Map<String, dynamic>>.from(results[1] as List<dynamic>);
+    final visitRows = List<Map<String, dynamic>>.from(
+      results[0] as List<dynamic>,
+    );
+    final onboardedSchools = List<Map<String, dynamic>>.from(
+      results[1] as List<dynamic>,
+    );
     final orders = results[2] as int;
     final wonSales = results[3] as int;
 
@@ -1185,7 +1234,9 @@ class DatabaseService {
       final schoolTypeRows =
           (await _supabase
                   .from('schools')
-                  .select('id, dealer_type, shop_category, school_level, partner_subtype, name')
+                  .select(
+                    'id, dealer_type, shop_category, school_level, partner_subtype, name',
+                  )
                   .inFilter('id', allIds))
               as List<dynamic>;
       final schoolTypeById = <String, String>{};
@@ -2104,7 +2155,8 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getEvent(String id) async {
     try {
-      final data = await _supabase.from('events').select().eq('id', id).maybeSingle();
+      final data =
+          await _supabase.from('events').select().eq('id', id).maybeSingle();
       return data != null ? Map<String, dynamic>.from(data) : null;
     } catch (e) {
       debugPrint('Error getting event: $e');
@@ -2114,7 +2166,8 @@ class DatabaseService {
 
   Future<String?> createEvent(Map<String, dynamic> payload) async {
     try {
-      final data = await _supabase.from('events').insert(payload).select().single();
+      final data =
+          await _supabase.from('events').insert(payload).select().single();
       return data['id']?.toString();
     } catch (e) {
       debugPrint('Error creating event: $e');
@@ -2220,11 +2273,14 @@ class DatabaseService {
 
   Future<void> toggleEventTask(String taskId, bool completed) async {
     try {
-      await _supabase.from('event_tasks').update({
-        'completed': completed,
-        'completed_at': completed ? DateTime.now().toIso8601String() : null,
-        'completed_by': completed ? getCurrentUserId() : null,
-      }).eq('id', taskId);
+      await _supabase
+          .from('event_tasks')
+          .update({
+            'completed': completed,
+            'completed_at': completed ? DateTime.now().toIso8601String() : null,
+            'completed_by': completed ? getCurrentUserId() : null,
+          })
+          .eq('id', taskId);
     } catch (e) {
       debugPrint('Error toggling event task: $e');
       rethrow;
@@ -2348,11 +2404,14 @@ class DatabaseService {
 
   Future<void> updateEventExpenseStatus(String expenseId, String status) async {
     try {
-      await _supabase.from('event_expenses').update({
-        'status': status,
-        'approved_by': getCurrentUserId(),
-        'approved_at': DateTime.now().toIso8601String(),
-      }).eq('id', expenseId);
+      await _supabase
+          .from('event_expenses')
+          .update({
+            'status': status,
+            'approved_by': getCurrentUserId(),
+            'approved_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', expenseId);
     } catch (e) {
       debugPrint('Error updating event expense status: $e');
       rethrow;
@@ -2361,11 +2420,12 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getEventReport(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_reports')
-          .select()
-          .eq('event_id', eventId)
-          .maybeSingle();
+      final data =
+          await _supabase
+              .from('event_reports')
+              .select()
+              .eq('event_id', eventId)
+              .maybeSingle();
       return data != null ? Map<String, dynamic>.from(data) : null;
     } catch (e) {
       debugPrint('Error getting event report: $e');
@@ -2376,11 +2436,12 @@ class DatabaseService {
   Future<void> saveEventReport(Map<String, dynamic> payload) async {
     try {
       final eventId = payload['event_id'];
-      final existing = await _supabase
-          .from('event_reports')
-          .select('id')
-          .eq('event_id', eventId)
-          .maybeSingle();
+      final existing =
+          await _supabase
+              .from('event_reports')
+              .select('id')
+              .eq('event_id', eventId)
+              .maybeSingle();
 
       if (existing != null) {
         await _supabase
@@ -2402,20 +2463,36 @@ class DatabaseService {
         _supabase.from('event_checkins').select('id').eq('event_id', eventId),
         _supabase.from('event_leads').select('id').eq('event_id', eventId),
         _supabase.from('event_orders').select('id').eq('event_id', eventId),
-        _supabase.from('event_samples').select('id, quantity').eq('event_id', eventId),
-        _supabase.from('event_expenses').select('amount, status').eq('event_id', eventId),
+        _supabase
+            .from('event_samples')
+            .select('id, quantity')
+            .eq('event_id', eventId),
+        _supabase
+            .from('event_expenses')
+            .select('amount, status')
+            .eq('event_id', eventId),
         _supabase.from('event_photos').select('id').eq('event_id', eventId),
-        _supabase.from('event_tasks').select('id, completed').eq('event_id', eventId),
+        _supabase
+            .from('event_tasks')
+            .select('id, completed')
+            .eq('event_id', eventId),
       ]);
 
       final checkins = (results[0] as List).length;
       final leads = (results[1] as List).length;
       final orders = (results[2] as List).length;
-      final samples = (results[3] as List).fold<int>(0, (sum, s) => sum + ((s['quantity'] as num?)?.toInt() ?? 0));
-      final expenses = (results[4] as List).fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+      final samples = (results[3] as List).fold<int>(
+        0,
+        (sum, s) => sum + ((s['quantity'] as num?)?.toInt() ?? 0),
+      );
+      final expenses = (results[4] as List).fold<double>(
+        0,
+        (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0),
+      );
       final photos = (results[5] as List).length;
       final tasks = (results[6] as List).length;
-      final completedTasks = (results[6] as List).where((t) => t['completed'] == true).length;
+      final completedTasks =
+          (results[6] as List).where((t) => t['completed'] == true).length;
 
       return {
         'checkins': checkins,
@@ -2450,13 +2527,22 @@ class DatabaseService {
     try {
       var query = _supabase.from('events').select();
       if (region != null) query = query.eq('region', region);
-      if (startDate != null) query = query.gte('start_at', startDate.toIso8601String());
-      if (endDate != null) query = query.lte('start_at', endDate.toIso8601String());
+      if (startDate != null)
+        query = query.gte('start_at', startDate.toIso8601String());
+      if (endDate != null)
+        query = query.lte('start_at', endDate.toIso8601String());
       final events = List<Map<String, dynamic>>.from(await query);
 
-      final activeEvents = events.where((e) => e['status'] == 'active' || e['status'] == 'in_progress').length;
-      final upcomingEvents = events.where((e) => e['status'] == 'scheduled').length;
-      final completedEvents = events.where((e) => e['status'] == 'completed').length;
+      final activeEvents =
+          events
+              .where(
+                (e) => e['status'] == 'active' || e['status'] == 'in_progress',
+              )
+              .length;
+      final upcomingEvents =
+          events.where((e) => e['status'] == 'scheduled').length;
+      final completedEvents =
+          events.where((e) => e['status'] == 'completed').length;
 
       double totalRevenue = 0;
       double totalBudget = 0;
@@ -2477,7 +2563,10 @@ class DatabaseService {
         totalExpenses += (summary['expenses'] as double?) ?? 0;
       }
 
-      final roi = totalExpenses > 0 ? ((totalRevenue - totalExpenses) / totalExpenses * 100) : 0;
+      final roi =
+          totalExpenses > 0
+              ? ((totalRevenue - totalExpenses) / totalExpenses * 100)
+              : 0;
 
       return {
         'total_events': events.length,
@@ -2510,7 +2599,9 @@ class DatabaseService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getTopPerformingEvents({int limit = 5}) async {
+  Future<List<Map<String, dynamic>>> getTopPerformingEvents({
+    int limit = 5,
+  }) async {
     try {
       final events = await getEvents();
       final eventsWithMetrics = <Map<String, dynamic>>[];
@@ -2519,10 +2610,7 @@ class DatabaseService {
         final eventId = event['id']?.toString();
         if (eventId == null) continue;
         final summary = await getEventSummary(eventId);
-        eventsWithMetrics.add({
-          ...event,
-          'metrics': summary,
-        });
+        eventsWithMetrics.add({...event, 'metrics': summary});
       }
 
       eventsWithMetrics.sort((a, b) {
@@ -2547,8 +2635,16 @@ class DatabaseService {
         final agentId = assignment['agent_id']?.toString();
         if (agentId == null) continue;
 
-        final leads = await _supabase.from('event_leads').select('id').eq('event_id', eventId).eq('agent_id', agentId);
-        final orders = await _supabase.from('event_orders').select('id').eq('event_id', eventId).eq('agent_id', agentId);
+        final leads = await _supabase
+            .from('event_leads')
+            .select('id')
+            .eq('event_id', eventId)
+            .eq('agent_id', agentId);
+        final orders = await _supabase
+            .from('event_orders')
+            .select('id')
+            .eq('event_id', eventId)
+            .eq('agent_id', agentId);
 
         agentsWithMetrics.add({
           ...assignment,

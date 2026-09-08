@@ -38,7 +38,7 @@ class OrderModel {
     this.createdAt,
     this.updatedAt,
   }) : id = id ?? const Uuid().v4(),
-     orderNumber = orderNumber ?? _generateOrderNumber();
+       orderNumber = orderNumber ?? _generateOrderNumber();
 
   static String _generateOrderNumber() {
     final stamp = DateTime.now().millisecondsSinceEpoch;

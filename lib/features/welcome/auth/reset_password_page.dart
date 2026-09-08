@@ -8,7 +8,12 @@ import '../../../core/constants/colors.dart';
 import 'login_page.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({super.key, this.code, this.accessToken, this.refreshToken});
+  const ResetPasswordPage({
+    super.key,
+    this.code,
+    this.accessToken,
+    this.refreshToken,
+  });
 
   final String? code;
   final String? accessToken;

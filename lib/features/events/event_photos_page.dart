@@ -18,9 +18,10 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
   List<Map<String, dynamic>> _photos = [];
   bool _loading = true;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -37,7 +38,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       setState(() => _photos = photos);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
       }
     } finally {
       setState(() => _loading = false);
@@ -61,7 +64,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
 
       await _supabase.storage.from('event_photos').upload(fileName, file);
 
-      final imageUrl = _supabase.storage.from('event_photos').getPublicUrl(fileName);
+      final imageUrl = _supabase.storage
+          .from('event_photos')
+          .getPublicUrl(fileName);
 
       final currentUser = _supabase.auth.currentUser;
       await _dbService.uploadEventPhoto({
@@ -80,7 +85,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
         setState(() => _loading = false);
       }
     }
@@ -103,7 +110,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
 
       await _supabase.storage.from('event_photos').upload(fileName, file);
 
-      final imageUrl = _supabase.storage.from('event_photos').getPublicUrl(fileName);
+      final imageUrl = _supabase.storage
+          .from('event_photos')
+          .getPublicUrl(fileName);
 
       final currentUser = _supabase.auth.currentUser;
       await _dbService.uploadEventPhoto({
@@ -122,7 +131,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
         setState(() => _loading = false);
       }
     }
@@ -131,21 +142,22 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
   Future<void> _deletePhoto(Map<String, dynamic> photo) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Photo'),
-        content: const Text('Are you sure you want to delete this photo?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Delete Photo'),
+            content: const Text('Are you sure you want to delete this photo?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -158,54 +170,65 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
         await _supabase.from('event_photos').delete().eq('id', photo['id']);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Photo deleted')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Photo deleted')));
         }
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
         }
       }
     }
   }
 
   Future<void> _editCaption(Map<String, dynamic> photo) async {
-    final captionController = TextEditingController(text: photo['caption']?.toString() ?? '');
+    final captionController = TextEditingController(
+      text: photo['caption']?.toString() ?? '',
+    );
 
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Caption'),
-        content: TextField(
-          controller: captionController,
-          decoration: const InputDecoration(
-            labelText: 'Caption',
-            border: OutlineInputBorder(),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Edit Caption'),
+            content: TextField(
+              controller: captionController,
+              decoration: const InputDecoration(
+                labelText: 'Caption',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed:
+                    () => Navigator.pop(ctx, captionController.text.trim()),
+                child: const Text('Save'),
+              ),
+            ],
           ),
-          maxLines: 2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, captionController.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
     );
 
     if (result != null) {
       try {
-        await _supabase.from('event_photos').update({'caption': result}).eq('id', photo['id']);
+        await _supabase
+            .from('event_photos')
+            .update({'caption': result})
+            .eq('id', photo['id']);
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
         }
       }
     }
@@ -218,12 +241,16 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _PhotoViewerPage(
-          photoUrl: url,
-          caption: photo['caption']?.toString() ?? '',
-          uploadedAt: photo['uploaded_at'],
-          agentName: (photo['users'] as Map<String, dynamic>?)?['full_name']?.toString() ?? '',
-        ),
+        builder:
+            (_) => _PhotoViewerPage(
+              photoUrl: url,
+              caption: photo['caption']?.toString() ?? '',
+              uploadedAt: photo['uploaded_at'],
+              agentName:
+                  (photo['users'] as Map<String, dynamic>?)?['full_name']
+                      ?.toString() ??
+                  '',
+            ),
       ),
     );
   }
@@ -234,39 +261,40 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       appBar: AppBar(
         title: const Text('Event Photos'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _photos.isEmpty
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _photos.isEmpty
               ? _buildEmptyState()
               : GridView.builder(
-                  padding: const EdgeInsets.all(8),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _photos.length,
-                  itemBuilder: (ctx, i) {
-                    final p = _photos[i];
-                    final url = p['photo_url'] ?? '';
-                    return GestureDetector(
-                      onTap: () => _viewPhoto(p),
-                      onLongPress: () => _showPhotoOptions(p),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: url.isEmpty
-                            ? const Card(child: Center(child: Icon(Icons.image)))
-                            : Image.network(url, fit: BoxFit.cover),
-                      ),
-                    );
-                  },
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
                 ),
+                itemCount: _photos.length,
+                itemBuilder: (ctx, i) {
+                  final p = _photos[i];
+                  final url = p['photo_url'] ?? '';
+                  return GestureDetector(
+                    onTap: () => _viewPhoto(p),
+                    onLongPress: () => _showPhotoOptions(p),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child:
+                          url.isEmpty
+                              ? const Card(
+                                child: Center(child: Icon(Icons.image)),
+                              )
+                              : Image.network(url, fit: BoxFit.cover),
+                    ),
+                  );
+                },
+              ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -291,29 +319,33 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
   void _showPhotoOptions(Map<String, dynamic> photo) {
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit Caption'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _editCaption(photo);
-              },
+      builder:
+          (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Edit Caption'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _editCaption(photo);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _deletePhoto(photo);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _deletePhoto(photo);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -364,9 +396,7 @@ class _PhotoViewerPage extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-            child: Center(
-              child: Image.network(photoUrl, fit: BoxFit.contain),
-            ),
+            child: Center(child: Image.network(photoUrl, fit: BoxFit.contain)),
           ),
           if (caption.isNotEmpty || agentName.isNotEmpty)
             Container(
@@ -379,7 +409,10 @@ class _PhotoViewerPage extends StatelessWidget {
                   if (caption.isNotEmpty)
                     Text(caption, style: const TextStyle(color: Colors.white)),
                   if (agentName.isNotEmpty)
-                    Text('By: $agentName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                    Text(
+                      'By: $agentName',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    ),
                   if (uploadedAt != null)
                     Text(
                       EventDateFormat.format(uploadedAt),

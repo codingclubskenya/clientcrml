@@ -43,9 +43,8 @@ class _UserSchoolTodayOnboardedPageState
     }
 
     final todayAll = all.where((s) => isToday(s.createdAt)).toList();
-    final schools = todayAll
-        .where((s) => !_isBookshop(s) && !_isInstitution(s))
-        .toList();
+    final schools =
+        todayAll.where((s) => !_isBookshop(s) && !_isInstitution(s)).toList();
     final bookshops = todayAll.where(_isBookshop).toList();
     final institutions = todayAll.where(_isInstitution).toList();
     return _TodayData(
@@ -86,16 +85,17 @@ class _UserSchoolTodayOnboardedPageState
       if (uid.isEmpty) continue;
       byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
     }
-    final rows = data.users
-        .map(
-          (u) => OnboardedExportRow(
-            user: u,
-            items: byUser[u.id] ?? const <SchoolModel>[],
-          ),
-        )
-        .where((r) => r.items.isNotEmpty)
-        .toList()
-      ..sort((a, b) => b.items.length.compareTo(a.items.length));
+    final rows =
+        data.users
+            .map(
+              (u) => OnboardedExportRow(
+                user: u,
+                items: byUser[u.id] ?? const <SchoolModel>[],
+              ),
+            )
+            .where((r) => r.items.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
     try {
       await OnboardedExportService.exportPerUserBreakdown(
@@ -108,9 +108,9 @@ class _UserSchoolTodayOnboardedPageState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -173,11 +173,10 @@ class _UserSchoolTodayOnboardedPageState
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Text('Failed to load: ${snapshot.error}'),
-            );
+            return Center(child: Text('Failed to load: ${snapshot.error}'));
           }
-          final data = snapshot.data ??
+          final data =
+              snapshot.data ??
               const _TodayData(
                 schools: <SchoolModel>[],
                 bookshops: <SchoolModel>[],
@@ -196,16 +195,17 @@ class _UserSchoolTodayOnboardedPageState
             if (uid.isEmpty) continue;
             byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
           }
-          final userRows = data.users
-              .map(
-                (u) => _UserBreakdownRow(
-                  user: u,
-                  items: byUser[u.id] ?? const <SchoolModel>[],
-                ),
-              )
-              .where((r) => r.items.isNotEmpty)
-              .toList()
-            ..sort((a, b) => b.items.length.compareTo(a.items.length));
+          final userRows =
+              data.users
+                  .map(
+                    (u) => _UserBreakdownRow(
+                      user: u,
+                      items: byUser[u.id] ?? const <SchoolModel>[],
+                    ),
+                  )
+                  .where((r) => r.items.isNotEmpty)
+                  .toList()
+                ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
@@ -332,8 +332,11 @@ class _UserSchoolTodayOnboardedPageState
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.person_off_outlined,
-                            color: Colors.grey, size: 28),
+                        Icon(
+                          Icons.person_off_outlined,
+                          color: Colors.grey,
+                          size: 28,
+                        ),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -439,11 +442,12 @@ class _UserSchoolTodayOnboardedPageState
                   _isBookshop(s)
                       ? Icons.store
                       : _isInstitution(s)
-                          ? Icons.account_balance
-                          : Icons.school,
-                  color: _isBookshop(s)
-                      ? AppColors.accentOrange
-                      : _isInstitution(s)
+                      ? Icons.account_balance
+                      : Icons.school,
+                  color:
+                      _isBookshop(s)
+                          ? AppColors.accentOrange
+                          : _isInstitution(s)
                           ? AppColors.infoBlue
                           : AppColors.primaryDark,
                   size: 20,
@@ -454,16 +458,15 @@ class _UserSchoolTodayOnboardedPageState
                     _isBookshop(s)
                         ? 'Bookshop'
                         : _isInstitution(s)
-                            ? 'Institution'
-                            : 'School',
+                        ? 'Institution'
+                        : 'School',
                     if (s.county.trim().isNotEmpty) s.county,
                   ].join(' • '),
                 ),
                 trailing: Text(
                   s.isSynced ? 'Synced' : 'Pending',
                   style: TextStyle(
-                    color:
-                        s.isSynced ? AppColors.primaryGreen : Colors.orange,
+                    color: s.isSynced ? AppColors.primaryGreen : Colors.orange,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),

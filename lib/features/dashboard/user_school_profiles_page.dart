@@ -10,8 +10,7 @@ class UserSchoolProfilesPage extends StatefulWidget {
   const UserSchoolProfilesPage({super.key});
 
   @override
-  State<UserSchoolProfilesPage> createState() =>
-      _UserSchoolProfilesPageState();
+  State<UserSchoolProfilesPage> createState() => _UserSchoolProfilesPageState();
 }
 
 class _UserSchoolProfilesPageState extends State<UserSchoolProfilesPage> {

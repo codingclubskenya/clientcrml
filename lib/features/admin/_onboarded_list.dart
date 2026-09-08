@@ -72,9 +72,7 @@ class OnboardedListSection extends StatelessWidget {
                 trailing: Text(
                   s.isSynced ? 'Synced' : 'Pending',
                   style: TextStyle(
-                    color: s.isSynced
-                        ? AppColors.primaryGreen
-                        : Colors.orange,
+                    color: s.isSynced ? AppColors.primaryGreen : Colors.orange,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),

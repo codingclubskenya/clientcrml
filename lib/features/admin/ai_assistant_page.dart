@@ -37,10 +37,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     try {
       final Map<String, dynamic> combinedContext = {};
       final reportTypes = [
-        'sales_summary', 'pipeline_analysis', 'agent_performance',
-        'regional_summary', 'event_summary', 'sample_roi', 'targets_analysis'
+        'sales_summary',
+        'pipeline_analysis',
+        'agent_performance',
+        'regional_summary',
+        'event_summary',
+        'sample_roi',
+        'targets_analysis',
       ];
-      
+
       for (var type in reportTypes) {
         final cacheKey = 'report_${type}_$_currentUserRole';
         final cached = await _dbService.getCachedReport(cacheKey);
@@ -48,7 +53,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           combinedContext[type] = cached['report'];
         }
       }
-      
+
       if (combinedContext.isNotEmpty) {
         return jsonEncode(combinedContext);
       }
@@ -70,12 +75,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
     try {
       final contextData = await _buildContext();
-      
+
       final response = await http.post(
         Uri.parse(ApiConfig.aiChatUrl()),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'messages': _messages.map((m) => {'role': m['role'], 'content': m['content']}).toList(),
+          'messages':
+              _messages
+                  .map((m) => {'role': m['role'], 'content': m['content']})
+                  .toList(),
           'context': contextData,
         }),
       );
@@ -85,22 +93,33 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final assistantMessage = data['choices']?[0]?['message']?['content'] ?? 'Sorry, I could not generate a response.';
+        final assistantMessage =
+            data['choices']?[0]?['message']?['content'] ??
+            'Sorry, I could not generate a response.';
         setState(() {
           _messages.add({'role': 'assistant', 'content': assistantMessage});
         });
       } else {
         final error = jsonDecode(response.body) as Map<String, dynamic>?;
-        final errorMessage = error?['error']?.toString() ?? 'AI assistant is temporarily unavailable. Please try again later.';
+        final errorMessage =
+            error?['error']?.toString() ??
+            'AI assistant is temporarily unavailable. Please try again later.';
         setState(() {
-          _messages.add({'role': 'assistant', 'content': 'Error: $errorMessage'});
+          _messages.add({
+            'role': 'assistant',
+            'content': 'Error: $errorMessage',
+          });
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isWaiting = false;
-        _messages.add({'role': 'assistant', 'content': 'Error: Unable to reach the AI assistant. Please check your connection and try again.'});
+        _messages.add({
+          'role': 'assistant',
+          'content':
+              'Error: Unable to reach the AI assistant. Please check your connection and try again.',
+        });
       });
     }
   }
@@ -118,7 +137,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       final cachedReport = await _dbService.getCachedReport(cacheKey);
       if (cachedReport != null) {
         setState(() {
-          _messages.add({'role': 'assistant', 'content': cachedReport['report']?.toString() ?? 'No report content.'});
+          _messages.add({
+            'role': 'assistant',
+            'content':
+                cachedReport['report']?.toString() ?? 'No report content.',
+          });
           _isWaiting = false;
         });
         return;
@@ -129,7 +152,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'report_type': reportType,
-          'prompt': 'Generate a comprehensive report with insights and recommendations.',
+          'prompt':
+              'Generate a comprehensive report with insights and recommendations.',
           'filters': {},
         }),
       );
@@ -146,16 +170,25 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         });
       } else {
         final error = jsonDecode(response.body) as Map<String, dynamic>?;
-        final errorMessage = error?['error']?.toString() ?? 'Report generation is temporarily unavailable. Please try again later.';
+        final errorMessage =
+            error?['error']?.toString() ??
+            'Report generation is temporarily unavailable. Please try again later.';
         setState(() {
-          _messages.add({'role': 'assistant', 'content': 'Report error: $errorMessage'});
+          _messages.add({
+            'role': 'assistant',
+            'content': 'Report error: $errorMessage',
+          });
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isWaiting = false;
-        _messages.add({'role': 'assistant', 'content': 'Error: Unable to generate report. Please check your connection and try again.'});
+        _messages.add({
+          'role': 'assistant',
+          'content':
+              'Error: Unable to generate report. Please check your connection and try again.',
+        });
       });
     }
   }
@@ -165,7 +198,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     final isManager = _currentUserRole <= 2;
     if (!isManager) {
       return const Scaffold(
-        body: Center(child: Text('Access restricted to Admin and Sales Manager roles.')),
+        body: Center(
+          child: Text('Access restricted to Admin and Sales Manager roles.'),
+        ),
       );
     }
 
@@ -178,39 +213,49 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       body: Column(
         children: [
           Expanded(
-            child: _messages.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Hello! How can I help you today?',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+            child:
+                _messages.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'Hello! How can I help you today?',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = _messages[index];
+                        final isUser = msg['role'] == 'user';
+                        return Align(
+                          alignment:
+                              isUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.all(12),
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.75,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isUser
+                                      ? AppColors.primaryDark
+                                      : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              msg['content'] ?? '',
+                              style: TextStyle(
+                                color: isUser ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = _messages[index];
-                      final isUser = msg['role'] == 'user';
-                      return Align(
-                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.all(12),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isUser ? AppColors.primaryDark : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            msg['content'] ?? '',
-                            style: TextStyle(color: isUser ? Colors.white : Colors.black87),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
           ),
           if (_isWaiting)
             const Padding(
@@ -244,19 +289,58 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                _ReportChip(label: 'Sales', onTap: () => _generateReport('sales_summary', 'Sales Summary')),
+                _ReportChip(
+                  label: 'Sales',
+                  onTap:
+                      () => _generateReport('sales_summary', 'Sales Summary'),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Pipeline', onTap: () => _generateReport('pipeline_analysis', 'Pipeline Analysis')),
+                _ReportChip(
+                  label: 'Pipeline',
+                  onTap:
+                      () => _generateReport(
+                        'pipeline_analysis',
+                        'Pipeline Analysis',
+                      ),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Agents', onTap: () => _generateReport('agent_performance', 'Agent Performance')),
+                _ReportChip(
+                  label: 'Agents',
+                  onTap:
+                      () => _generateReport(
+                        'agent_performance',
+                        'Agent Performance',
+                      ),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Regions', onTap: () => _generateReport('regional_summary', 'Regional Summary')),
+                _ReportChip(
+                  label: 'Regions',
+                  onTap:
+                      () => _generateReport(
+                        'regional_summary',
+                        'Regional Summary',
+                      ),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Events', onTap: () => _generateReport('event_summary', 'Event Summary')),
+                _ReportChip(
+                  label: 'Events',
+                  onTap:
+                      () => _generateReport('event_summary', 'Event Summary'),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Samples', onTap: () => _generateReport('sample_roi', 'Sample ROI')),
+                _ReportChip(
+                  label: 'Samples',
+                  onTap: () => _generateReport('sample_roi', 'Sample ROI'),
+                ),
                 const SizedBox(width: 8),
-                _ReportChip(label: 'Targets', onTap: () => _generateReport('targets_analysis', 'Targets Analysis')),
+                _ReportChip(
+                  label: 'Targets',
+                  onTap:
+                      () => _generateReport(
+                        'targets_analysis',
+                        'Targets Analysis',
+                      ),
+                ),
               ],
             ),
           ),

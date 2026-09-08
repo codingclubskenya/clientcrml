@@ -89,10 +89,7 @@ class CatalogService extends ChangeNotifier {
   Future<void> _persistProducts([Box<dynamic>? box]) async {
     try {
       box ??= await _openBox();
-      await box.put(
-        _kProductsKey,
-        _products.map((p) => p.toMap()).toList(),
-      );
+      await box.put(_kProductsKey, _products.map((p) => p.toMap()).toList());
     } catch (e, st) {
       debugPrint('CatalogService._persistProducts failed: $e\n$st');
     }
@@ -394,9 +391,10 @@ class CatalogService extends ChangeNotifier {
     var remaining = units;
     for (final allocation in allocations) {
       if (remaining <= 0) break;
-      final take = remaining < allocation.unitsRemaining
-          ? remaining
-          : allocation.unitsRemaining;
+      final take =
+          remaining < allocation.unitsRemaining
+              ? remaining
+              : allocation.unitsRemaining;
       allocation.unitsSold += take;
       remaining -= take;
     }
@@ -449,26 +447,43 @@ List<Consignment> _seedConsignments() {
   final now = DateTime.now();
   return [
     Consignment(
-      consignmentId: 'CON-${now.millisecondsSinceEpoch.toString().substring(7)}',
+      consignmentId:
+          'CON-${now.millisecondsSinceEpoch.toString().substring(7)}',
       businessAssociateId: 'ba1',
       businessAssociateName: 'Jane Wanjiku',
       status: ConsignmentStatus.active,
       createdAt: now.subtract(const Duration(days: 3)),
       notes: 'Nairobi region back-to-school drive',
       items: [
-        ConsignmentItem(product: p1, unitsToAssign: 80, unitPrice: 700, unitsSold: 12),
-        ConsignmentItem(product: p5, unitsToAssign: 40, unitPrice: 380, unitsSold: 6),
+        ConsignmentItem(
+          product: p1,
+          unitsToAssign: 80,
+          unitPrice: 700,
+          unitsSold: 12,
+        ),
+        ConsignmentItem(
+          product: p5,
+          unitsToAssign: 40,
+          unitPrice: 380,
+          unitsSold: 6,
+        ),
       ],
     ),
     Consignment(
-      consignmentId: 'CON-${(now.millisecondsSinceEpoch - 86400000).toString().substring(7)}',
+      consignmentId:
+          'CON-${(now.millisecondsSinceEpoch - 86400000).toString().substring(7)}',
       businessAssociateId: 'ba2',
       businessAssociateName: 'Peter Otieno',
       status: ConsignmentStatus.active,
       createdAt: now.subtract(const Duration(days: 1)),
       notes: 'Kisumu schools restock',
       items: [
-        ConsignmentItem(product: p2, unitsToAssign: 60, unitPrice: 760, unitsSold: 4),
+        ConsignmentItem(
+          product: p2,
+          unitsToAssign: 60,
+          unitPrice: 760,
+          unitsSold: 4,
+        ),
         ConsignmentItem(product: p4, unitsToAssign: 30, unitPrice: 580),
       ],
     ),

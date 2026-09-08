@@ -7,10 +7,12 @@ class EventAssignmentsManagementPage extends StatefulWidget {
   const EventAssignmentsManagementPage({super.key});
 
   @override
-  State<EventAssignmentsManagementPage> createState() => _EventAssignmentsManagementPageState();
+  State<EventAssignmentsManagementPage> createState() =>
+      _EventAssignmentsManagementPageState();
 }
 
-class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagementPage> {
+class _EventAssignmentsManagementPageState
+    extends State<EventAssignmentsManagementPage> {
   final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
@@ -19,9 +21,10 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
   bool _loading = true;
   bool _canManage = false;
 
-  String? get _eventId => ModalRoute.of(context)?.settings.arguments is Map
-      ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
-      : null;
+  String? get _eventId =>
+      ModalRoute.of(context)?.settings.arguments is Map
+          ? (ModalRoute.of(context)!.settings.arguments as Map)['id'] as String?
+          : null;
 
   @override
   void initState() {
@@ -35,7 +38,9 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
       if (role == 5) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('You do not have permission to manage assignments')),
+            const SnackBar(
+              content: Text('You do not have permission to manage assignments'),
+            ),
           );
           Navigator.pop(context);
         }
@@ -64,7 +69,9 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
       }
     } finally {
       setState(() => _loading = false);
@@ -102,84 +109,100 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Assign Agent to Event'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Select Agent:', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedAgentId,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Choose an agent',
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: const Text('Assign Agent to Event'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Select Agent:',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedAgentId,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Choose an agent',
+                          ),
+                          items:
+                              _availableAgents.map((agent) {
+                                final name =
+                                    agent['full_name']?.toString() ??
+                                    agent['email']?.toString() ??
+                                    'Unknown';
+                                final role =
+                                    agent['role'] == 4 ? 'Agent' : 'Sales Rep';
+                                final region =
+                                    agent['region']?.toString() ?? '';
+                                return DropdownMenuItem(
+                                  value: agent['id']?.toString(),
+                                  child: Text('$name ($role) - $region'),
+                                );
+                              }).toList(),
+                          onChanged:
+                              (val) =>
+                                  setDialogState(() => selectedAgentId = val),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: scheduleController,
+                          decoration: const InputDecoration(
+                            labelText: 'Schedule Notes',
+                            border: OutlineInputBorder(),
+                            hintText: 'e.g., Morning shift 9am-1pm',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: targetController,
+                          decoration: const InputDecoration(
+                            labelText: 'Sales Target (KES)',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: productController,
+                          decoration: const InputDecoration(
+                            labelText: 'Products to Promote',
+                            border: OutlineInputBorder(),
+                            hintText: 'Comma-separated list',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: notesController,
+                          decoration: const InputDecoration(
+                            labelText: 'Additional Notes',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
                   ),
-                  items: _availableAgents.map((agent) {
-                    final name = agent['full_name']?.toString() ?? agent['email']?.toString() ?? 'Unknown';
-                    final role = agent['role'] == 4 ? 'Agent' : 'Sales Rep';
-                    final region = agent['region']?.toString() ?? '';
-                    return DropdownMenuItem(
-                      value: agent['id']?.toString(),
-                      child: Text('$name ($role) - $region'),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setDialogState(() => selectedAgentId = val),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed:
+                          selectedAgentId != null
+                              ? () => Navigator.pop(ctx, true)
+                              : null,
+                      child: const Text('Assign'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: scheduleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Schedule Notes',
-                    border: OutlineInputBorder(),
-                    hintText: 'e.g., Morning shift 9am-1pm',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: targetController,
-                  decoration: const InputDecoration(
-                    labelText: 'Sales Target (KES)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: productController,
-                  decoration: const InputDecoration(
-                    labelText: 'Products to Promote',
-                    border: OutlineInputBorder(),
-                    hintText: 'Comma-separated list',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Additional Notes',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: selectedAgentId != null ? () => Navigator.pop(ctx, true) : null,
-              child: const Text('Assign'),
-            ),
-          ],
-        ),
-      ),
     );
 
     if (result == true && selectedAgentId != null) {
@@ -210,9 +233,14 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
         targets['sales_target'] = double.tryParse(target) ?? 0;
       }
 
-      final productList = products.isNotEmpty
-          ? products.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-          : <String>[];
+      final productList =
+          products.isNotEmpty
+              ? products
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+              : <String>[];
 
       await _dbService.assignAgentToEvent({
         'event_id': eventId,
@@ -232,72 +260,84 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Assignment failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Assignment failed: $e')));
       }
     }
   }
 
   Future<void> _editAssignment(Map<String, dynamic> assignment) async {
     final user = assignment['users'] as Map<String, dynamic>?;
-    final name = user?['full_name']?.toString() ?? user?['email']?.toString() ?? 'Unknown';
+    final name =
+        user?['full_name']?.toString() ??
+        user?['email']?.toString() ??
+        'Unknown';
 
     final scheduleController = TextEditingController(
-      text: (assignment['schedule'] as Map<String, dynamic>?)?['notes']?.toString() ?? '',
+      text:
+          (assignment['schedule'] as Map<String, dynamic>?)?['notes']
+              ?.toString() ??
+          '',
     );
-    final notesController = TextEditingController(text: assignment['notes']?.toString() ?? '');
+    final notesController = TextEditingController(
+      text: assignment['notes']?.toString() ?? '',
+    );
     final targetController = TextEditingController(
-      text: (assignment['targets'] as Map<String, dynamic>?)?['sales_target']?.toString() ?? '',
+      text:
+          (assignment['targets'] as Map<String, dynamic>?)?['sales_target']
+              ?.toString() ??
+          '',
     );
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Edit Assignment - $name'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: scheduleController,
-                decoration: const InputDecoration(
-                  labelText: 'Schedule Notes',
-                  border: OutlineInputBorder(),
-                ),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text('Edit Assignment - $name'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: scheduleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Schedule Notes',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: targetController,
+                    decoration: const InputDecoration(
+                      labelText: 'Sales Target (KES)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: targetController,
-                decoration: const InputDecoration(
-                  labelText: 'Sales Target (KES)',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
     );
 
     if (result == true) {
@@ -307,23 +347,26 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
           targets['sales_target'] = double.tryParse(targetController.text) ?? 0;
         }
 
-        await _supabase.from('event_assignments').update({
-          'schedule': {'notes': scheduleController.text.trim()},
-          'targets': targets,
-          'notes': notesController.text.trim(),
-        }).eq('id', assignment['id']);
+        await _supabase
+            .from('event_assignments')
+            .update({
+              'schedule': {'notes': scheduleController.text.trim()},
+              'targets': targets,
+              'notes': notesController.text.trim(),
+            })
+            .eq('id', assignment['id']);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Assignment updated')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Assignment updated')));
         }
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Update failed: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
         }
       }
     }
@@ -331,41 +374,47 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
 
   Future<void> _removeAssignment(Map<String, dynamic> assignment) async {
     final user = assignment['users'] as Map<String, dynamic>?;
-    final name = user?['full_name']?.toString() ?? user?['email']?.toString() ?? 'Unknown';
+    final name =
+        user?['full_name']?.toString() ??
+        user?['email']?.toString() ??
+        'Unknown';
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove Assignment'),
-        content: Text('Remove $name from this event?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Remove Assignment'),
+            content: Text('Remove $name from this event?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
-        await _dbService.removeEventAssignment(assignment['id']?.toString() ?? '');
+        await _dbService.removeEventAssignment(
+          assignment['id']?.toString() ?? '',
+        );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Assignment removed')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Assignment removed')));
         }
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to remove: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to remove: $e')));
         }
       }
     }
@@ -377,125 +426,187 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
       appBar: AppBar(
         title: const Text('Manage Assignments'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                Card(
-                  color: Colors.blue.withValues(alpha: 0.05),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${_assignments.length} Agent(s) Assigned',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _showAddAssignmentDialog,
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Add Agent'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_assignments.isEmpty)
-                  const Center(
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  Card(
+                    color: Colors.blue.withValues(alpha: 0.05),
                     child: Padding(
-                      padding: EdgeInsets.all(48),
-                      child: Column(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text('No agents assigned yet'),
-                          SizedBox(height: 8),
-                          Text('Tap "Add Agent" to assign agents to this event', style: TextStyle(color: Colors.grey)),
+                          Text(
+                            '${_assignments.length} Agent(s) Assigned',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _showAddAssignmentDialog,
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Add Agent'),
+                          ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  ..._assignments.map((a) {
-                    final user = a['users'] as Map<String, dynamic>?;
-                    final name = user?['full_name']?.toString() ?? user?['email']?.toString() ?? 'Unknown Agent';
-                    final phone = user?['phone']?.toString() ?? '';
-                    final email = user?['email']?.toString() ?? '';
-                    final role = user?['role'] == 4 ? 'Agent' : 'Sales Rep';
-                    final targets = a['targets'] as Map<String, dynamic>? ?? {};
-                    final schedule = a['schedule'] as Map<String, dynamic>? ?? {};
-                    final products = a['products'] as List<dynamic>? ?? [];
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_assignments.isEmpty)
+                    const Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(48),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                                  child: const Icon(Icons.person, color: Colors.blue),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      Text(role, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') _editAssignment(a);
-                                    if (value == 'remove') _removeAssignment(a);
-                                  },
-                                  itemBuilder: (ctx) => [
-                                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                    const PopupMenuItem(value: 'remove', child: Text('Remove', style: TextStyle(color: Colors.red))),
-                                  ],
-                                ),
-                              ],
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey,
                             ),
-                            const Divider(),
-                            if (email.isNotEmpty) _buildInfoRow(Icons.email, email),
-                            if (phone.isNotEmpty) _buildInfoRow(Icons.phone, phone),
-                            if (schedule['notes'] != null)
-                              _buildInfoRow(Icons.schedule, schedule['notes'].toString()),
-                            if (targets['sales_target'] != null)
-                              _buildInfoRow(Icons.track_changes, 'Target: KES ${targets['sales_target']}'),
-                            if (a['notes'] != null && a['notes'].toString().isNotEmpty)
-                              _buildInfoRow(Icons.note, a['notes'].toString()),
-                            if (products.isNotEmpty)
-                              _buildInfoRow(Icons.inventory, 'Products: ${products.join(', ')}'),
-                            if (a['created_at'] != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  'Assigned: ${EventDateFormat.format(a['created_at'])}',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                                ),
-                              ),
+                            SizedBox(height: 16),
+                            Text('No agents assigned yet'),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tap "Add Agent" to assign agents to this event',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
-                    );
-                  }),
-              ],
-            ),
+                    )
+                  else
+                    ..._assignments.map((a) {
+                      final user = a['users'] as Map<String, dynamic>?;
+                      final name =
+                          user?['full_name']?.toString() ??
+                          user?['email']?.toString() ??
+                          'Unknown Agent';
+                      final phone = user?['phone']?.toString() ?? '';
+                      final email = user?['email']?.toString() ?? '';
+                      final role = user?['role'] == 4 ? 'Agent' : 'Sales Rep';
+                      final targets =
+                          a['targets'] as Map<String, dynamic>? ?? {};
+                      final schedule =
+                          a['schedule'] as Map<String, dynamic>? ?? {};
+                      final products = a['products'] as List<dynamic>? ?? [];
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.blue.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    child: const Icon(
+                                      Icons.person,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        Text(
+                                          role,
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      if (value == 'edit') _editAssignment(a);
+                                      if (value == 'remove')
+                                        _removeAssignment(a);
+                                    },
+                                    itemBuilder:
+                                        (ctx) => [
+                                          const PopupMenuItem(
+                                            value: 'edit',
+                                            child: Text('Edit'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'remove',
+                                            child: Text(
+                                              'Remove',
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                  ),
+                                ],
+                              ),
+                              const Divider(),
+                              if (email.isNotEmpty)
+                                _buildInfoRow(Icons.email, email),
+                              if (phone.isNotEmpty)
+                                _buildInfoRow(Icons.phone, phone),
+                              if (schedule['notes'] != null)
+                                _buildInfoRow(
+                                  Icons.schedule,
+                                  schedule['notes'].toString(),
+                                ),
+                              if (targets['sales_target'] != null)
+                                _buildInfoRow(
+                                  Icons.track_changes,
+                                  'Target: KES ${targets['sales_target']}',
+                                ),
+                              if (a['notes'] != null &&
+                                  a['notes'].toString().isNotEmpty)
+                                _buildInfoRow(
+                                  Icons.note,
+                                  a['notes'].toString(),
+                                ),
+                              if (products.isNotEmpty)
+                                _buildInfoRow(
+                                  Icons.inventory,
+                                  'Products: ${products.join(', ')}',
+                                ),
+                              if (a['created_at'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'Assigned: ${EventDateFormat.format(a['created_at'])}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddAssignmentDialog,
         icon: const Icon(Icons.person_add),
@@ -511,7 +622,12 @@ class _EventAssignmentsManagementPageState extends State<EventAssignmentsManagem
         children: [
           Icon(icon, size: 16, color: Colors.grey[600]),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: Colors.grey[700]))),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+          ),
         ],
       ),
     );

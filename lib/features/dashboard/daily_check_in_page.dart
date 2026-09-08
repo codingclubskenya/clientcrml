@@ -62,16 +62,18 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
     try {
-      final response = await Supabase.instance.client
-          .from('visit_checkins')
-          .select('id, checkin_at')
-          .eq('agent_id', userId)
-          .isFilter('checkout_at', null)
-          .order('checkin_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
+      final response =
+          await Supabase.instance.client
+              .from('visit_checkins')
+              .select('id, checkin_at')
+              .eq('agent_id', userId)
+              .isFilter('checkout_at', null)
+              .order('checkin_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
       if (response != null && mounted) {
-        final start = DateTime.parse(response['checkin_at'] as String).toLocal();
+        final start =
+            DateTime.parse(response['checkin_at'] as String).toLocal();
         setState(() {
           _isClockedIn = true;
           _checkInTime = start;
@@ -190,11 +192,12 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
     _scheduleAutoCheckOut();
 
     try {
-      final profile = await Supabase.instance.client
-          .from('users')
-          .select('full_name')
-          .eq('id', userId)
-          .maybeSingle();
+      final profile =
+          await Supabase.instance.client
+              .from('users')
+              .select('full_name')
+              .eq('id', userId)
+              .maybeSingle();
       final agentName = profile?['full_name']?.toString();
 
       await Supabase.instance.client.from('visit_checkins').insert({
@@ -226,9 +229,10 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
     final position = await _getCurrentPosition();
     final checkInTime = _checkInTime;
     final checkoutTime = DateTime.now();
-    final duration = checkInTime != null
-        ? checkoutTime.difference(checkInTime).inSeconds
-        : 0;
+    final duration =
+        checkInTime != null
+            ? checkoutTime.difference(checkInTime).inSeconds
+            : 0;
 
     setState(() {
       _isClockedIn = false;
@@ -245,14 +249,16 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
               'checkout_at': checkoutTime.toUtc().toIso8601String(),
               'gps_lat': position?.latitude,
               'gps_lng': position?.longitude,
-              'location_text': position == null
-                  ? 'Location unavailable'
-                  : 'Lat: ${position.latitude.toStringAsFixed(5)}, Lng: ${position.longitude.toStringAsFixed(5)}',
+              'location_text':
+                  position == null
+                      ? 'Location unavailable'
+                      : 'Lat: ${position.latitude.toStringAsFixed(5)}, Lng: ${position.longitude.toStringAsFixed(5)}',
               'duration_seconds': duration,
               'auto_checkout': autoTriggered,
-              'notes': autoTriggered
-                  ? 'Auto check-out after ${_maxShiftDuration.inHours}h'
-                  : 'Manual check-out',
+              'notes':
+                  autoTriggered
+                      ? 'Auto check-out after ${_maxShiftDuration.inHours}h'
+                      : 'Manual check-out',
             })
             .eq('agent_id', userId)
             .isFilter('checkout_at', null);
@@ -267,9 +273,8 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
               ? 'Auto checked out after ${_maxShiftDuration.inHours} hours.'
               : 'Checked out successfully.',
         ),
-        backgroundColor: autoTriggered
-            ? AppColors.accentOrange
-            : AppColors.secondaryOrange,
+        backgroundColor:
+            autoTriggered ? AppColors.accentOrange : AppColors.secondaryOrange,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -298,10 +303,11 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VisitTrackerMapPage(
-          currentPosition: _currentPosition,
-          checkInTime: _checkInTime,
-        ),
+        builder:
+            (_) => VisitTrackerMapPage(
+              currentPosition: _currentPosition,
+              checkInTime: _checkInTime,
+            ),
       ),
     );
   }
@@ -373,9 +379,10 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
   }
 
   Widget _buildMapPreview(bool isSmallScreen) {
-    final center = _currentPosition != null
-        ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-        : const LatLng(-1.286389, 36.817223);
+    final center =
+        _currentPosition != null
+            ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+            : const LatLng(-1.286389, 36.817223);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -508,10 +515,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                   color: _isClockedIn ? AppColors.primaryGreen : Colors.grey,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Location: ',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                const Text('Location: ', style: TextStyle(color: Colors.grey)),
                 Expanded(
                   child: Text(
                     locationLabel,
@@ -545,9 +549,8 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                       style: TextStyle(
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.bold,
-                        color: _isClockedIn
-                            ? AppColors.primaryGreen
-                            : Colors.grey,
+                        color:
+                            _isClockedIn ? AppColors.primaryGreen : Colors.grey,
                       ),
                     ),
                   ],
@@ -616,9 +619,10 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontFamily: 'monospace',
-                      color: remaining.inMinutes < 30
-                          ? AppColors.accentOrange
-                          : AppColors.primaryGreen,
+                      color:
+                          remaining.inMinutes < 30
+                              ? AppColors.accentOrange
+                              : AppColors.primaryGreen,
                     ),
                   ),
                 ],
@@ -632,12 +636,16 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
 
   Widget _buildResponsiveClockButton(Size screenSize) {
     double diameter = (screenSize.height * 0.22).clamp(150.0, 220.0);
-    final bool canCheckOut = _checkInTime == null ||
+    final bool canCheckOut =
+        _checkInTime == null ||
         DateTime.now().difference(_checkInTime!) >= _maxShiftDuration;
     final bool isLocked = _isClockedIn && !canCheckOut;
-    final Color activeColor = isLocked
-        ? Colors.grey
-        : (_isClockedIn ? AppColors.secondaryOrange : AppColors.primaryGreen);
+    final Color activeColor =
+        isLocked
+            ? Colors.grey
+            : (_isClockedIn
+                ? AppColors.secondaryOrange
+                : AppColors.primaryGreen);
 
     return GestureDetector(
       onTap: (_isLoadingLocation || isLocked) ? null : _toggleClock,
@@ -657,32 +665,33 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
           ],
           border: Border.all(color: activeColor, width: diameter * 0.04),
         ),
-        child: _isLoadingLocation
-            ? const Center(
-                child: CircularProgressIndicator(strokeWidth: 3),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isLocked
-                        ? Icons.lock_rounded
-                        : (_isClockedIn
-                            ? Icons.stop_rounded
-                            : Icons.play_arrow_rounded),
-                    size: diameter * 0.4,
-                    color: activeColor,
-                  ),
-                  Text(
-                    isLocked ? "LOCKED" : (_isClockedIn ? "CHECK OUT" : "CHECK IN"),
-                    style: TextStyle(
-                      fontSize: diameter * 0.08,
-                      fontWeight: FontWeight.bold,
+        child:
+            _isLoadingLocation
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 3))
+                : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isLocked
+                          ? Icons.lock_rounded
+                          : (_isClockedIn
+                              ? Icons.stop_rounded
+                              : Icons.play_arrow_rounded),
+                      size: diameter * 0.4,
                       color: activeColor,
                     ),
-                  ),
-                ],
-              ),
+                    Text(
+                      isLocked
+                          ? "LOCKED"
+                          : (_isClockedIn ? "CHECK OUT" : "CHECK IN"),
+                      style: TextStyle(
+                        fontSize: diameter * 0.08,
+                        fontWeight: FontWeight.bold,
+                        color: activeColor,
+                      ),
+                    ),
+                  ],
+                ),
       ),
     );
   }

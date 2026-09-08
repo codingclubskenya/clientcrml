@@ -8,7 +8,8 @@ class EventManagerDashboardPage extends StatefulWidget {
   const EventManagerDashboardPage({super.key});
 
   @override
-  State<EventManagerDashboardPage> createState() => _EventManagerDashboardPageState();
+  State<EventManagerDashboardPage> createState() =>
+      _EventManagerDashboardPageState();
 }
 
 class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
@@ -59,7 +60,9 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
         _regionPerformance = regionPerf;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load dashboard: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load dashboard: $e')));
     } finally {
       setState(() => _loading = false);
     }
@@ -67,7 +70,9 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
 
   Future<List<Map<String, dynamic>>> _loadRegionPerformance() async {
     try {
-      final events = List<Map<String, dynamic>>.from(_dashboardData['events'] ?? []);
+      final events = List<Map<String, dynamic>>.from(
+        _dashboardData['events'] ?? [],
+      );
       final regionMap = <String, Map<String, dynamic>>{};
 
       for (final event in events) {
@@ -83,21 +88,31 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
             'total_orders': 0,
           };
         }
-        regionMap[region]!['total_events'] = (regionMap[region]!['total_events'] as int) + 1;
+        regionMap[region]!['total_events'] =
+            (regionMap[region]!['total_events'] as int) + 1;
         if (event['status'] == 'active' || event['status'] == 'in_progress') {
-          regionMap[region]!['active_events'] = (regionMap[region]!['active_events'] as int) + 1;
+          regionMap[region]!['active_events'] =
+              (regionMap[region]!['active_events'] as int) + 1;
         }
         final budget = event['budget'];
         if (budget is num) {
-          regionMap[region]!['total_budget'] = (regionMap[region]!['total_budget'] as double) + budget.toDouble();
+          regionMap[region]!['total_budget'] =
+              (regionMap[region]!['total_budget'] as double) +
+              budget.toDouble();
         }
 
         final eventId = event['id']?.toString();
         if (eventId != null) {
           final summary = await _dbService.getEventSummary(eventId);
-          regionMap[region]!['total_leads'] = (regionMap[region]!['total_leads'] as int) + ((summary['leads'] as int?) ?? 0);
-          regionMap[region]!['total_orders'] = (regionMap[region]!['total_orders'] as int) + ((summary['orders'] as int?) ?? 0);
-          regionMap[region]!['total_expenses'] = (regionMap[region]!['total_expenses'] as double) + ((summary['expenses'] as double?) ?? 0);
+          regionMap[region]!['total_leads'] =
+              (regionMap[region]!['total_leads'] as int) +
+              ((summary['leads'] as int?) ?? 0);
+          regionMap[region]!['total_orders'] =
+              (regionMap[region]!['total_orders'] as int) +
+              ((summary['orders'] as int?) ?? 0);
+          regionMap[region]!['total_expenses'] =
+              (regionMap[region]!['total_expenses'] as double) +
+              ((summary['expenses'] as double?) ?? 0);
         }
       }
 
@@ -110,12 +125,16 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
 
   Future<List<String>> _getRegions() async {
     try {
-      final data = await _supabase.from('events').select('region').not('region', 'is', null);
-      final regions = (data as List)
-          .map((e) => e['region']?.toString() ?? '')
-          .where((r) => r.isNotEmpty)
-          .toSet()
-          .toList();
+      final data = await _supabase
+          .from('events')
+          .select('region')
+          .not('region', 'is', null);
+      final regions =
+          (data as List)
+              .map((e) => e['region']?.toString() ?? '')
+              .where((r) => r.isNotEmpty)
+              .toSet()
+              .toList();
       regions.sort();
       return regions;
     } catch (_) {
@@ -146,37 +165,38 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadDashboard,
-              child: ListView(
-                padding: EdgeInsets.all(isNarrow ? 12 : 20),
-                children: [
-                  _buildHeaderCard(),
-                  const SizedBox(height: 16),
-                  _buildFiltersRow(isNarrow),
-                  const SizedBox(height: 16),
-                  _buildMetricsGrid(isNarrow),
-                  const SizedBox(height: 20),
-                  _buildSectionHeader('Events Overview'),
-                  const SizedBox(height: 12),
-                  _buildEventsOverview(isNarrow),
-                  const SizedBox(height: 20),
-                  _buildSectionHeader('Performance by Region'),
-                  const SizedBox(height: 12),
-                  _buildRegionPerformanceTable(isNarrow),
-                  const SizedBox(height: 20),
-                  _buildSectionHeader('Top Performing Events'),
-                  const SizedBox(height: 12),
-                  _buildTopEventsList(isNarrow),
-                  const SizedBox(height: 20),
-                  _buildSectionHeader('Revenue & ROI'),
-                  const SizedBox(height: 12),
-                  _buildRevenueCard(isNarrow),
-                ],
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadDashboard,
+                child: ListView(
+                  padding: EdgeInsets.all(isNarrow ? 12 : 20),
+                  children: [
+                    _buildHeaderCard(),
+                    const SizedBox(height: 16),
+                    _buildFiltersRow(isNarrow),
+                    const SizedBox(height: 16),
+                    _buildMetricsGrid(isNarrow),
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('Events Overview'),
+                    const SizedBox(height: 12),
+                    _buildEventsOverview(isNarrow),
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('Performance by Region'),
+                    const SizedBox(height: 12),
+                    _buildRegionPerformanceTable(isNarrow),
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('Top Performing Events'),
+                    const SizedBox(height: 12),
+                    _buildTopEventsList(isNarrow),
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('Revenue & ROI'),
+                    const SizedBox(height: 12),
+                    _buildRevenueCard(isNarrow),
+                  ],
+                ),
               ),
-            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openEventCreate,
         icon: const Icon(Icons.add),
@@ -190,7 +210,10 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primaryGreen, AppColors.primaryGreen.withValues(alpha: 0.8)],
+          colors: [
+            AppColors.primaryGreen,
+            AppColors.primaryGreen.withValues(alpha: 0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -215,7 +238,10 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
                 const SizedBox(height: 4),
                 Text(
                   'Track events, leads, sales, and ROI across all regions',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -242,15 +268,23 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
                   labelText: 'Region',
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('All Regions')),
-                  ...regions.map((r) => DropdownMenuItem(value: r, child: Text(r))),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All Regions'),
+                  ),
+                  ...regions.map(
+                    (r) => DropdownMenuItem(value: r, child: Text(r)),
+                  ),
                 ],
                 onChanged: (val) {
                   setState(() => _selectedRegion = val);
@@ -268,7 +302,10 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
               labelText: 'Time Period',
               filled: true,
               fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: Colors.grey.shade300),
@@ -387,16 +424,27 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
   }
 
   Widget _buildEventsOverview(bool isNarrow) {
-    final events = List<Map<String, dynamic>>.from(_dashboardData['events'] ?? []);
-    final activeEvents = events.where((e) => e['status'] == 'active' || e['status'] == 'in_progress').toList();
-    final upcomingEvents = events.where((e) => e['status'] == 'scheduled').toList();
+    final events = List<Map<String, dynamic>>.from(
+      _dashboardData['events'] ?? [],
+    );
+    final activeEvents =
+        events
+            .where(
+              (e) => e['status'] == 'active' || e['status'] == 'in_progress',
+            )
+            .toList();
+    final upcomingEvents =
+        events.where((e) => e['status'] == 'scheduled').toList();
 
     return Column(
       children: [
         if (activeEvents.isNotEmpty) ...[
           const Align(
             alignment: Alignment.centerLeft,
-            child: Text('Active Events', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            child: Text(
+              'Active Events',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
           ),
           const SizedBox(height: 8),
           ...activeEvents.take(3).map((e) => _buildEventTile(e)),
@@ -405,7 +453,10 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
           const SizedBox(height: 12),
           const Align(
             alignment: Alignment.centerLeft,
-            child: Text('Upcoming Events', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            child: Text(
+              'Upcoming Events',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
           ),
           const SizedBox(height: 8),
           ...upcomingEvents.take(3).map((e) => _buildEventTile(e)),
@@ -456,10 +507,19 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
           ),
           child: Text(
             status.toUpperCase(),
-            style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 10,
+              color: statusColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        onTap: () => Navigator.pushNamed(context, '/events/detail', arguments: {'id': event['id']}),
+        onTap:
+            () => Navigator.pushNamed(
+              context,
+              '/events/detail',
+              arguments: {'id': event['id']},
+            ),
       ),
     );
   }
@@ -499,17 +559,24 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
             DataColumn(label: Text('Budget')),
             DataColumn(label: Text('Expenses')),
           ],
-          rows: _regionPerformance.map((r) {
-            return DataRow(cells: [
-              DataCell(Text(r['region']?.toString() ?? '')),
-              DataCell(Text('${r['total_events'] ?? 0}')),
-              DataCell(Text('${r['active_events'] ?? 0}')),
-              DataCell(Text('${r['total_leads'] ?? 0}')),
-              DataCell(Text('${r['total_orders'] ?? 0}')),
-              DataCell(Text('KES ${_formatNumber(r['total_budget'] ?? 0)}')),
-              DataCell(Text('KES ${_formatNumber(r['total_expenses'] ?? 0)}')),
-            ]);
-          }).toList(),
+          rows:
+              _regionPerformance.map((r) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(r['region']?.toString() ?? '')),
+                    DataCell(Text('${r['total_events'] ?? 0}')),
+                    DataCell(Text('${r['active_events'] ?? 0}')),
+                    DataCell(Text('${r['total_leads'] ?? 0}')),
+                    DataCell(Text('${r['total_orders'] ?? 0}')),
+                    DataCell(
+                      Text('KES ${_formatNumber(r['total_budget'] ?? 0)}'),
+                    ),
+                    DataCell(
+                      Text('KES ${_formatNumber(r['total_expenses'] ?? 0)}'),
+                    ),
+                  ],
+                );
+              }).toList(),
         ),
       ),
     );
@@ -546,7 +613,10 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
   Widget _buildMiniStat(String label, String value) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
       ],
     );
@@ -558,36 +628,56 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
     }
 
     return Column(
-      children: _topEvents.map((e) {
-        final metrics = e['metrics'] as Map<String, dynamic>? ?? {};
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
-              child: const Icon(Icons.event, color: AppColors.primaryGreen),
-            ),
-            title: Text(e['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w500)),
-            subtitle: Text('${e['region'] ?? ''} • ${e['venue'] ?? ''}'),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('${metrics['orders'] ?? 0} orders', style: const TextStyle(fontSize: 12)),
-                Text('${metrics['leads'] ?? 0} leads', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-              ],
-            ),
-            onTap: () => Navigator.pushNamed(context, '/events/detail', arguments: {'id': e['id']}),
-          ),
-        );
-      }).toList(),
+      children:
+          _topEvents.map((e) {
+            final metrics = e['metrics'] as Map<String, dynamic>? ?? {};
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primaryGreen.withValues(
+                    alpha: 0.1,
+                  ),
+                  child: const Icon(Icons.event, color: AppColors.primaryGreen),
+                ),
+                title: Text(
+                  e['name']?.toString() ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text('${e['region'] ?? ''} • ${e['venue'] ?? ''}'),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${metrics['orders'] ?? 0} orders',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      '${metrics['leads'] ?? 0} leads',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                onTap:
+                    () => Navigator.pushNamed(
+                      context,
+                      '/events/detail',
+                      arguments: {'id': e['id']},
+                    ),
+              ),
+            );
+          }).toList(),
     );
   }
 
   Widget _buildRevenueCard(bool isNarrow) {
-    final totalRevenue = (_dashboardData['total_revenue'] as num?)?.toDouble() ?? 0;
-    final totalBudget = (_dashboardData['total_budget'] as num?)?.toDouble() ?? 0;
-    final totalExpenses = (_dashboardData['total_expenses'] as num?)?.toDouble() ?? 0;
+    final totalRevenue =
+        (_dashboardData['total_revenue'] as num?)?.toDouble() ?? 0;
+    final totalBudget =
+        (_dashboardData['total_budget'] as num?)?.toDouble() ?? 0;
+    final totalExpenses =
+        (_dashboardData['total_expenses'] as num?)?.toDouble() ?? 0;
     final roi = (_dashboardData['roi'] as num?)?.toDouble() ?? 0;
 
     return Container(
@@ -672,7 +762,11 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.grey[600]),
+      ),
     );
   }
 

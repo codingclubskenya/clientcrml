@@ -17,7 +17,8 @@ class BasDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUser = Supabase.instance.client.auth.currentUser;
-    final displayName = currentUser?.userMetadata?['full_name']?.toString() ??
+    final displayName =
+        currentUser?.userMetadata?['full_name']?.toString() ??
         currentUser?.userMetadata?['name']?.toString() ??
         currentUser?.email?.split('@').first ??
         'BAS User';
