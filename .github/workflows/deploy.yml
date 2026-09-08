@@ -50,7 +50,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Build APK
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release
 
       - name: Generate version.json
         run: |
