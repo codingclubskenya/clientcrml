@@ -17,6 +17,7 @@ import 'features/welcome/auth/reset_password_page.dart';
 import 'package:app_links/app_links.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'services/server_update_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 
 // Event module pages
@@ -419,11 +420,32 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Later'),
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await service.installApk(apkPath!);
-                },
+               ElevatedButton(
+                 onPressed: () async {
+                   Navigator.pop(ctx);
+                   if (!context.mounted) return;
+                   try {
+                     await service.installApk(apkPath!);
+                   } on Exception catch (e) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       SnackBar(
+                         content: Text(e.toString()),
+                         action: SnackBarAction(
+                           label: 'Open Settings',
+                           onPressed: () => openAppSettings(),
+                         ),
+                       ),
+                     );
+                   } catch (_) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(
+                         content: Text(
+                           'Failed to install. Please check the APK file.',
+                         ),
+                       ),
+                     );
+                   }
+                 },
                 child: const Text('Install'),
               ),
             ],

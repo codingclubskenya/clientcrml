@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AppVersion {
   final String version;
@@ -93,9 +95,23 @@ class ServerUpdateService {
   }
 
   Future<void> installApk(String filePath) async {
-    await OpenFile.open(
-      filePath,
-      type: 'application/vnd.android.package-archive',
-    );
+    if (Platform.isAndroid) {
+      final status = await Permission.requestInstallPackages.request();
+      if (status.isGranted) {
+        await OpenFile.open(
+          filePath,
+          type: 'application/vnd.android.package-archive',
+        );
+      } else {
+        throw Exception(
+          'Install permission denied. Please enable "Install unknown apps" in Settings.',
+        );
+      }
+    } else {
+      await OpenFile.open(
+        filePath,
+        type: 'application/vnd.android.package-archive',
+      );
+    }
   }
 }
