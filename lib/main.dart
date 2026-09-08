@@ -47,11 +47,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   await CatalogService.instance.init();
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
-    authOptions: const FlutterAuthClientOptions(detectSessionInUri: false),
-  );
+
+  try {
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      anonKey: SupabaseConfig.anonKey,
+      authOptions: const FlutterAuthClientOptions(detectSessionInUri: false),
+    ).timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // Supabase failed to initialize - app will run in offline mode
+  }
+
   runApp(const DeHeusApp());
 }
 
@@ -188,7 +194,6 @@ class _SessionEntryPage extends StatefulWidget {
 }
 
 class _SessionEntryPageState extends State<_SessionEntryPage> {
-  final _supabase = Supabase.instance.client;
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _deepLinkSubscription;
   bool _loading = true;
@@ -264,24 +269,25 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
       return;
     }
 
-    final session = _supabase.auth.currentSession;
-    if (session == null || session.user.id.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _destination = const WelcomePage();
-        _loading = false;
-      });
-      _checkForUpdate();
-      return;
-    }
+     try {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      if (session == null || session.user.id.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _destination = const WelcomePage();
+          _loading = false;
+        });
+        _checkForUpdate();
+        return;
+      }
 
-    try {
       final userId = session.user.id;
       final metadataRole = session.user.userMetadata?['role']?.toString();
 
       Map<String, dynamic>? userData;
       try {
-        userData = await _supabase
+        userData = await supabase
             .from('users')
             .select('role')
             .eq('id', userId)
