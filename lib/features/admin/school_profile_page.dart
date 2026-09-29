@@ -548,7 +548,7 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
     );
   }
 
-  Widget _buildMapCard(double lat, double lng, {double height = 250}) {
+  Widget _buildMapCard(double lat, double lng, {double height = 400}) {
     return Container(
       height: height,
       width: double.infinity,

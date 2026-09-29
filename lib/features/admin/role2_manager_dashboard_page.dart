@@ -6,6 +6,7 @@ import '../../../core/constants/colors.dart';
 import '../database/database_service.dart';
 import '../../../models/region_model.dart';
 import '../../../models/user_model.dart';
+import 'add_team_member_form.dart';
 
 class Role2ManagerDashboardPage extends StatefulWidget {
   const Role2ManagerDashboardPage({super.key});
@@ -1369,13 +1370,34 @@ class _Role2ManagerDashboardPageState extends State<Role2ManagerDashboardPage> {
                   color: Colors.black87,
                 ),
               ),
-              if (_selectedRegion != null && _selectedRegion != 'All')
-                TextButton.icon(
-                  onPressed: () => setState(() => _selectedRegion = null),
-                  icon: const Icon(Icons.clear, size: 16),
-                  label: const Text('Clear Filter'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_selectedRegion != null && _selectedRegion != 'All')
+                    TextButton.icon(
+                      onPressed: () => setState(() => _selectedRegion = null),
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Clear Filter'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.person_add_alt_rounded),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        builder: (_) => const AddTeamMemberForm(),
+                      ).then((_) => _loadDashboard());
+                    },
+                    tooltip: 'Add Team Member',
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 16),

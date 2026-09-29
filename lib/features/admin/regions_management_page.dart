@@ -1145,27 +1145,25 @@ class _RegionsManagementPageState extends State<RegionsManagementPage> {
                                       ? [legacySupervisorUser]
                                       : assignedSupervisors;
                               return _RegionCard(
-                                region: region,
-                                assignedAgents: displayAgents,
-                                assignedSupervisors: displaySupervisors,
-                                countyColor: _countyChipColor,
-                                onEdit: () => _showRegionForm(region: region),
-                                onDelete: () => _deleteRegion(region),
-                                onAssignAgent:
-                                    () => _showAssignAgentDialog(region),
-                                onAssignSupervisor:
-                                    () => _showAssignSupervisorDialog(region),
-                                onMembers: () => _showAddMemberDialog(region),
-                              );
+      region: region,
+      assignedAgents: displayAgents,
+      assignedSupervisors: displaySupervisors,
+      countyColor: _countyChipColor,
+      onEdit: () => _showRegionForm(region: region),
+      onDelete: () => _deleteRegion(region),
+      onAssignAgent: () => _showAssignAgentDialog(region),
+      onAssignSupervisor: () => _showAssignSupervisorDialog(region),
+      onMembers: () => _showAddMemberDialog(region),
+    );
                             }, childCount: _filteredRegions.length),
                           ),
                         ),
                   ],
                 ),
               ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showRegionForm(),
-        backgroundColor: AppColors.primaryGreen,
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: () => _showRegionForm(),
+      backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add Region'),

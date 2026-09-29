@@ -23,6 +23,10 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
   bool _isLoading = true;
   String? _selectedAgentId;
   DateTime? _selectedDate;
+  int _currentUserRole = 3;
+  late final MapController _mapController = MapController();
+  List<LatLng> _currentMapPoints = [];
+  String _lastMapPointsSignature = '';
 
   List<Map<String, dynamic>> _agents = [];
   List<Map<String, dynamic>> _schools = [];
@@ -43,6 +47,7 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
 
   @override
   void dispose() {
+    _mapController.dispose();
     _schoolSearchController.dispose();
     super.dispose();
   }
@@ -50,11 +55,19 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      final role = await _dbService.getCurrentUserRole();
+      _currentUserRole = role;
+
       final usersResponse = await _supabase
           .from('users')
           .select('id, full_name, email, role')
           .eq('role', 5)
           .order('full_name', ascending: true);
+
+      if (_currentUserRole == 4) {
+        _selectedAgentId = _supabase.auth.currentUser?.id;
+      }
+
       final schoolModels = await _dbService.getAllSchools();
       final localSchools =
           schoolModels
@@ -308,20 +321,6 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
     }).toList();
   }
 
-  LatLng _defaultMapCenter() {
-    for (final school in _visibleSchools) {
-      final lat = _toDouble(school['latitude']);
-      final lng = _toDouble(school['longitude']);
-      if (lat != null && lng != null) return LatLng(lat, lng);
-    }
-    for (final school in _schools) {
-      final lat = _toDouble(school['latitude']);
-      final lng = _toDouble(school['longitude']);
-      if (lat != null && lng != null) return LatLng(lat, lng);
-    }
-    return const LatLng(-1.2921, 36.8219);
-  }
-
   void _toggleSchool(String schoolId, bool checked) {
     setState(() {
       if (checked) {
@@ -376,6 +375,45 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
     return null;
   }
 
+  void _fitMapToContent() {
+    final signature = _currentMapPoints
+        .map(
+          (point) =>
+              '${point.latitude.toStringAsFixed(6)},${point.longitude.toStringAsFixed(6)}',
+        )
+        .join('|');
+    if (signature == _lastMapPointsSignature) return;
+    _lastMapPointsSignature = signature;
+
+    if (_currentMapPoints.isEmpty) return;
+    if (_currentMapPoints.length == 1) {
+      _mapController.move(_currentMapPoints.first, 12);
+      return;
+    }
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(_currentMapPoints),
+        padding: const EdgeInsets.all(32),
+        maxZoom: 16,
+      ),
+    );
+  }
+
+  LatLng _mapPointsCenter(List<LatLng> points) {
+    if (points.isEmpty) return const LatLng(-1.2921, 36.8219);
+    final latitudes = points
+        .map((point) => point.latitude)
+        .toList(growable: false);
+    final longitudes = points
+        .map((point) => point.longitude)
+        .toList(growable: false);
+    return LatLng(
+      latitudes.reduce((a, b) => a + b) / latitudes.length,
+      longitudes.reduce((a, b) => a + b) / longitudes.length,
+    );
+  }
+
   Color _stageColor(String stage) {
     final normalized = _normalizeStage(stage);
     if (normalized.isEmpty) return Colors.grey;
@@ -407,6 +445,10 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fitMapToContent();
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Role 2 Route Planner'),
@@ -423,8 +465,8 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
                   final isTablet = constraints.maxWidth >= 750;
                   // Cap map height to ensure it fits better on shorter screens
                   final mapHeight = (isWide
-                          ? 560.0
-                          : (isTablet ? 420.0 : 300.0))
+                          ? 640.0
+                          : (isTablet ? 480.0 : 420.0))
                       .clamp(150.0, constraints.maxHeight * 0.7);
                   final pagePadding = isWide ? 20.0 : (isTablet ? 16.0 : 10.0);
 
@@ -503,25 +545,27 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: selectedAgentValue,
-              decoration: const InputDecoration(
-                labelText: 'Assign To (Field Agent)',
-                border: OutlineInputBorder(),
+            if (_currentUserRole != 4) ...[
+              DropdownButtonFormField<String>(
+                initialValue: selectedAgentValue,
+                decoration: const InputDecoration(
+                  labelText: 'Assign To (Field Agent)',
+                  border: OutlineInputBorder(),
+                ),
+                items:
+                    _agents.map((agent) {
+                      final label =
+                          (agent['full_name'] ?? agent['email'] ?? 'Unknown')
+                              .toString();
+                      return DropdownMenuItem<String>(
+                        value: agent['id'].toString(),
+                        child: Text(label),
+                      );
+                    }).toList(),
+                onChanged: (value) => setState(() => _selectedAgentId = value),
               ),
-              items:
-                  _agents.map((agent) {
-                    final label =
-                        (agent['full_name'] ?? agent['email'] ?? 'Unknown')
-                            .toString();
-                    return DropdownMenuItem<String>(
-                      value: agent['id'].toString(),
-                      child: Text(label),
-                    );
-                  }).toList(),
-              onChanged: (value) => setState(() => _selectedAgentId = value),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             DropdownButtonFormField<String>(
               initialValue: selectedCountyValue,
               decoration: const InputDecoration(
@@ -561,7 +605,6 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
 
   Widget _buildMapSection(double mapHeight) {
     final routePoints = _selectedRoutePoints();
-    final center = _defaultMapCenter();
     final totalVisibleSchools = _visibleSchools.length;
     var geocodedSchools = 0;
     final markers =
@@ -593,6 +636,12 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
             })
             .whereType<Marker>()
             .toList();
+    final mapPoints =
+        <LatLng>{
+          ...routePoints,
+          ...markers.map((marker) => marker.point),
+        }.toList();
+    _currentMapPoints = mapPoints;
 
     return Card(
       child: Padding(
@@ -641,15 +690,22 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: FlutterMap(
+                        mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: center,
-                          initialZoom: 6.0,
+                          initialCenter: _mapPointsCenter(_currentMapPoints),
+                          initialZoom:
+                              _currentMapPoints.length > 1 ? 6.3 : 11.5,
                           minZoom: 3,
                           maxZoom: 19,
                           interactionOptions: const InteractionOptions(
                             flags:
                                 InteractiveFlag.all & ~InteractiveFlag.rotate,
                           ),
+                          onMapReady: () {
+                            if (_currentMapPoints.length > 1) {
+                              _fitMapToContent();
+                            }
+                          },
                         ),
                         children: [
                           MapTileLayer(
@@ -681,7 +737,7 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
                           MaterialPageRoute(
                             builder:
                                 (_) => _Role2RouteFullScreenMapPage(
-                                  center: center,
+                                  mapPoints: mapPoints,
                                   routePoints: routePoints,
                                   markers: markers,
                                 ),
@@ -906,47 +962,87 @@ class _ColorSwatch extends StatelessWidget {
   }
 }
 
-class _Role2RouteFullScreenMapPage extends StatelessWidget {
+class _Role2RouteFullScreenMapPage extends StatefulWidget {
   const _Role2RouteFullScreenMapPage({
-    required this.center,
+    required this.mapPoints,
     required this.routePoints,
     required this.markers,
   });
 
-  final LatLng center;
+  final List<LatLng> mapPoints;
   final List<LatLng> routePoints;
   final List<Marker> markers;
+
+  @override
+  State<_Role2RouteFullScreenMapPage> createState() =>
+      _Role2RouteFullScreenMapPageState();
+}
+
+class _Role2RouteFullScreenMapPageState
+    extends State<_Role2RouteFullScreenMapPage> {
+  final MapController _mapController = MapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  LatLng _center() {
+    if (widget.mapPoints.isEmpty) return const LatLng(-1.2921, 36.8219);
+    final latitudes = widget.mapPoints
+        .map((point) => point.latitude)
+        .toList(growable: false);
+    final longitudes = widget.mapPoints
+        .map((point) => point.longitude)
+        .toList(growable: false);
+    return LatLng(
+      latitudes.reduce((a, b) => a + b) / latitudes.length,
+      longitudes.reduce((a, b) => a + b) / longitudes.length,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Route Map - Full Screen')),
       body: FlutterMap(
+        mapController: _mapController,
         options: MapOptions(
-          initialCenter: center,
-          initialZoom: 6.0,
+          initialCenter: _center(),
+          initialZoom: widget.mapPoints.length > 1 ? 6.3 : 11.5,
           minZoom: 3,
           maxZoom: 19,
           interactionOptions: const InteractionOptions(
             flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
           ),
+          onMapReady: () {
+            if (widget.mapPoints.length < 2) return;
+            _mapController.fitCamera(
+              CameraFit.bounds(
+                bounds: LatLngBounds.fromPoints(widget.mapPoints),
+                padding: const EdgeInsets.all(32),
+                maxZoom: 16,
+              ),
+            );
+          },
         ),
         children: [
           MapTileLayer(
             userAgentPackageName: 'com.longhorn.dehus',
             maxNativeZoom: 19,
           ),
-          if (routePoints.length > 1)
+          if (widget.routePoints.length > 1)
             PolylineLayer(
               polylines: [
                 Polyline(
-                  points: routePoints,
+                  points: widget.routePoints,
                   color: Colors.orange,
                   strokeWidth: 4,
                 ),
               ],
             ),
-          if (markers.isNotEmpty) MarkerLayer(markers: markers),
+          if (widget.markers.isNotEmpty) MarkerLayer(markers: widget.markers),
         ],
       ),
     );

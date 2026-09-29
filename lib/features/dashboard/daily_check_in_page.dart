@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../core/constants/colors.dart';
+import '../../core/daily_shift.dart';
 import 'visit_tracker_map_page.dart';
 import '../../core/widgets/map_tile_controls.dart';
 
@@ -15,11 +16,11 @@ class DailyCheckInPage extends StatefulWidget {
   State<DailyCheckInPage> createState() => _DailyCheckInPageState();
 }
 
-class _DailyCheckInPageState extends State<DailyCheckInPage> {
-  static const Duration _maxShiftDuration = Duration(hours: 5);
-
+class _DailyCheckInPageState extends State<DailyCheckInPage>
+    with WidgetsBindingObserver {
   bool _isClockedIn = false;
   bool _isLoadingLocation = false;
+  bool _autoCheckoutInProgress = false;
   String _currentTime = "";
   String? _locationError;
   Position? _currentPosition;
@@ -31,6 +32,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _updateTime();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
@@ -41,9 +43,17 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer.cancel();
     _autoCheckOutTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _maybeAutoCheckoutAtMidnight();
+    }
   }
 
   void _updateTime() {
@@ -56,6 +66,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
           _elapsed = now.difference(_checkInTime!);
         }
       });
+      _maybeAutoCheckoutAtMidnight();
     }
   }
 
@@ -139,37 +150,50 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
   void _scheduleAutoCheckOut() {
     _autoCheckOutTimer?.cancel();
     if (_checkInTime == null) return;
-    final remaining = _maxShiftDuration - _elapsed;
-    if (remaining.isNegative || remaining == Duration.zero) {
+    final remaining = DailyShift.timeUntilNewDay(_checkInTime!);
+    if (remaining == Duration.zero) {
       _performAutoCheckOut();
       return;
     }
     _autoCheckOutTimer = Timer(remaining, _performAutoCheckOut);
   }
 
+  void _maybeAutoCheckoutAtMidnight() {
+    if (!_isClockedIn || _checkInTime == null) return;
+    if (DailyShift.shouldAutoCheckout(_checkInTime!)) {
+      _performAutoCheckOut();
+    }
+  }
+
   Future<void> _performAutoCheckOut() async {
-    if (!_isClockedIn) return;
-    await _saveCheckOut(autoTriggered: true);
+    if (!_isClockedIn || _autoCheckoutInProgress) return;
+    _autoCheckoutInProgress = true;
+    try {
+      await _saveCheckOut(autoTriggered: true);
+    } finally {
+      _autoCheckoutInProgress = false;
+    }
   }
 
   Future<void> _toggleClock() async {
     if (_isClockedIn) {
-      if (_checkInTime != null) {
-        final elapsed = DateTime.now().difference(_checkInTime!);
-        if (elapsed < _maxShiftDuration) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Check-out is locked until ${_maxShiftDuration.inHours} hours have passed. '
-                'Time remaining: ${_formatElapsed(_maxShiftDuration - elapsed)}.',
-              ),
-              backgroundColor: AppColors.accentOrange,
-              behavior: SnackBarBehavior.floating,
+      if (_checkInTime != null &&
+          !DailyShift.canManualCheckout(_checkInTime!)) {
+        final remaining =
+            DailyShift.minDurationBeforeManualCheckout - _elapsed;
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Check-out is locked until ${DailyShift.minDurationBeforeManualCheckout.inHours} hours have passed. '
+              'Time remaining: ${_formatElapsed(remaining.isNegative ? Duration.zero : remaining)}. '
+              'After that you can keep working until midnight.',
             ),
-          );
-          return;
-        }
+            backgroundColor: AppColors.accentOrange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
       await _saveCheckOut(autoTriggered: false);
     } else {
@@ -258,7 +282,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
               'auto_checkout': autoTriggered,
               'notes':
                   autoTriggered
-                      ? 'Auto check-out after ${_maxShiftDuration.inHours}h'
+                      ? 'Auto check-out at midnight to start a new day'
                       : 'Manual check-out',
             })
             .eq('agent_id', userId)
@@ -271,7 +295,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
       SnackBar(
         content: Text(
           autoTriggered
-              ? 'Auto checked out after ${_maxShiftDuration.inHours} hours.'
+              ? 'Auto checked out at midnight to start a new day.'
               : 'Checked out successfully.',
         ),
         backgroundColor:
@@ -289,10 +313,10 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
   }
 
   Duration _remainingTime() {
-    if (_checkInTime == null) return _maxShiftDuration;
-    final elapsed = DateTime.now().difference(_checkInTime!);
-    final remaining = _maxShiftDuration - elapsed;
-    return remaining.isNegative ? Duration.zero : remaining;
+    if (_checkInTime == null) {
+      return DailyShift.timeUntilNewDay(DateTime.now());
+    }
+    return DailyShift.timeUntilNewDay(_checkInTime!);
   }
 
   void _openMap() async {
@@ -390,7 +414,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
       child: GestureDetector(
         onTap: _openMap,
         child: Container(
-          height: isSmallScreen ? 160 : 200,
+          height: isSmallScreen ? 280 : 260,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.grey.shade300),
@@ -581,7 +605,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       const Text(
-                        'MAX SHIFT',
+                        'MIN SHIFT',
                         style: TextStyle(
                           fontSize: 10,
                           letterSpacing: 1.2,
@@ -590,7 +614,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_maxShiftDuration.inHours}h 00m',
+                        '${DailyShift.minDurationBeforeManualCheckout.inHours}h 00m',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
@@ -606,7 +630,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'AUTO CHECK-OUT IN',
+                    'AUTO CHECK-OUT AT MIDNIGHT',
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 1.2,
@@ -626,6 +650,13 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
                   ),
                 ],
               ),
+              if (DailyShift.canManualCheckout(_checkInTime!)) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Minimum shift complete. You can keep working until midnight, or check out.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+              ],
             ],
           ],
         ),
@@ -636,8 +667,7 @@ class _DailyCheckInPageState extends State<DailyCheckInPage> {
   Widget _buildResponsiveClockButton(Size screenSize) {
     double diameter = (screenSize.height * 0.22).clamp(150.0, 220.0);
     final bool canCheckOut =
-        _checkInTime == null ||
-        DateTime.now().difference(_checkInTime!) >= _maxShiftDuration;
+        _checkInTime == null || DailyShift.canManualCheckout(_checkInTime!);
     final bool isLocked = _isClockedIn && !canCheckOut;
     final Color activeColor =
         isLocked

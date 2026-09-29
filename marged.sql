@@ -3244,8 +3244,8 @@ CREATE POLICY "managers_can_manage_region_assignments"
 ON public.region_assignments
 FOR ALL
 TO authenticated
-USING (public.current_user_role_id() <= 2)
-WITH CHECK (public.current_user_role_id() <= 2);
+USING (public.current_user_role_id() <= 4)
+WITH CHECK (public.current_user_role_id() <= 4);
 
 DROP POLICY IF EXISTS "users_can_view_own_region_assignments" ON public.region_assignments;
 CREATE POLICY "users_can_view_own_region_assignments"
@@ -3254,7 +3254,7 @@ FOR SELECT
 TO authenticated
 USING (
   user_id = auth.uid()
-  OR public.current_user_role_id() <= 2
+  OR public.current_user_role_id() <= 4
 );
 
 -- =============================================================================

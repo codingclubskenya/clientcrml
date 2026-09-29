@@ -160,7 +160,7 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
               ),
             ),
           SizedBox(
-            height: 320,
+            height: MediaQuery.of(context).size.height * 0.5,
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(initialCenter: center, initialZoom: 13.0),

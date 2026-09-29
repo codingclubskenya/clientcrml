@@ -372,7 +372,77 @@ class _SalesDashboardState extends State<SalesDashboard> {
 
   Future<List<TaskModel>> _loadAssignedTasks() async {
     final role = await _dbService.getCurrentUserRole();
-    return _dbService.getTasksForRole(role);
+    final dbTasks = await _dbService.getTasksForRole(role);
+
+    // Add Route Plans (visitations) assigned to the current user
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId != null) {
+      try {
+        final visitations = await Supabase.instance.client
+            .from('visitations')
+            .select('id, visit_date, status, notes, schools(name)')
+            .eq('assigned_to', currentUserId);
+
+        for (final v in visitations) {
+          final schoolName = v['schools']?['name'] ?? 'School Visit';
+          final notes = v['notes'] ?? 'No notes';
+          final visitDateStr = v['visit_date'] as String?;
+          final status = v['status'] == 'completed' ? 'closed' : 'open';
+
+          dbTasks.add(
+            TaskModel(
+              id: 'visit_${v['id']}',
+              title: 'Route Plan: $schoolName',
+              description: notes,
+              targetRole: role,
+              dueAt:
+                  visitDateStr != null ? DateTime.tryParse(visitDateStr) : null,
+              status: status,
+            ),
+          );
+        }
+
+        // Route Plans (route_plans table) assigned to the current user
+        final routePlans = await Supabase.instance.client
+            .from('route_plans')
+            .select('id, title, route_date, status, notes, school_ids')
+            .eq('assigned_to', currentUserId);
+
+        for (final rp in routePlans) {
+          final rawSchoolIds = rp['school_ids'];
+          final stopCount = rawSchoolIds is List ? rawSchoolIds.length : 0;
+          final rpDateStr = rp['route_date']?.toString();
+          final rpStatus = rp['status']?.toString() ?? 'assigned';
+          final title = rp['title']?.toString() ?? 'Route Plan';
+          final descParts = <String>[];
+          final rpNotes = rp['notes']?.toString();
+          if (rpNotes != null && rpNotes.trim().isNotEmpty) {
+            descParts.add(rpNotes);
+          }
+          if (stopCount > 0) descParts.add('$stopCount stops');
+          dbTasks.add(
+            TaskModel(
+              id: 'routeplan_${rp['id']}',
+              title: title,
+              description: descParts.join(' • '),
+              targetRole: role,
+              dueAt: rpDateStr != null ? DateTime.tryParse(rpDateStr) : null,
+              status: rpStatus,
+            ),
+          );
+        }
+
+        dbTasks.sort((a, b) {
+          if (a.dueAt == null && b.dueAt == null) return 0;
+          if (a.dueAt == null) return 1;
+          if (b.dueAt == null) return -1;
+          return a.dueAt!.compareTo(b.dueAt!);
+        });
+      } catch (e) {
+        debugPrint('Error fetching route plans for tasks: $e');
+      }
+    }
+    return dbTasks;
   }
 
   // --- UI Components ---
@@ -1394,15 +1464,33 @@ class _SalesDashboardState extends State<SalesDashboard> {
     );
   }
 
-  Future<void> _markTaskComplete(BuildContext context, TaskModel task) async {
+  Future<void> _toggleTaskStatus(
+    BuildContext context,
+    TaskModel task,
+    bool isDone,
+  ) async {
+    final newStatus = isDone ? 'closed' : 'open';
     try {
-      await _dbService.updateTaskStatus(task.id, 'closed');
+      if (task.id.startsWith('visit_')) {
+        final visitId = task.id.substring(6);
+        final visitStatus = isDone ? 'completed' : 'pending';
+        await Supabase.instance.client
+            .from('visitations')
+            .update({'status': visitStatus})
+            .eq('id', visitId);
+      } else if (task.id.startsWith('routeplan_')) {
+        final planId = task.id.substring(10);
+        final planStatus = isDone ? 'completed' : 'in_progress';
+        await Supabase.instance.client
+            .from('route_plans')
+            .update({'status': planStatus})
+            .eq('id', planId);
+      } else {
+        await _dbService.updateTaskStatus(task.id, newStatus);
+      }
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Task marked as complete.')));
       setState(() {
-        if (_autoHideAssignedTasks) _showAssignedTasks = false;
+        if (_autoHideAssignedTasks && isDone) _showAssignedTasks = false;
       });
     } catch (e) {
       if (!context.mounted) return;
@@ -1435,7 +1523,21 @@ class _SalesDashboardState extends State<SalesDashboard> {
     if (confirmed != true) return;
 
     try {
-      await _dbService.deleteTask(task.id);
+      if (task.id.startsWith('visit_')) {
+        final visitId = task.id.substring(6);
+        await Supabase.instance.client
+            .from('visitations')
+            .delete()
+            .eq('id', visitId);
+      } else if (task.id.startsWith('routeplan_')) {
+        final planId = task.id.substring(10);
+        await Supabase.instance.client
+            .from('route_plans')
+            .delete()
+            .eq('id', planId);
+      } else {
+        await _dbService.deleteTask(task.id);
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -1459,186 +1561,90 @@ class _SalesDashboardState extends State<SalesDashboard> {
                 task.dueAt == null
                     ? 'No due date'
                     : '${task.dueAt!.year}-${task.dueAt!.month.toString().padLeft(2, '0')}-${task.dueAt!.day.toString().padLeft(2, '0')}';
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 420;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: EdgeInsets.all(isCompact ? 12 : 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+            final isDone =
+                task.status.toLowerCase() == 'closed' ||
+                task.status.toLowerCase() == 'completed';
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color:
+                      isDone
+                          ? AppColors.primaryGreen.withValues(alpha: 0.5)
+                          : Colors.grey.shade200,
+                ),
+              ),
+              child: CheckboxListTile(
+                value: isDone,
+                activeColor: AppColors.primaryGreen,
+                title: Text(
+                  task.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    decoration:
+                        isDone
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                    color: isDone ? AppColors.textMuted : AppColors.textDark,
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: isCompact ? 38 : 44,
-                        height: isCompact ? 38 : 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.longhornMaroon.withValues(
-                            alpha: 0.1,
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (task.description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          task.description,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                isDone ? AppColors.textMuted : Colors.black87,
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.checklist_rounded,
-                          color: AppColors.longhornMaroon,
-                          size: 20,
                         ),
                       ),
-                      SizedBox(width: isCompact ? 10 : 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              task.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isCompact ? 14 : 15,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              task.description,
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontSize: isCompact ? 12 : 13,
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.schedule_outlined,
-                                      size: 15,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      dueText,
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: isCompact ? 11 : 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.leafGreen.withValues(
-                                      alpha: 0.12,
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    task.status,
-                                    style: const TextStyle(
-                                      color: AppColors.longhornMaroon,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            if (task.status.toLowerCase() != 'closed')
-                              isCompact
-                                  ? Column(
-                                    children: [
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: FilledButton.icon(
-                                          onPressed:
-                                              () => _markTaskComplete(
-                                                context,
-                                                task,
-                                              ),
-                                          icon: const Icon(
-                                            Icons.check_circle_outline,
-                                          ),
-                                          label: const Text('Mark Complete'),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          onPressed:
-                                              () => _deleteTask(context, task),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                          ),
-                                          label: const Text('Delete'),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                  : Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      FilledButton.icon(
-                                        onPressed:
-                                            () => _markTaskComplete(
-                                              context,
-                                              task,
-                                            ),
-                                        icon: const Icon(
-                                          Icons.check_circle_outline,
-                                        ),
-                                        label: const Text('Mark Complete'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      OutlinedButton.icon(
-                                        onPressed:
-                                            () => _deleteTask(context, task),
-                                        icon: const Icon(Icons.delete_outline),
-                                        label: const Text('Delete'),
-                                      ),
-                                    ],
-                                  )
-                            else
-                              SizedBox(
-                                width: isCompact ? double.infinity : null,
-                                child: Align(
-                                  alignment:
-                                      isCompact
-                                          ? Alignment.centerLeft
-                                          : Alignment.centerRight,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _deleteTask(context, task),
-                                    icon: const Icon(Icons.delete_outline),
-                                    label: const Text('Delete'),
-                                  ),
-                                ),
-                              ),
-                          ],
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.schedule_outlined,
+                          size: 14,
+                          color: Colors.grey,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          dueText,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                onChanged: (bool? checked) {
+                  if (checked != null) {
+                    _toggleTaskStatus(context, task, checked);
+                    // Refresh is done optimistically by setState in _toggleTaskStatus,
+                    // but since it's a FutureBuilder, we need to refresh the list by calling setState here.
+                    setState(() {});
+                  }
+                },
+                secondary: IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.longhornMaroon,
                   ),
-                );
-              },
+                  onPressed: () async {
+                    await _deleteTask(context, task);
+                    setState(() {});
+                  },
+                ),
+              ),
             );
           }).toList(),
     );

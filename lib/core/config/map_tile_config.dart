@@ -3,7 +3,10 @@ import 'package:flutter/foundation.dart';
 enum MapTileStyle { street, satellite }
 
 class MapTileConfig {
-  static const String _mapboxAccessToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
+  static const String _mapboxAccessToken = String.fromEnvironment(
+    'MAPBOX_ACCESS_TOKEN',
+    defaultValue: '',
+  );
   static final ValueNotifier<MapTileStyle> style = ValueNotifier(
     MapTileStyle.street,
   );

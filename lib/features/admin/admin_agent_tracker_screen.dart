@@ -229,7 +229,7 @@ class _AdminAgentTrackerScreenState extends State<AdminAgentTrackerScreen> {
                           const Text('No geofences assigned.'),
                         if (_geofences.isNotEmpty) ...[
                           SizedBox(
-                            height: 250,
+                            height: MediaQuery.of(context).size.height * 0.4,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: FlutterMap(

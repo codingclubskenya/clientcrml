@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
 import '../../models/user_model.dart';
+import 'add_team_member_form.dart';
 
 class UsersListPage extends StatefulWidget {
   const UsersListPage({super.key});
@@ -347,6 +348,24 @@ class _UsersListPageState extends State<UsersListPage> {
         title: const Text('Team Directory'),
         backgroundColor: AppColors.primaryDark,
         foregroundColor: AppColors.surfaceWhite,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_rounded),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                builder: (_) => const AddTeamMemberForm(),
+              ).then((_) => _loadUsers());
+            },
+            tooltip: 'Add Team Member',
+          ),
+        ],
       ),
       body:
           _isLoading

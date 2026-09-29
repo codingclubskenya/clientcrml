@@ -219,7 +219,7 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
                     final isTablet = constraints.maxWidth >= 760;
                     final padding = isTablet ? 20.0 : 12.0;
                     final mapHeight =
-                        isWide ? 500.0 : (isTablet ? 420.0 : 300.0);
+                        isWide ? 560.0 : (isTablet ? 460.0 : 420.0);
 
                     if (isWide) {
                       return ListView(

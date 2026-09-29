@@ -28,6 +28,7 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
   bool _isLoadingUsers = true;
   bool _isMapReady = false;
   bool _showControlPanel = false;
+  bool _mapRefocusScheduled = false;
 
   // Geofence states
   LatLng? _selectedLocation;
@@ -119,7 +120,9 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
           _schools = List<Map<String, dynamic>>.from(schoolsResponse);
           _isLoadingUsers = false;
         });
-        _zoomToSelectedCountyGeofences();
+        if (_hasActiveMapFilters()) {
+          _scheduleMapRefocus(notifyEmpty: true);
+        }
       }
     } catch (e) {
       debugPrint('Error fetching data: $e');
@@ -154,53 +157,87 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
     return Colors.primaries[safe % Colors.primaries.length];
   }
 
+  Map<String, dynamic>? _findUserById(String id) {
+    for (final user in _users) {
+      if (user['id']?.toString() == id) return user;
+    }
+    return null;
+  }
+
+  String? _geofenceCounty(Map<String, dynamic> geo) {
+    final region = geo['region']?.toString().trim();
+    if (region != null && region.isNotEmpty) return region;
+
+    final assignedTo = geo['assigned_to']?.toString();
+    if (assignedTo == null || assignedTo.isEmpty) return null;
+    return _findUserById(assignedTo)?['region']?.toString().trim();
+  }
+
   bool _geofenceMatchesCounty(Map<String, dynamic> geo) {
     if (_selectedCountyFilter == null ||
         _selectedCountyFilter!.trim().isEmpty) {
       return true;
     }
     final selected = _selectedCountyFilter!.toLowerCase();
-    final geoCounty = (geo['region'] ?? '').toString().trim().toLowerCase();
-    if (geoCounty == selected) return true;
+    final geoCounty = (_geofenceCounty(geo) ?? '').toLowerCase();
+    return geoCounty == selected;
+  }
 
-    // Fallback: infer county from assigned user's region when geofence.region is missing.
+  bool _geofenceMatchesUser(Map<String, dynamic> geo) {
+    final selectedUserId = _selectedUserId?.trim();
+    if (selectedUserId == null || selectedUserId.isEmpty) return true;
+    return geo['assigned_to']?.toString() == selectedUserId;
+  }
+
+  bool _geofenceMatchesRole(Map<String, dynamic> geo) {
     final assignedTo = geo['assigned_to']?.toString();
     if (assignedTo == null || assignedTo.isEmpty) return false;
-    final matchedUser = _users.cast<Map<String, dynamic>?>().firstWhere(
-      (u) => u?['id']?.toString() == assignedTo,
-      orElse: () => null,
-    );
-    if (matchedUser == null) return false;
-    final userRegion =
-        (matchedUser['region'] ?? '').toString().trim().toLowerCase();
-    return userRegion == selected;
+    return _findUserById(assignedTo)?['role']?.toString() ==
+        _selectedRoleFilter.toString();
+  }
+
+  bool _geofenceMatchesFilters(Map<String, dynamic> geo) {
+    return _geofenceMatchesRole(geo) &&
+        _geofenceMatchesCounty(geo) &&
+        _geofenceMatchesUser(geo);
+  }
+
+  bool _hasAreaFilter() {
+    return (_selectedCountyFilter?.trim().isNotEmpty ?? false) ||
+        (_selectedUserId?.trim().isNotEmpty ?? false);
+  }
+
+  bool _hasActiveMapFilters() {
+    return _hasAreaFilter() || _selectedRoleFilter >= 0;
   }
 
   List<CircleMarker> _buildExistingGeofenceCircles() {
-    List<CircleMarker> markers = [];
-    for (var geo in _existingGeofences) {
-      final county = geo['region']?.toString();
-      if (!_geofenceMatchesCounty(geo)) continue;
+    final markers = <CircleMarker>[];
+    for (final geo in _existingGeofences) {
+      if (!_geofenceMatchesFilters(geo)) continue;
+      final county = _geofenceCounty(geo);
       final coords = geo['coordinates'];
-      if (coords != null && coords is List && coords.isNotEmpty) {
-        final countyColor = _countyColor(county);
-        for (var point in coords) {
-          final lat = (point['lat'] as num?)?.toDouble();
-          final lng = (point['lng'] as num?)?.toDouble();
-          final radius = (point['radius'] as num?)?.toDouble();
-          if (lat != null && lng != null && radius != null) {
-            markers.add(
-              CircleMarker(
-                point: LatLng(lat, lng),
-                radius: radius,
-                useRadiusInMeter: true,
-                color: countyColor.withValues(alpha: 0.22),
-                borderColor: countyColor,
-                borderStrokeWidth: 3,
-              ),
-            );
-          }
-        }
+      if (coords is! List || coords.isEmpty) continue;
+
+      final color = _countyColor(county);
+      for (final point in coords) {
+        if (point is! Map) continue;
+        final mapPoint = Map<String, dynamic>.from(point);
+        final lat = (mapPoint['lat'] as num?)?.toDouble();
+        final lng = (mapPoint['lng'] as num?)?.toDouble();
+        final radius = (mapPoint['radius'] as num?)?.toDouble();
+        if (lat == null || lng == null || radius == null) continue;
+
+        markers.add(
+          CircleMarker(
+            point: LatLng(lat, lng),
+            radius: radius,
+            useRadiusInMeter: true,
+            color: color.withValues(alpha: 0.22),
+            borderColor: color,
+            borderStrokeWidth: 3,
+          ),
+        );
       }
     }
     return markers;
@@ -208,81 +245,85 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
 
   List<Marker> _buildCountyLabels() {
     final labels = <Marker>[];
+    final labeledCounties = <String>{};
     for (final geo in _existingGeofences) {
-      final county = geo['region']?.toString();
-      if (!_geofenceMatchesCounty(geo)) continue;
+      if (!_geofenceMatchesFilters(geo)) continue;
+      final county = _geofenceCounty(geo);
+      if (county == null || county.trim().isEmpty) continue;
+
+      final normalizedCounty = county.toLowerCase();
+      if (!labeledCounties.add(normalizedCounty)) continue;
+
       final coords = geo['coordinates'];
-      if (coords is List && coords.isNotEmpty) {
-        final first = coords.first;
-        if (first is Map) {
-          final mapFirst = Map<String, dynamic>.from(first);
-          final lat = (mapFirst['lat'] as num?)?.toDouble();
-          final lng = (mapFirst['lng'] as num?)?.toDouble();
-          if (lat != null && lng != null && (county ?? '').trim().isNotEmpty) {
-            labels.add(
-              Marker(
-                point: LatLng(lat, lng),
-                width: 130,
-                height: 28,
-                child: IgnorePointer(
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _countyColor(county), width: 2),
-                    ),
-                    child: Text(
-                      county!,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+      if (coords is! List || coords.isEmpty) continue;
+      final first = coords.first;
+      if (first is! Map) continue;
+
+      final mapFirst = Map<String, dynamic>.from(first);
+      final lat = (mapFirst['lat'] as num?)?.toDouble();
+      final lng = (mapFirst['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+
+      labels.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 130,
+          height: 28,
+          child: IgnorePointer(
+            child: Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _countyColor(county), width: 2),
+              ),
+              child: Text(
+                county,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            );
-          }
-        }
-      }
+            ),
+          ),
+        ),
+      );
     }
     return labels;
   }
 
-  List<LatLng> _countyAreaPoints() {
-    if (_selectedCountyFilter == null ||
-        _selectedCountyFilter!.trim().isEmpty) {
-      return const [];
-    }
-    final selected = _selectedCountyFilter!.toLowerCase();
+  List<LatLng> _visibleMapPoints() {
     final points = <LatLng>[];
 
     for (final geo in _existingGeofences) {
-      if (!_geofenceMatchesCounty(geo)) continue;
+      if (!_geofenceMatchesFilters(geo)) continue;
       final coords = geo['coordinates'];
-      if (coords is List) {
-        for (final point in coords) {
-          if (point is Map) {
-            final mapPoint = Map<String, dynamic>.from(point);
-            final lat = (mapPoint['lat'] as num?)?.toDouble();
-            final lng = (mapPoint['lng'] as num?)?.toDouble();
-            if (lat != null && lng != null) {
-              points.add(LatLng(lat, lng));
-            }
-          }
-        }
+      if (coords is! List) continue;
+
+      for (final point in coords) {
+        if (point is! Map) continue;
+        final mapPoint = Map<String, dynamic>.from(point);
+        final lat = (mapPoint['lat'] as num?)?.toDouble();
+        final lng = (mapPoint['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null) points.add(LatLng(lat, lng));
       }
     }
 
-    for (final school in _schools) {
-      final county = (school['county'] ?? '').toString().trim().toLowerCase();
-      if (county != selected) continue;
-      final lat = (school['latitude'] as num?)?.toDouble();
-      final lng = (school['longitude'] as num?)?.toDouble();
-      if (lat != null && lng != null) {
-        points.add(LatLng(lat, lng));
+    final selectedCounty = _selectedCountyFilter?.trim().toLowerCase();
+    if (selectedCounty != null && selectedCounty.isNotEmpty) {
+      for (final school in _schools) {
+        final county = (school['county'] ?? '').toString().trim().toLowerCase();
+        if (county != selectedCounty) continue;
+        final lat = (school['latitude'] as num?)?.toDouble();
+        final lng = (school['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) points.add(LatLng(lat, lng));
+      }
+    } else if (!_hasAreaFilter()) {
+      for (final school in _schools) {
+        final lat = (school['latitude'] as num?)?.toDouble();
+        final lng = (school['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) points.add(LatLng(lat, lng));
       }
     }
 
@@ -290,7 +331,7 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
   }
 
   List<LatLng> _countyBoundaryPolygon() {
-    final points = _countyAreaPoints();
+    final points = _visibleMapPoints();
     if (points.isEmpty) return const [];
 
     double minLat = points.first.latitude;
@@ -316,28 +357,22 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
     ];
   }
 
-  void _zoomToSelectedCountyGeofences() {
+  void _fitMapToVisibleGeofences({bool notifyEmpty = false}) {
     if (!_isMapReady) return;
-    if (_selectedCountyFilter == null ||
-        _selectedCountyFilter!.trim().isEmpty) {
-      return;
-    }
 
-    final points = _countyAreaPoints();
-
+    final points = _visibleMapPoints();
     if (points.isEmpty) {
       _mapController.move(_initialCenter, 6);
-      if (mounted) {
+      if (notifyEmpty && mounted && _hasActiveMapFilters()) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No geofence/school coordinates found in $_selectedCountyFilter.',
-            ),
+          const SnackBar(
+            content: Text('No map items match the current filters.'),
           ),
         );
       }
       return;
     }
+
     if (points.length == 1) {
       _mapController.move(points.first, 12);
       return;
@@ -347,6 +382,20 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
     _mapController.fitCamera(
       CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48)),
     );
+  }
+
+  void _scheduleMapRefocus({bool notifyEmpty = false}) {
+    if (!_isMapReady || _mapRefocusScheduled) return;
+    _mapRefocusScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapRefocusScheduled = false;
+      if (!mounted) return;
+      _fitMapToVisibleGeofences(notifyEmpty: notifyEmpty);
+    });
+  }
+
+  void _zoomToSelectedCountyGeofences({bool notifyEmpty = false}) {
+    _scheduleMapRefocus(notifyEmpty: notifyEmpty);
   }
 
   Future<void> _centerOnCurrentLocation() async {
@@ -487,8 +536,11 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
             ),
             onMapReady: () {
               _isMapReady = true;
-              _centerOnCurrentLocation();
-              _zoomToSelectedCountyGeofences();
+              if (_hasActiveMapFilters()) {
+                _scheduleMapRefocus(notifyEmpty: true);
+              } else {
+                _centerOnCurrentLocation();
+              }
             },
             onTap: _onMapTapped,
           ),
@@ -528,9 +580,7 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
                 ],
               ),
             MarkerLayer(markers: _buildCountyLabels()),
-            if (_selectedCountyFilter != null &&
-                _selectedCountyFilter!.trim().isNotEmpty &&
-                _countyBoundaryPolygon().isNotEmpty)
+            if (_hasActiveMapFilters() && _countyBoundaryPolygon().isNotEmpty)
               PolygonLayer(
                 polygons: [
                   Polygon(
@@ -656,6 +706,7 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
                         _selectedRoleFilter = val;
                         _filterUsers();
                       });
+                      _scheduleMapRefocus(notifyEmpty: true);
                     }
                   },
                 ),
@@ -710,7 +761,10 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
                         ),
                       );
                     }).toList(),
-                onChanged: (val) => setState(() => _selectedUserId = val),
+                onChanged: (val) {
+                  setState(() => _selectedUserId = val);
+                  _scheduleMapRefocus(notifyEmpty: true);
+                },
               ),
           const SizedBox(height: 16),
           ElevatedButton(
@@ -792,105 +846,214 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
         builder:
             (_) => _AdminGeofenceFullScreenMapPage(
               initialCenter: _initialCenter,
+              mapPoints: [
+                ..._visibleMapPoints(),
+                if (_selectedLocation != null) _selectedLocation!,
+              ],
               existingGeofenceCircles: _buildExistingGeofenceCircles(),
               countyLabels: _buildCountyLabels(),
               countyBoundaryPolygon: _countyBoundaryPolygon(),
               countyColor: _countyColor(_selectedCountyFilter),
               selectedCountyFilter: _selectedCountyFilter,
+              showBoundary: _hasActiveMapFilters(),
               selectedLocation: _selectedLocation,
               geofenceRadiusMeters: _geofenceRadiusMeters,
+              onLocationSelected: (point) {
+                setState(() => _selectedLocation = point);
+              },
+              onAssign: _assignGeofenceTask,
             ),
       ),
     );
   }
 }
 
-class _AdminGeofenceFullScreenMapPage extends StatelessWidget {
+class _AdminGeofenceFullScreenMapPage extends StatefulWidget {
   const _AdminGeofenceFullScreenMapPage({
     required this.initialCenter,
+    required this.mapPoints,
     required this.existingGeofenceCircles,
     required this.countyLabels,
     required this.countyBoundaryPolygon,
     required this.countyColor,
     required this.selectedCountyFilter,
+    required this.showBoundary,
     required this.selectedLocation,
     required this.geofenceRadiusMeters,
+    required this.onLocationSelected,
+    required this.onAssign,
   });
 
   final LatLng initialCenter;
+  final List<LatLng> mapPoints;
   final List<CircleMarker> existingGeofenceCircles;
   final List<Marker> countyLabels;
   final List<LatLng> countyBoundaryPolygon;
   final Color countyColor;
   final String? selectedCountyFilter;
+  final bool showBoundary;
   final LatLng? selectedLocation;
   final double geofenceRadiusMeters;
+  final ValueChanged<LatLng> onLocationSelected;
+  final VoidCallback onAssign;
+
+  @override
+  State<_AdminGeofenceFullScreenMapPage> createState() =>
+      _AdminGeofenceFullScreenMapPageState();
+}
+
+class _AdminGeofenceFullScreenMapPageState
+    extends State<_AdminGeofenceFullScreenMapPage> {
+  final MapController _mapController = MapController();
+  LatLng? _localSelectedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _localSelectedLocation = widget.selectedLocation;
+  }
+
+  void _fitMapToPoints() {
+    final points = widget.mapPoints;
+    if (points.isEmpty) return;
+    if (points.length == 1) {
+      _mapController.move(points.first, 12);
+      return;
+    }
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(points),
+        padding: const EdgeInsets.all(48),
+        maxZoom: 16,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  void _onMapTapped(TapPosition _, LatLng position) {
+    setState(() => _localSelectedLocation = position);
+    widget.onLocationSelected(position);
+  }
+
+  Future<void> _centerOnCurrentLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+    _mapController.move(
+      LatLng(position.latitude, position.longitude),
+      _mapController.camera.zoom,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final localLocation = _localSelectedLocation;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Geofence Map - Full Screen')),
-      body: FlutterMap(
-        options: MapOptions(
-          initialCenter: initialCenter,
-          initialZoom: 12.0,
-          minZoom: 2,
-          maxZoom: 18,
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-          ),
-        ),
+      body: Stack(
         children: [
-          MapTileLayer(
-            userAgentPackageName: 'com.longhorn.dehus',
-            maxNativeZoom: 19,
-            panBuffer: 2,
-          ),
-          CircleLayer(
-            circles: [
-              ...existingGeofenceCircles,
-              if (selectedLocation != null)
-                CircleMarker(
-                  point: selectedLocation!,
-                  radius: geofenceRadiusMeters,
-                  useRadiusInMeter: true,
-                  color: Colors.blue.withValues(alpha: 0.3),
-                  borderColor: Colors.blue,
-                  borderStrokeWidth: 2,
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: widget.initialCenter,
+              initialZoom: 12.0,
+              minZoom: 2,
+              maxZoom: 18,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
+              onTap: _onMapTapped,
+              onMapReady: _fitMapToPoints,
+            ),
+            children: [
+              MapTileLayer(
+                userAgentPackageName: 'com.longhorn.dehus',
+                maxNativeZoom: 19,
+                panBuffer: 2,
+              ),
+              CircleLayer(
+                circles: [
+                  ...widget.existingGeofenceCircles,
+                  if (localLocation != null)
+                    CircleMarker(
+                      point: localLocation,
+                      radius: widget.geofenceRadiusMeters,
+                      useRadiusInMeter: true,
+                      color: Colors.blue.withValues(alpha: 0.3),
+                      borderColor: Colors.blue,
+                      borderStrokeWidth: 2,
+                    ),
+                ],
+              ),
+              if (localLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: localLocation,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(
+                        Icons.location_pin,
+                        color: Colors.red,
+                        size: 40,
+                      ),
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: widget.countyLabels),
+              if (widget.showBoundary &&
+                  widget.countyBoundaryPolygon.isNotEmpty)
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: widget.countyBoundaryPolygon,
+                      color: widget.countyColor.withValues(alpha: 0.12),
+                      borderColor: widget.countyColor,
+                      borderStrokeWidth: 3,
+                    ),
+                  ],
                 ),
             ],
           ),
-          if (selectedLocation != null)
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: selectedLocation!,
-                  width: 40,
-                  height: 40,
-                  child: const Icon(
-                    Icons.location_pin,
-                    color: Colors.red,
-                    size: 40,
-                  ),
-                ),
-              ],
-            ),
-          MarkerLayer(markers: countyLabels),
-          if (selectedCountyFilter != null &&
-              selectedCountyFilter!.trim().isNotEmpty &&
-              countyBoundaryPolygon.isNotEmpty)
-            PolygonLayer(
-              polygons: [
-                Polygon(
-                  points: countyBoundaryPolygon,
-                  color: countyColor.withValues(alpha: 0.12),
-                  borderColor: countyColor,
-                  borderStrokeWidth: 3,
-                ),
-              ],
-            ),
+          const Positioned(top: 12, right: 12, child: MapStyleSwitcher()),
         ],
       ),
+      floatingActionButton:
+          localLocation != null
+              ? FloatingActionButton.extended(
+                heroTag: 'assign_geofence_fullscreen',
+                backgroundColor: const Color(0xFF6D273F),
+                onPressed: widget.onAssign,
+                icon: const Icon(Icons.save, color: Colors.white),
+                label: const Text(
+                  'Assign Geofence',
+                  style: TextStyle(color: Colors.white),
+                ),
+              )
+              : FloatingActionButton(
+                heroTag: 'my_location_fullscreen',
+                backgroundColor: Colors.white,
+                onPressed: _centerOnCurrentLocation,
+                child: const Icon(Icons.my_location, color: Colors.black87),
+              ),
     );
   }
 }

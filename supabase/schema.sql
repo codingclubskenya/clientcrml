@@ -1692,6 +1692,7 @@ for select
 to authenticated
 using (
   assigned_to = auth.uid()
+  or assigned_to is null
   or public.current_user_role_id() <= 2
   or (
     public.current_user_role_id() = 3
@@ -1713,6 +1714,10 @@ to authenticated
 using (
   public.current_user_role_id() <= 2
   or (
+    public.current_user_role_id() <= 4
+    and assigned_to is null
+  )
+  or (
     public.current_user_role_id() = 3
     and exists (
       select 1
@@ -1725,6 +1730,10 @@ using (
 )
 with check (
   public.current_user_role_id() <= 2
+  or (
+    public.current_user_role_id() <= 4
+    and assigned_to is null
+  )
   or (
     public.current_user_role_id() = 3
     and exists (

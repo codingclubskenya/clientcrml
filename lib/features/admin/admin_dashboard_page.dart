@@ -37,8 +37,6 @@ import '../dashboard/sample_distribution_page.dart';
 import 'school_profile_page.dart';
 import 'admin_individual_performance_page.dart';
 import '../../../core/constants/agent_dashboard_page.dart';
-import '../../../features/profile/profile_page.dart';
-import '../../../core/constants/bas_dashboard_page.dart';
 import '../catalog/product_list_screen.dart';
 import '../consignments/consignment_list_screen.dart';
 
@@ -63,8 +61,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   DateTimeRange? _taskDateRange;
   String _taskTimeFilter = 'All'; // 'All', 'Daily', 'Weekly', 'Monthly'
   String _taskStatusFilter = 'All'; // 'All', 'Open', 'In Progress', 'Closed'
-  bool _isSidebarExpanded = true;
+  final bool _isSidebarExpanded = true;
   int? _currentRole;
+
+  late final MapController _mapController = MapController();
+  List<LatLng> _currentMapPoints = [];
+  String _lastMapPointsSignature = '';
+  bool _mapCameraFitScheduled = false;
 
   @override
   void initState() {
@@ -156,6 +159,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _dashboardFuture = _loadDashboard();
     });
+    _scheduleMapCameraFit();
   }
 
   Future<void> _updateRole(UserModel user, int role) async {
@@ -197,7 +201,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _refreshDashboard();
   }
 
-  Future<void> _pickMapDateRange() async {
+  void _pickMapDateRange() async {
     final now = DateTime.now();
     final first = DateTime(now.year - 5, 1, 1);
     final last = DateTime(now.year + 1, 12, 31);
@@ -212,6 +216,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _mapDateRange = picked;
     });
+    _scheduleMapCameraFit();
   }
 
   void _clearMapDateRange() {
@@ -219,6 +224,42 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _mapDateRange = null;
     });
+  }
+
+  void _scheduleMapCameraFit() {
+    if (_mapCameraFitScheduled) return;
+    _mapCameraFitScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapCameraFitScheduled = false;
+      if (!mounted) return;
+      _fitMapToContent();
+    });
+  }
+
+  void _fitMapToContent() {
+    final signature = _currentMapPoints
+        .map(
+          (point) =>
+              '${point.latitude.toStringAsFixed(6)},${point.longitude.toStringAsFixed(6)}',
+        )
+        .join('|');
+    if (signature == _lastMapPointsSignature) return;
+    _lastMapPointsSignature = signature;
+
+    if (_currentMapPoints.isEmpty) return;
+    if (_currentMapPoints.length == 1) {
+      _mapController.move(_currentMapPoints.first, 12);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(_currentMapPoints);
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: bounds,
+        padding: const EdgeInsets.all(32),
+        maxZoom: 16,
+      ),
+    );
   }
 
   Future<void> _pickTaskDateRange() async {
@@ -289,7 +330,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitMapToContent();
+    });
     final isDesktop = MediaQuery.of(context).size.width >= 800;
     final isNarrow = MediaQuery.of(context).size.width < 900;
 
@@ -1264,13 +1314,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           mapSchools.where((s) => _schoolStages.containsKey(s.id)).toList();
     }
 
+    DateTime? mapStart;
+    DateTime? mapEnd;
     if (_mapDateRange != null) {
-      final start = DateTime(
+      mapStart = DateTime(
         _mapDateRange!.start.year,
         _mapDateRange!.start.month,
         _mapDateRange!.start.day,
       );
-      final end = DateTime(
+      mapEnd = DateTime(
         _mapDateRange!.end.year,
         _mapDateRange!.end.month,
         _mapDateRange!.end.day,
@@ -1282,43 +1334,84 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           mapSchools.where((s) {
             final createdAt = s.createdAt;
             if (createdAt == null) return false;
-            return !createdAt.isBefore(start) && !createdAt.isAfter(end);
+            return !createdAt.isBefore(mapStart!) &&
+                !createdAt.isAfter(mapEnd!);
           }).toList();
     }
 
-    List<Map<String, dynamic>> userRoutePlans = [];
+    List<Map<String, dynamic>> userRoutePlans = routePlans;
     List<Map<String, dynamic>> userGeofences = geofences;
+
+    if (mapStart != null && mapEnd != null) {
+      userRoutePlans =
+          userRoutePlans.where((route) {
+            final rawDate = route['route_date'];
+            if (rawDate == null) return false;
+            final routeDate =
+                rawDate is DateTime
+                    ? DateTime(rawDate.year, rawDate.month, rawDate.day)
+                    : DateTime.tryParse(rawDate.toString());
+            if (routeDate == null) return false;
+            return !routeDate.isBefore(mapStart!) &&
+                !routeDate.isAfter(mapEnd!);
+          }).toList();
+      userGeofences =
+          userGeofences.where((geofence) {
+            final rawDate = geofence['created_at'];
+            if (rawDate == null) return false;
+            final createdAt =
+                rawDate is DateTime
+                    ? rawDate
+                    : DateTime.tryParse(rawDate.toString());
+            if (createdAt == null) return false;
+            return !createdAt.isBefore(mapStart!) &&
+                !createdAt.isAfter(mapEnd!);
+          }).toList();
+    }
 
     if (_selectedUserIdForMap != null) {
       userRoutePlans =
-          routePlans
-              .where((r) => r['assigned_to'] == _selectedUserIdForMap)
+          userRoutePlans
+              .where(
+                (r) => r['assigned_to']?.toString() == _selectedUserIdForMap,
+              )
               .toList();
       final routeSchoolIds = <String>{};
       for (final r in userRoutePlans) {
         final idsRaw = r['school_ids'];
-        if (idsRaw != null) {
-          if (idsRaw is List) {
-            routeSchoolIds.addAll(idsRaw.map((e) => e.toString()));
-          }
+        if (idsRaw != null && idsRaw is List) {
+          routeSchoolIds.addAll(idsRaw.map((e) => e.toString()));
         }
       }
       mapSchools =
           mapSchools.where((s) => routeSchoolIds.contains(s.id)).toList();
 
       userGeofences =
-          geofences
-              .where((g) => g['assigned_to'] == _selectedUserIdForMap)
+          userGeofences
+              .where(
+                (g) => g['assigned_to']?.toString() == _selectedUserIdForMap,
+              )
               .toList();
     }
 
-    final polylines = _buildRoutePolylines(userRoutePlans, schools);
+    final polylines = _buildRoutePolylines(userRoutePlans, mapSchools);
     final polygons = _buildGeofencePolygons(userGeofences);
+    final geofenceCircles = _buildGeofenceCircles(userGeofences);
+    final mapPoints =
+        <LatLng>{
+          ...mapSchools.map(
+            (s) => LatLng(s.latitude!.toDouble(), s.longitude!.toDouble()),
+          ),
+          ..._geofenceMapPoints(userGeofences),
+          ...polygons.expand((polygon) => polygon.points),
+          ...polylines.expand((polyline) => polyline.points),
+        }.toList();
+    _currentMapPoints = mapPoints;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final isSmall = constraints.maxWidth < 900;
-        final mapHeight = isSmall ? 340.0 : 460.0;
+        final mapHeight = isSmall ? 420.0 : 460.0;
         final dateLabel =
             _mapDateRange == null
                 ? 'Date Filter'
@@ -1457,7 +1550,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       activeThumbColor: AppColors.primaryGreen,
                       onChanged:
-                          (val) => setState(() => _showOnlyCrmSchools = val),
+                          (val) => setState(() {
+                            _showOnlyCrmSchools = val;
+                          }),
                     ),
                   ],
                 ),
@@ -1483,16 +1578,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 children: [
                   Positioned.fill(
                     child:
-                        mapSchools.isEmpty
+                        mapPoints.isEmpty
                             ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(24),
                                 child: Text(
-                                  _selectedUserIdForMap == null
-                                      ? (_mapDateRange == null
-                                          ? 'No school GPS coordinates found yet.\nSave a school profile to see dots here.'
-                                          : 'No schools found for the selected date range.')
-                                      : 'No mapped schools or areas found for this filter.',
+                                  _selectedUserIdForMap != null
+                                      ? 'No mapped schools, routes, or geofences found for this user.'
+                                      : _mapDateRange != null
+                                      ? 'No mapped schools, routes, or geofences found for the selected date range.'
+                                      : _showOnlyCrmSchools
+                                      ? 'No pipeline schools, routes, or geofences found.'
+                                      : 'No school GPS coordinates found yet.\nSave a school profile to see dots here.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: Colors.grey[700]),
                                 ),
@@ -1501,18 +1598,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             : Stack(
                               children: [
                                 FlutterMap(
+                                  mapController: _mapController,
                                   options: MapOptions(
-                                    initialCenter: _mapCenter(mapSchools),
+                                    initialCenter: _pointsCenter(mapPoints),
                                     initialZoom:
-                                        mapSchools.length > 1 ? 6.3 : 11.5,
+                                        mapPoints.length > 1 ? 6.3 : 11.5,
                                     minZoom: 2,
                                     maxZoom: 18,
                                     backgroundColor: const Color(0xFFE9EFE8),
-                                    interactionOptions: const InteractionOptions(
-                                      flags:
-                                          InteractiveFlag.all &
-                                          ~InteractiveFlag.rotate,
-                                    ),
+                                    interactionOptions:
+                                        const InteractionOptions(
+                                          flags:
+                                              InteractiveFlag.all &
+                                              ~InteractiveFlag.rotate,
+                                        ),
                                   ),
                                   children: [
                                     MapTileLayer(
@@ -1522,6 +1621,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                       panBuffer: 2,
                                     ),
                                     PolygonLayer(polygons: polygons),
+                                    CircleLayer(circles: geofenceCircles),
                                     PolylineLayer(polylines: polylines),
                                     MarkerLayer(
                                       markers: _schoolMarkers(
@@ -1539,9 +1639,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               ],
                             ),
                   ),
-                  if (_showOnlyCrmSchools && mapSchools.isNotEmpty)
+                  if (_showOnlyCrmSchools && mapPoints.isNotEmpty)
                     Positioned(right: 12, top: 12, child: _buildMapLegend()),
-                  if (mapSchools.isNotEmpty)
+                  if (mapPoints.isNotEmpty)
                     Positioned(
                       left: 12,
                       bottom: 12,
@@ -1553,9 +1653,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             MaterialPageRoute(
                               builder:
                                   (_) => _FullScreenMapPage(
-                                    schools: mapSchools,
+                                    mapPoints: mapPoints,
                                     polygons: polygons,
                                     polylines: polylines,
+                                    geofenceCircles: geofenceCircles,
                                     markers: _schoolMarkers(
                                       context,
                                       mapSchools,
@@ -1640,20 +1741,83 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  LatLng _mapCenter(List<SchoolModel> schools) {
-    if (schools.isEmpty) {
+  LatLng _pointsCenter(List<LatLng> points) {
+    if (points.isEmpty) {
       return const LatLng(-1.286389, 36.817223);
     }
 
-    final latitudes = schools
-        .map((school) => school.latitude!.toDouble())
+    final latitudes = points
+        .map((point) => point.latitude)
         .toList(growable: false);
-    final longitudes = schools
-        .map((school) => school.longitude!.toDouble())
+    final longitudes = points
+        .map((point) => point.longitude)
         .toList(growable: false);
     final avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
     final avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
     return LatLng(avgLat, avgLng);
+  }
+
+  List<CircleMarker> _buildGeofenceCircles(
+    List<Map<String, dynamic>> geofences,
+  ) {
+    final circles = <CircleMarker>[];
+    for (final geofence in geofences) {
+      final rawPoints = geofence['coordinates'];
+      if (rawPoints is! List) continue;
+      for (final rawPoint in rawPoints) {
+        if (rawPoint is! Map) continue;
+        final latValue = rawPoint['lat'] ?? rawPoint['latitude'];
+        final lngValue = rawPoint['lng'] ?? rawPoint['longitude'];
+        final radiusValue = rawPoint['radius'];
+        final lat =
+            latValue is num
+                ? latValue.toDouble()
+                : double.tryParse(latValue.toString());
+        final lng =
+            lngValue is num
+                ? lngValue.toDouble()
+                : double.tryParse(lngValue.toString());
+        if (lat == null || lng == null) continue;
+        final radius =
+            radiusValue is num
+                ? radiusValue.toDouble()
+                : double.tryParse(radiusValue.toString());
+        circles.add(
+          CircleMarker(
+            point: LatLng(lat, lng),
+            radius: radius ?? 100,
+            useRadiusInMeter: radius != null,
+            color: Colors.green.withValues(alpha: 0.2),
+            borderColor: Colors.green,
+            borderStrokeWidth: 2,
+          ),
+        );
+      }
+    }
+    return circles;
+  }
+
+  List<LatLng> _geofenceMapPoints(List<Map<String, dynamic>> geofences) {
+    final points = <LatLng>[];
+    for (final geofence in geofences) {
+      final rawPoints = geofence['coordinates'];
+      if (rawPoints is! List) continue;
+      for (final rawPoint in rawPoints) {
+        if (rawPoint is! Map) continue;
+        final latValue = rawPoint['lat'] ?? rawPoint['latitude'];
+        final lngValue = rawPoint['lng'] ?? rawPoint['longitude'];
+        final lat =
+            latValue is num
+                ? latValue.toDouble()
+                : double.tryParse(latValue.toString());
+        final lng =
+            lngValue is num
+                ? lngValue.toDouble()
+                : double.tryParse(lngValue.toString());
+        if (lat != null && lng != null) points.add(LatLng(lat, lng));
+      }
+    }
+    return points;
   }
 
   List<Polygon> _buildGeofencePolygons(List<Map<String, dynamic>> geofences) {
@@ -1948,8 +2112,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   ),
                 ),
-                ],
-              ),
+              ],
+            ),
           ),
         );
       },
@@ -1957,29 +2121,48 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
-class _FullScreenMapPage extends StatelessWidget {
+class _FullScreenMapPage extends StatefulWidget {
   const _FullScreenMapPage({
-    required this.schools,
+    required this.mapPoints,
     required this.polygons,
     required this.polylines,
+    required this.geofenceCircles,
     required this.markers,
   });
 
-  final List<SchoolModel> schools;
+  final List<LatLng> mapPoints;
   final List<Polygon> polygons;
   final List<Polyline> polylines;
+  final List<CircleMarker> geofenceCircles;
   final List<Marker> markers;
 
-  LatLng _mapCenter(List<SchoolModel> schools) {
-    final latitudes = schools
-        .map((school) => school.latitude!.toDouble())
+  @override
+  State<_FullScreenMapPage> createState() => _FullScreenMapPageState();
+}
+
+class _FullScreenMapPageState extends State<_FullScreenMapPage> {
+  final MapController _mapController = MapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  LatLng _center() {
+    if (widget.mapPoints.isEmpty) {
+      return const LatLng(-1.286389, 36.817223);
+    }
+    final latitudes = widget.mapPoints
+        .map((point) => point.latitude)
         .toList(growable: false);
-    final longitudes = schools
-        .map((school) => school.longitude!.toDouble())
+    final longitudes = widget.mapPoints
+        .map((point) => point.longitude)
         .toList(growable: false);
-    final avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
-    final avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
-    return LatLng(avgLat, avgLng);
+    return LatLng(
+      latitudes.reduce((a, b) => a + b) / latitudes.length,
+      longitudes.reduce((a, b) => a + b) / longitudes.length,
+    );
   }
 
   @override
@@ -1990,15 +2173,26 @@ class _FullScreenMapPage extends StatelessWidget {
         children: [
           Positioned.fill(
             child: FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
-                initialCenter: _mapCenter(schools),
-                initialZoom: schools.length > 1 ? 6.3 : 11.5,
+                initialCenter: _center(),
+                initialZoom: widget.mapPoints.length > 1 ? 6.3 : 11.5,
                 minZoom: 2,
                 maxZoom: 18,
                 backgroundColor: const Color(0xFFE9EFE8),
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
+                onMapReady: () {
+                  if (widget.mapPoints.length < 2) return;
+                  _mapController.fitCamera(
+                    CameraFit.bounds(
+                      bounds: LatLngBounds.fromPoints(widget.mapPoints),
+                      padding: const EdgeInsets.all(32),
+                      maxZoom: 16,
+                    ),
+                  );
+                },
               ),
               children: [
                 MapTileLayer(
@@ -2006,17 +2200,14 @@ class _FullScreenMapPage extends StatelessWidget {
                   maxNativeZoom: 19,
                   panBuffer: 2,
                 ),
-                PolygonLayer(polygons: polygons),
-                PolylineLayer(polylines: polylines),
-                MarkerLayer(markers: markers),
+                PolygonLayer(polygons: widget.polygons),
+                CircleLayer(circles: widget.geofenceCircles),
+                PolylineLayer(polylines: widget.polylines),
+                MarkerLayer(markers: widget.markers),
               ],
             ),
           ),
-          const Positioned(
-            right: 12,
-            top: 12,
-            child: MapStyleSwitcher(),
-          ),
+          const Positioned(right: 12, top: 12, child: MapStyleSwitcher()),
         ],
       ),
     );

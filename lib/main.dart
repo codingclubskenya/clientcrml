@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'core/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'core/config/supabase_config.dart';
@@ -61,10 +61,13 @@ Future<void> main() async {
     await Supabase.initialize(
       url: SupabaseConfig.url,
       anonKey: SupabaseConfig.anonKey,
-      authOptions: const FlutterAuthClientOptions(detectSessionInUri: false),
-    ).timeout(const Duration(seconds: 10));
-  } catch (_) {
-    // Supabase failed to initialize - app will run in offline mode
+      authOptions: const FlutterAuthClientOptions(
+        autoRefreshToken: true,
+        detectSessionInUri: false,
+      ),
+    );
+  } catch (e, st) {
+    debugPrint('Supabase initialization failed: $e\n$st');
   }
 
   runApp(const DeHeusApp());

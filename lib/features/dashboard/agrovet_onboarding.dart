@@ -150,15 +150,33 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
     super.dispose();
   }
 
-  @override
+   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recoverLostCameraData();
       _selectClientType();
       _watchConnectivity();
       _fetchCurrentLocation();
       _loadSampleBooks();
     });
+  }
+
+  Future<void> _recoverLostCameraData() async {
+    try {
+      final lostData = await _imagePicker.retrieveLostData();
+      if (!mounted || lostData.isEmpty || lostData.file == null) return;
+      final file = lostData.file!;
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _capturedPhoto = file;
+        _capturedPhotoBytes = bytes;
+        _captureStatus =
+            "Photo recovered from previous capture (${bytes.length} bytes)";
+      });
+    } catch (e, st) {
+      debugPrint('Failed to recover lost camera data: $e\n$st');
+    }
   }
 
   Future<void> _selectClientType() async {
@@ -490,6 +508,8 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       final photo = await _imagePicker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
       );
       if (!mounted || photo == null) return;
       final bytes = await photo.readAsBytes();
@@ -498,7 +518,20 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
         _capturedPhotoBytes = bytes;
         _captureStatus = "Photo captured successfully";
       });
-    } catch (_) {
+    } on PlatformException catch (e, st) {
+      debugPrint('Camera capture failed (PlatformException): $e\n$st');
+      if (!mounted) return;
+      if (e.code == 'camera_access_denied' || e.code == 'activity_destroyed') {
+        setState(() {
+          _captureStatus = "Camera unavailable. Please try again.";
+        });
+      } else {
+        setState(() {
+          _captureStatus = "Could not open the camera: ${e.message ?? e.code}";
+        });
+      }
+    } catch (e, st) {
+      debugPrint('Camera capture failed: $e\n$st');
       if (!mounted) return;
       setState(() {
         _captureStatus = "Could not open the camera";
@@ -1652,6 +1685,8 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       final photo = await _imagePicker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
       );
       if (!mounted || photo == null) return;
       final bytes = await photo.readAsBytes();
@@ -1659,7 +1694,19 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
         _sampleProofPhoto = photo;
         _sampleProofPhotoBytes = bytes;
       });
-    } catch (_) {
+    } on PlatformException catch (e, st) {
+      debugPrint('Sample proof camera failed (PlatformException): $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open camera: ${e.message ?? e.code}',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('Sample proof camera failed: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
