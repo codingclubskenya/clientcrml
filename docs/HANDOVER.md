@@ -60,7 +60,7 @@ Pattern: `map['isSynced'] == true || map['isSynced'] == 1`
 4. Created `run.sh` helper script for running with the token
 5. Updated `README.md` with clear token instructions
 
-**Valid token**: `pk.eyJ1Ijo...REDACTED`  
+**Valid token**: `pk.eyJ1Ijo...` (redacted for security)  
 **Needs to be added to**: `lcrm` GitHub repo → Settings → Secrets → `MAPBOX_ACCESS_TOKEN`
 
 ### 1.5 Password Reset Fix
@@ -165,7 +165,7 @@ Config: /etc/systemd/system/gunicorn.service
 ### Required Secrets (in `lcrm` repo)
 | Secret | Value | Used By |
 |--------|-------|---------|
-| `MAPBOX_ACCESS_TOKEN` | `pk.eyJ1Ijo...REDACTED` | `deploy-gh-pages.yml`, `release.yml`, `deploy.yml` |
+| `MAPBOX_ACCESS_TOKEN` | `pk.eyJ1Ijo...` (contact project owner for actual token) | `deploy-gh-pages.yml`, `release.yml`, `deploy.yml` |
 | `SERVER_HOST` | `213.199.41.219` | `deploy.yml`, `deploy-django.yml` |
 | `SERVER_USER` | `devops` | `deploy.yml`, `deploy-django.yml` |
 | `SSH_PRIVATE_KEY` | (SSH key) | `deploy.yml`, `deploy-django.yml` |
