@@ -27,11 +27,14 @@ Build or run with the `--dart-define` flag:
 # Run with Mapbox tiles
 flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token_here
 
-# Build for release
+# Build APK with Mapbox tiles
 flutter build apk --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token_here
+
+# Build appbundle with Mapbox tiles
+flutter build appbundle --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token_here
 ```
 
-Alternatively, use the helper script:
+Alternatively, use the helper script (for running only):
 
 ```bash
 export MAPBOX_ACCESS_TOKEN=pk.your_token_here
