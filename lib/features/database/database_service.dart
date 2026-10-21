@@ -818,7 +818,7 @@ class DatabaseService {
     return box.values.map((e) => SchoolModel.fromMap(e)).toList();
   }
 
-  Future<List<SchoolModel>> getAllSchools() async {
+  Future<List<SchoolModel>> getAllSchools({int limit = 2000}) async {
     // Attempt a sync before read so UI reflects latest server state.
     try {
       await syncData();
@@ -828,7 +828,7 @@ class DatabaseService {
 
     final localSchools = await getAllSchoolProfiles();
     try {
-      final data = await ApiService().getAll('schools', orderBy: 'created_at', orderDir: 'ASC', limit: 500);
+      final data = await ApiService().getAll('schools', orderBy: 'created_at', orderDir: 'ASC', limit: limit);
       final remoteSchools =
           data
               .map(

@@ -34,4 +34,12 @@ class MapTileConfig {
     if (style.value == tileStyle) return;
     style.value = tileStyle;
   }
+
+  /// Returns the tile provider URL for debugging. Shows whether Mapbox or OSM is active.
+  static String get activeProvider {
+    if (isMapboxConfigured) {
+      return 'Mapbox (${style.value == MapTileStyle.street ? 'street' : 'satellite'})';
+    }
+    return 'OpenStreetMap (set MAPBOX_ACCESS_TOKEN via --dart-define to use Mapbox)';
+  }
 }

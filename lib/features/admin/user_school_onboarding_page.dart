@@ -29,7 +29,7 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
 
   Future<_UserSchoolData> _loadData() async {
     final users = await _dbService.getAllUsers();
-    final schools = await _dbService.getAllSchools();
+    final schools = await _dbService.getAllSchools(limit: 2000);
     return _UserSchoolData(users: users, schools: schools);
   }
 
@@ -46,23 +46,27 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
       ).showSnackBar(const SnackBar(content: Text('No data to export.')));
       return;
     }
+    final validUserIds = data.users.map((u) => u.id.trim().toLowerCase()).toSet();
+
     final byUser = <String, List<SchoolModel>>{};
     for (final s in data.schools) {
-      final uid = (s.capturedBy ?? '').trim();
+      final uid = (s.capturedBy ?? '').trim().toLowerCase();
       if (uid.isEmpty) continue;
-      byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
+      if (validUserIds.contains(uid)) {
+        byUser.putIfAbsent(uid, () => <SchoolModel>[]).add(s);
+      }
     }
     final rows =
         data.users
             .map(
               (u) => OnboardedExportRow(
                 user: u,
-                items: byUser[u.id] ?? const <SchoolModel>[],
+                items: byUser[u.id.trim().toLowerCase()] ?? const <SchoolModel>[],
               ),
             )
             .where((r) => r.items.isNotEmpty)
             .toList()
-          ..sort((a, b) => b.items.length.compareTo(a.items.length));
+            ..sort((a, b) => b.items.length.compareTo(a.items.length));
 
     try {
       await OnboardedExportService.exportPerUserBreakdown(
@@ -141,18 +145,27 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
               .where((s) => _isSameDay(s.createdAt, today))
               .toList(growable: false);
 
+          final validUserIds = data.users.map((u) => u.id.trim().toLowerCase()).toSet();
+
           final schoolsByUser = <String, List<SchoolModel>>{};
+          final unassignedSchools = <SchoolModel>[];
           for (final school in data.schools) {
-            final userId = (school.capturedBy ?? '').trim();
-            if (userId.isEmpty) continue;
-            schoolsByUser
-                .putIfAbsent(userId, () => <SchoolModel>[])
-                .add(school);
+            final rawId = (school.capturedBy ?? '').trim();
+            if (rawId.isEmpty) {
+              unassignedSchools.add(school);
+              continue;
+            }
+            final userId = rawId.toLowerCase();
+            if (validUserIds.contains(userId)) {
+              schoolsByUser.putIfAbsent(userId, () => <SchoolModel>[]).add(school);
+            } else {
+              unassignedSchools.add(school);
+            }
           }
 
           final userRows =
               data.users.map((user) {
-                  final userSchools = schoolsByUser[user.id] ?? <SchoolModel>[];
+                  final userSchools = schoolsByUser[user.id.trim().toLowerCase()] ?? <SchoolModel>[];
                   return _UserSchoolRow(user: user, schools: userSchools);
                 }).toList()
                 ..sort((a, b) => b.schools.length.compareTo(a.schools.length));
@@ -199,6 +212,12 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
                   destination: UserSchoolTodayOnboardedPage(today: today),
                 ),
                 const SizedBox(height: 20),
+                if (unassignedSchools.isNotEmpty) ...[
+                  const _SectionLabel('Unassigned Schools'),
+                  const SizedBox(height: 8),
+                  _buildUnassignedCard(unassignedSchools),
+                  const SizedBox(height: 20),
+                ],
                 const _SectionLabel('Per-user breakdown'),
                 const SizedBox(height: 8),
                 if (userRows.isEmpty)
@@ -391,6 +410,39 @@ class _UserSchoolOnboardingPageState extends State<UserSchoolOnboardingPage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(message, textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildUnassignedCard(List<SchoolModel> unassigned) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.grey.shade300,
+          child: const Icon(Icons.help_outline, color: Colors.grey),
+        ),
+        title: const Text('Unassigned'),
+        subtitle: Text('No matching agent • ${unassigned.length} schools'),
+        children: [
+          ...unassigned.map(
+            (school) => ListTile(
+              title: Text(school.name),
+              subtitle: Text(
+                '${_typeOf(school).toUpperCase()} • ${school.county} • ${school.phone}',
+              ),
+              trailing: Text(
+                school.isSynced ? 'Synced' : 'Pending',
+                style: TextStyle(
+                  color: school.isSynced
+                      ? AppColors.primaryGreen
+                      : Colors.orange,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

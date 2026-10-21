@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/constants/colors.dart';
+import '../../core/config/map_tile_config.dart';
 import '../../core/widgets/map_tile_controls.dart';
 import '../database/database_service.dart';
 import '../../models/farmer_model.dart';
@@ -1638,6 +1640,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   top: 12,
                                   child: MapStyleSwitcher(),
                                 ),
+                                if (!kReleaseMode)
+                                  Positioned(
+                                    right: 12,
+                                    top: 60,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: (MapTileConfig.isMapboxConfigured
+                                                ? Colors.green
+                                                : Colors.orange)
+                                            .withValues(alpha: 0.8),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        MapTileConfig.activeProvider,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                   ),
@@ -2210,6 +2237,25 @@ class _FullScreenMapPageState extends State<_FullScreenMapPage> {
             ),
           ),
           const Positioned(right: 12, top: 12, child: MapStyleSwitcher()),
+          if (!kReleaseMode)
+            Positioned(
+              right: 12,
+              top: 60,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (MapTileConfig.isMapboxConfigured
+                          ? Colors.green
+                          : Colors.orange)
+                      .withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  MapTileConfig.activeProvider,
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                ),
+              ),
+            ),
         ],
       ),
     );

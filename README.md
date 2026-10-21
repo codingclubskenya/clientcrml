@@ -17,10 +17,29 @@ samples, guidance on mobile development, and a full API reference.
 
 ## Map tiles
 
-To use Mapbox-backed maps, build or run with:
+The app supports Mapbox and OpenStreetMap tile providers. Mapbox requires an access token.
+
+### Using Mapbox
+
+Build or run with the `--dart-define` flag:
 
 ```bash
---dart-define=MAPBOX_ACCESS_TOKEN=your_token
+# Run with Mapbox tiles
+flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token_here
+
+# Build for release
+flutter build apk --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token_here
 ```
 
-If the token is omitted, the app falls back to OpenStreetMap tiles.
+Alternatively, use the helper script:
+
+```bash
+export MAPBOX_ACCESS_TOKEN=pk.your_token_here
+./run.sh
+```
+
+The token must have access to the `mapbox/streets-v12` and `mapbox/satellite-streets-v12` styles. You can verify your token at https://account.mapbox.com/.
+
+### Fallback
+
+If `MAPBOX_ACCESS_TOKEN` is not provided, the app automatically falls back to OpenStreetMap tiles. No additional configuration is needed.

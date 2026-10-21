@@ -20,8 +20,10 @@ class MapTileLayer extends StatelessWidget {
     return ValueListenableBuilder<MapTileStyle>(
       valueListenable: MapTileConfig.style,
       builder: (context, tileStyle, _) {
+        final urlTemplate = MapTileConfig.urlTemplateFor(tileStyle);
         return TileLayer(
-          urlTemplate: MapTileConfig.urlTemplateFor(tileStyle),
+          key: ValueKey<String>(urlTemplate),
+          urlTemplate: urlTemplate,
           userAgentPackageName: userAgentPackageName,
           maxNativeZoom: maxNativeZoom,
           panBuffer: panBuffer,
