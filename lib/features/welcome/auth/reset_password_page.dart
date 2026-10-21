@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import 'login_page.dart';
@@ -95,7 +94,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           backgroundColor: AppColors.primaryGreen,
         ),
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
