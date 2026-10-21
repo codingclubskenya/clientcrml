@@ -1,0 +1,15 @@
+[Unit]
+Description=Deheus Django API (Gunicorn)
+After=network.target
+
+[Service]
+User=devops
+Group=www-data
+WorkingDirectory=/home/devops/deheus-api-django/app
+ExecStart=/home/devops/deheus-api-django/venv/bin/gunicorn deheus_api.wsgi:application --bind 127.0.0.1:8000 --workers 4 --timeout 120
+Restart=always
+EnvironmentFile=/home/devops/deheus-api-django/.env
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

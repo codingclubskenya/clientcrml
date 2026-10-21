@@ -1,0 +1,54 @@
+name: Deploy Django API to Server
+
+on:
+  push:
+    branches: [ "master", "joe" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: deheus-api-django/app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd deheus-api-django/app
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations check
+        run: |
+          python -c "import django; import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'deheus_api.settings'); django.setup(); from django.core.management import call_command; call_command('makemigrations', '--check', '--dry-run')"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/joe' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/devops/deheus-api-django/app
+            git pull origin joe
+            /home/devops/deheus-api-django/venv/bin/pip install -r requirements.txt
+            /home/devops/deheus-api-django/venv/bin/python manage.py migrate --noinput
+            /home/devops/deheus-api-django/venv/bin/python manage.py collectstatic --noinput
+            sudo systemctl restart gunicorn
+            echo "Django API deployed successfully"
