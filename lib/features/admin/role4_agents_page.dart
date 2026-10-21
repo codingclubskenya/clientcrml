@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../core/constants/agent_dashboard_page.dart';
@@ -27,9 +26,9 @@ class _Role4AgentsPageState extends State<Role4AgentsPage> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return;
-    final currentAgent = await _dbService.getUser(currentUser.id);
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) return;
+    final currentAgent = await _dbService.getUser(currentUserId);
     if (currentAgent == null || currentAgent.role != 4) {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

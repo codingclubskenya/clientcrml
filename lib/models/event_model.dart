@@ -97,7 +97,7 @@ class EventModel {
       notes: map['notes']?.toString(),
       status: map['status']?.toString() ?? 'scheduled',
       createdBy: map['created_by']?.toString(),
-      isSynced: map['isSynced'] == true,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
       createdAt:
           map['created_at'] != null
               ? DateTime.tryParse(map['created_at'].toString())

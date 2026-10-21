@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'core/constants/colors.dart';
 import 'package:flutter/material.dart';
-import 'core/config/supabase_config.dart';
 import 'features/welcome/welcome_page.dart';
 import 'features/welcome/auth/login_page.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -10,7 +9,7 @@ import 'features/admin/admin_dashboard_page.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/welcome/auth/admin_login_page.dart';
 import 'features/profile/profile_page.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/api_service.dart';
 import 'core/constants/bas_dashboard_page.dart';
 import 'core/constants/agent_dashboard_page.dart';
 import 'features/welcome/auth/reset_password_page.dart';
@@ -57,18 +56,7 @@ Future<void> main() async {
     // CatalogService failed - app will run without persisted catalog
   }
 
-  try {
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      anonKey: SupabaseConfig.anonKey,
-      authOptions: const FlutterAuthClientOptions(
-        autoRefreshToken: true,
-        detectSessionInUri: false,
-      ),
-    );
-  } catch (e, st) {
-    debugPrint('Supabase initialization failed: $e\n$st');
-  }
+  await ApiService().init();
 
   runApp(const DeHeusApp());
 }
@@ -89,12 +77,14 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
   final uri = Uri.tryParse(settings.name ?? '');
   if (uri != null && _isPasswordResetLink(uri)) {
     String? code = uri.queryParameters['code'];
+    code ??= uri.queryParameters['resetToken'];
     String? accessToken = uri.queryParameters['access_token'];
     String? refreshToken = uri.queryParameters['refresh_token'];
 
     if (uri.fragment.isNotEmpty) {
       final fragmentParams = Uri.splitQueryString(uri.fragment);
       code ??= fragmentParams['code'];
+      code ??= fragmentParams['resetToken'];
       accessToken ??= fragmentParams['access_token'];
       refreshToken ??= fragmentParams['refresh_token'];
     }
@@ -282,9 +272,9 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
     }
 
      try {
-      final supabase = Supabase.instance.client;
-      final session = supabase.auth.currentSession;
-      if (session == null || session.user.id.isEmpty) {
+      final api = ApiService();
+      final userId = api.currentUserId;
+      if (userId == null || userId.isEmpty) {
         if (!mounted) return;
         setState(() {
           _destination = const WelcomePage();
@@ -294,22 +284,17 @@ class _SessionEntryPageState extends State<_SessionEntryPage> {
         return;
       }
 
-      final userId = session.user.id;
-      final metadataRole = session.user.userMetadata?['role']?.toString();
-
+      String? metadataRole = api.cachedUser?['role']?.toString();
       Map<String, dynamic>? userData;
       try {
-        userData = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', userId)
-            .maybeSingle()
+        userData = await api.getCurrentUser()
             .timeout(const Duration(seconds: 2));
       } catch (_) {
         // Timeout or network error, silently fallback to metadata
       }
 
-      final dbRole = userData?['role'] as int?;
+      metadataRole ??= userData?['role']?.toString();
+      final dbRole = int.tryParse(userData?['role']?.toString() ?? '');
       final resolvedRole =
           dbRole ??
           int.tryParse(metadataRole ?? '') ??

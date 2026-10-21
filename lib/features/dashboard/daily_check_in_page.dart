@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../core/constants/colors.dart';
 import '../../core/daily_shift.dart';
 import 'visit_tracker_map_page.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class DailyCheckInPage extends StatefulWidget {
   const DailyCheckInPage({super.key});
@@ -71,18 +71,14 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
   }
 
   Future<void> _restoreActiveSession() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final api = ApiService();
+    final userId = api.currentUserId;
     if (userId == null) return;
     try {
-      final response =
-          await Supabase.instance.client
-              .from('visit_checkins')
-              .select('id, checkin_at')
-              .eq('agent_id', userId)
-              .isFilter('checkout_at', null)
-              .order('checkin_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+      final rows = await api.getAll('visit_checkins',
+          filter: {'agent_id': userId, 'checkout_at': {'is': null}},
+          orderBy: 'checkin_at', orderDir: 'DESC', limit: 1);
+      final response = rows.isEmpty ? null : rows.first;
       if (response != null && mounted) {
         final start =
             DateTime.parse(response['checkin_at'] as String).toLocal();
@@ -204,7 +200,8 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
   }
 
   Future<void> _saveCheckIn(Position position) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final api = ApiService();
+    final userId = api.currentUserId;
     if (userId == null) return;
 
     final now = DateTime.now();
@@ -217,20 +214,15 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
     _scheduleAutoCheckOut();
 
     try {
-      final profile =
-          await Supabase.instance.client
-              .from('users')
-              .select('full_name')
-              .eq('id', userId)
-              .maybeSingle();
+      final profile = await api.getById('users', userId);
       final agentName = profile?['full_name']?.toString();
 
-      await Supabase.instance.client.from('visit_checkins').insert({
+      await api.create('visit_checkins', {
         'agent_id': userId,
         'agent_name': agentName,
         'checkin_at': now.toUtc().toIso8601String(),
-        'gps_lat': position.latitude,
-        'gps_lng': position.longitude,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
         'location_text':
             'Lat: ${position.latitude.toStringAsFixed(5)}, Lng: ${position.longitude.toStringAsFixed(5)}',
         'notes': 'Daily check-in',
@@ -248,7 +240,8 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
   }
 
   Future<void> _saveCheckOut({required bool autoTriggered}) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final api = ApiService();
+    final userId = api.currentUserId;
     if (userId == null) return;
 
     final position = await _getCurrentPosition();
@@ -268,9 +261,11 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
 
     try {
       if (checkInTime != null) {
-        await Supabase.instance.client
-            .from('visit_checkins')
-            .update({
+        final rows = await api.getAll('visit_checkins',
+            filter: {'agent_id': userId, 'checkout_at': {'is': null}},
+            orderBy: 'checkin_at', orderDir: 'DESC', limit: 1);
+        if (rows.isNotEmpty) {
+          await api.patch('visit_checkins', rows.first['id'].toString(), {
               'checkout_at': checkoutTime.toUtc().toIso8601String(),
               'gps_lat': position?.latitude,
               'gps_lng': position?.longitude,
@@ -284,9 +279,8 @@ class _DailyCheckInPageState extends State<DailyCheckInPage>
                   autoTriggered
                       ? 'Auto check-out at midnight to start a new day'
                       : 'Manual check-out',
-            })
-            .eq('agent_id', userId)
-            .isFilter('checkout_at', null);
+          });
+        }
       }
     } catch (_) {}
 

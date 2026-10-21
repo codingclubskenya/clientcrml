@@ -1,11 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../features/admin/role2_route_plan_page.dart';
 import '../../features/admin/route_plans_management_page.dart';
 import '../../features/dashboard/school_sell_page.dart';
+import '../../services/api_service.dart';
 
 class AgentRoutePlanScreen extends StatefulWidget {
   const AgentRoutePlanScreen({super.key});
@@ -15,7 +15,6 @@ class AgentRoutePlanScreen extends StatefulWidget {
 }
 
 class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -50,16 +49,11 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
 
   // Fetch Current User Role
   Future<void> _fetchUserRole() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
     try {
-      final res =
-          await _supabase
-              .from('users')
-              .select('role')
-              .eq('id', user.id)
-              .maybeSingle();
-      final role = int.tryParse(res?['role']?.toString() ?? '5') ?? 5;
+      final res = await ApiService().getById('users', userId);
+      final role = int.tryParse(res['role']?.toString() ?? '5') ?? 5;
       _currentUserRoleId = role;
       _currentUserRole = role <= 4 ? 'supervisor' : 'agent';
     } catch (e) {
@@ -69,26 +63,18 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
 
   // Fetch Route Plan / To-Do List for Selected Date
   Future<void> _fetchRoutePlan() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
 
     try {
       final formattedDate =
           "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
-      var query = _supabase
-          .from('visitations')
-          .select(
-            'id, school_id, visit_date, status, notes, schools(id, name, address)',
-          )
-          .eq('visit_date', formattedDate);
-
-      // Agents see only their assigned visits; Supervisors see all visits in their area or assigned
-      if (_currentUserRoleId >= 5) {
-        query = query.eq('assigned_to', user.id);
-      }
-
-      final response = await query;
+      final response = await ApiService().getAll('visitations', filter: {
+        'visit_date': formattedDate,
+        if (_currentUserRoleId >= 5) 'assigned_to': userId,
+      }, limit: 500);
+      await _attachSchoolNames(response);
       _visitations = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching route plan: $e');
@@ -100,13 +86,29 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     }
   }
 
+  Future<void> _attachSchoolNames(List<dynamic> rows) async {
+    final schoolIds = rows
+        .map((row) => (row as Map)['school_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (schoolIds.isEmpty) return;
+    final schools = await ApiService().getAll('schools', filter: {
+      'id': {'in': schoolIds},
+    }, limit: 500);
+    final byId = {for (final school in schools) school['id'].toString(): school};
+    for (final row in rows) {
+      final data = row as Map;
+      data['schools'] = byId[data['school_id']?.toString()];
+    }
+  }
+
   // Fetch Managed Agents (always loaded — used by assign modal + route form)
   Future<void> _fetchAgents() async {
     try {
-      final agentsRes = await _supabase
-          .from('users')
-          .select('id, full_name, email, role')
-          .inFilter('role', [4, 5]);
+      final agentsRes = await ApiService().getAll('users', filter: {
+        'role': {'in': [4, 5]},
+      }, limit: 500);
       _managedAgents = List<Map<String, dynamic>>.from(agentsRes);
     } catch (e) {
       debugPrint('Error fetching agents: $e');
@@ -116,9 +118,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
   // Fetch Regional Schools (supervisor/admin only — used by assign modal)
   Future<void> _fetchRegionalSchools() async {
     try {
-      final schoolsRes = await _supabase
-          .from('schools')
-          .select('id, name, address');
+      final schoolsRes = await ApiService().getAll('schools', limit: 500);
       _regionalSchools = List<Map<String, dynamic>>.from(schoolsRes);
     } catch (e) {
       debugPrint('Error fetching school data: $e');
@@ -128,11 +128,9 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
   // Fetch Sales Rep agents (users role 5) — used by the route plan assign-to field
   Future<void> _fetchSalesRepAgents() async {
     try {
-      final res = await _supabase
-          .from('users')
-          .select('id, full_name, email')
-          .inFilter('role', [4, 5])
-          .order('full_name', ascending: true);
+      final res = await ApiService().getAll('users', filter: {
+        'role': {'in': [4, 5]},
+      }, orderBy: 'full_name', orderDir: 'ASC', limit: 500);
       _salesRepAgents = List<Map<String, dynamic>>.from(res);
     } catch (e) {
       debugPrint('Error fetching sales reps: $e');
@@ -141,21 +139,12 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
 
   // Fetch Existing Route Plans (dynamic) — created by role2_route_plan_page.dart
   Future<void> _fetchRoutePlans() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
     try {
-      var query = _supabase
-          .from('route_plans')
-          .select(
-            'id, title, route_date, status, school_ids, notes, assigned_to',
-          );
-
-      // Agents only see plans assigned to them
-      if (_currentUserRoleId >= 5) {
-        query = query.eq('assigned_to', user.id);
-      }
-
-      final response = await query.order('route_date', ascending: false);
+      final response = await ApiService().getAll('route_plans', filter: {
+        if (_currentUserRoleId >= 5) 'assigned_to': userId,
+      }, orderBy: 'route_date', orderDir: 'DESC', limit: 500);
       final plans = List<Map<String, dynamic>>.from(response);
       if (mounted) {
         setState(() => _routePlans = plans);
@@ -180,10 +169,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     });
 
     try {
-      await _supabase
-          .from('visitations')
-          .update({'status': newStatus})
-          .eq('id', visitId);
+      await ApiService().patch('visitations', visitId, {'status': newStatus});
     } catch (e) {
       debugPrint('Error updating status: $e');
       _fetchRoutePlan(); // Revert on failure
@@ -197,21 +183,21 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
       allowedExtensions: ['csv', 'xlsx', 'xls'],
     );
 
-    if (result != null && result.files.single.path != null) {
-      final filePath = result.files.single.path!;
+    if (result.isNotEmpty && result.single.path != null) {
+      final filePath = result.single.path!;
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Uploading route plan file: ${result.files.single.name}...',
+            'Uploading route plan file: ${result.single.name}...',
           ),
         ),
       );
 
       try {
         // TODO: Parse CSV/Excel rows here using 'csv' or 'excel' packages,
-        // then perform batch insertion into Supabase `visitations` table.
+        // then perform batch insertion into the API `visitations` table.
 
         await Future.delayed(const Duration(seconds: 2)); // Simulated delay
 
@@ -238,7 +224,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
   void _showAssignVisitationDialog() {
     String? selectedSchoolId;
     String? selectedAgentId =
-        (_currentUserRoleId <= 4) ? null : _supabase.auth.currentUser?.id;
+        (_currentUserRoleId <= 4) ? null : ApiService().currentUserId;
     DateTime assignedDate = _selectedDate;
     final notesController = TextEditingController();
 
@@ -354,13 +340,13 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
                             "${assignedDate.year}-${assignedDate.month.toString().padLeft(2, '0')}-${assignedDate.day.toString().padLeft(2, '0')}";
 
                         try {
-                          await _supabase.from('visitations').insert({
+                          await ApiService().create('visitations', {
                             'school_id': selectedSchoolId,
                             'assigned_to': selectedAgentId,
                             'visit_date': formattedDate,
                             'status': 'pending',
                             'notes': notesController.text.trim(),
-                            'created_by': _supabase.auth.currentUser?.id,
+                            'created_by': ApiService().currentUserId,
                           });
 
                           if (context.mounted) {
@@ -411,7 +397,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     final titleController = TextEditingController();
     final notesController = TextEditingController();
     DateTime formDate = _selectedDate;
-    final currentUserId = _supabase.auth.currentUser?.id;
+    final currentUserId = ApiService().currentUserId;
     // A route plan can be created first and assigned later.
     String? formAssigneeId;
     String planAssigneeSearch = '';
@@ -433,7 +419,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
                 {
                   'id': currentUserId,
                   'full_name': 'Me',
-                  'email': _supabase.auth.currentUser?.email ?? '',
+                  'email': ApiService().cachedUser?['email'] ?? '',
                   'isMe': true,
                 },
               ..._salesRepAgents,
@@ -721,30 +707,28 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     required String assignedTo,
     required String notes,
   }) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return 0;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return 0;
 
-    final existingRes = await _supabase
-        .from('visitations')
-        .select('school_id')
-        .eq('visit_date', visitDate)
-        .eq('assigned_to', assignedTo);
-    final existingIds =
-        (existingRes as List)
-            .map((v) => v['school_id']?.toString())
-            .whereType<String>()
-            .toSet();
+    final existingRes = await ApiService().getAll('visitations', filter: {
+      'visit_date': visitDate,
+      'assigned_to': assignedTo,
+    }, limit: 500);
+    final existingIds = existingRes
+        .map((v) => v['school_id']?.toString())
+        .whereType<String>()
+        .toSet();
     final newSchoolIds =
         schoolIds.where((id) => !existingIds.contains(id)).toList();
 
     for (final schoolId in newSchoolIds) {
-      await _supabase.from('visitations').insert({
+      await ApiService().create('visitations', {
         'school_id': schoolId,
         'assigned_to': assignedTo,
         'visit_date': visitDate,
         'status': 'pending',
         'notes': notes,
-        'created_by': user.id,
+        'created_by': userId,
       });
     }
     return newSchoolIds.length;
@@ -765,8 +749,8 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     }
     if (schoolIds.isEmpty) return;
 
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
 
     final String? routeDateStr =
         plan['route_date']?.toString().split('T').first;
@@ -781,7 +765,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final assignedTo = plan['assigned_to']?.toString() ?? user.id;
+      final assignedTo = plan['assigned_to']?.toString() ?? userId;
       final added = await _insertVisitationsForSchools(
         schoolIds: schoolIds,
         visitDate: routeDate,
@@ -821,8 +805,8 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     String? assignedTo,
     required String notes,
   }) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
 
     final routeDateStr =
         "${routeDate.year}-${routeDate.month.toString().padLeft(2, '0')}-${routeDate.day.toString().padLeft(2, '0')}";
@@ -839,14 +823,14 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _supabase.from('route_plans').insert({
+      await ApiService().create('route_plans', {
         'title': title,
         'route_date': routeDateStr,
         'assigned_to': assignedTo,
         'school_ids': schoolIds,
         'notes': notes,
         'status': assignedTo == null ? 'draft' : 'assigned',
-        'created_by': user.id,
+        'created_by': userId,
       });
 
       if (assignedTo != null && schoolIds.isNotEmpty) {
@@ -864,7 +848,7 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
                 (visit) => visit['school_id']?.toString() == schoolIds[i],
                 orElse: () => <String, dynamic>{},
               )['schools'];
-          await _supabase.from('tasks').insert({
+          await ApiService().create('tasks', {
             'title':
                 'Visit ${school is Map ? school['name'] ?? 'School' : 'School'}',
             'description':
@@ -873,20 +857,20 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
             'assigned_to': assignedTo,
             'due_at': '${routeDateStr}T09:00:00',
             'status': 'pending',
-            'created_by': user.id,
+            'created_by': userId,
           });
         }
       } else if (assignedTo != null) {
         // A route plan without selected stops is still actionable in the
         // assignee's to-do list.
-        await _supabase.from('tasks').insert({
+        await ApiService().create('tasks', {
           'title': title,
           'description': notes.isEmpty ? 'Complete assigned route plan' : notes,
           'target_role': 5,
           'assigned_to': assignedTo,
           'due_at': '${routeDateStr}T09:00:00',
           'status': 'pending',
-          'created_by': user.id,
+          'created_by': userId,
         });
       }
 
@@ -1080,14 +1064,11 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    await _supabase
-                        .from('route_plans')
-                        .update({
+                    await ApiService().patch('route_plans', plan['id'].toString(), {
                           'title': titleController.text.trim(),
                           'notes': notesController.text.trim(),
                           'status': selectedStatus,
-                        })
-                        .eq('id', plan['id']);
+                        });
                     Navigator.pop(dctx);
                   },
                   child: const Text('Save'),
@@ -1140,18 +1121,20 @@ class _AgentRoutePlanScreenState extends State<AgentRoutePlanScreen> {
                   .whereType<String>()
                   .toList();
           if (schoolIds.isNotEmpty) {
-            await _supabase
-                .from('visitations')
-                .delete()
-                .eq('visit_date', visitDate)
-                .eq('assigned_to', assignedTo)
-                .inFilter('school_id', schoolIds);
+            final visits = await ApiService().getAll('visitations', filter: {
+              'visit_date': visitDate,
+              'assigned_to': assignedTo,
+              'school_id': {'in': schoolIds},
+            }, limit: 500);
+            for (final visit in visits) {
+              await ApiService().delete('visitations', visit['id'].toString());
+            }
           }
         }
       } catch (e) {
         debugPrint('Error cleaning up visitations: $e');
       }
-      await _supabase.from('route_plans').delete().eq('id', plan['id']);
+      await ApiService().delete('route_plans', plan['id'].toString());
       _fetchRoutePlans();
       _fetchRoutePlan();
       if (mounted) {
@@ -1421,14 +1404,18 @@ class _AgentSchoolVisitsScreenState extends State<AgentSchoolVisitsScreen> {
 
   Future<void> _fetchVisits() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       if (userId == null) return;
 
-      final response = await Supabase.instance.client
-          .from('school_visits')
-          .select('*, schools(name)')
-          .eq('agent_id', userId)
-          .order('visited_at', ascending: false);
+      final response = await ApiService().getAll(
+        'school_visits', filter: {'agent_id': userId},
+        orderBy: 'visited_at', orderDir: 'DESC', limit: 500,
+      );
+      final schools = await ApiService().getAll('schools', limit: 500);
+      final schoolsById = {for (final s in schools) s['id'].toString(): s};
+      for (final visit in response) {
+        visit['schools'] = schoolsById[visit['school_id']?.toString()];
+      }
 
       setState(() {
         _visits = List<Map<String, dynamic>>.from(response);
@@ -1518,10 +1505,9 @@ class _AgentSubmitOrderScreenState extends State<AgentSubmitOrderScreen> {
 
   Future<void> _fetchSchools() async {
     try {
-      final response = await Supabase.instance.client
-          .from('schools')
-          .select()
-          .order('name');
+      final response = await ApiService().getAll(
+        'schools', orderBy: 'name', orderDir: 'ASC', limit: 500,
+      );
 
       setState(() {
         _schools = List<Map<String, dynamic>>.from(response);
@@ -1604,14 +1590,18 @@ class _AgentDistributeSamplesScreenState
 
   Future<void> _fetchSamples() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       if (userId == null) return;
 
-      final response = await Supabase.instance.client
-          .from('school_sample_distributions')
-          .select('*, schools(name)')
-          .eq('agent_id', userId)
-          .order('distributed_at', ascending: false);
+      final response = await ApiService().getAll(
+        'school_sample_distributions', filter: {'agent_id': userId},
+        orderBy: 'distributed_at', orderDir: 'DESC', limit: 500,
+      );
+      final schools = await ApiService().getAll('schools', limit: 500);
+      final schoolsById = {for (final s in schools) s['id'].toString(): s};
+      for (final sample in response) {
+        sample['schools'] = schoolsById[sample['school_id']?.toString()];
+      }
 
       setState(() {
         _samples = List<Map<String, dynamic>>.from(response);

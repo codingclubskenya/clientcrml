@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/api_service.dart';
 
 /// Field-shift rules for daily check-in.
 ///
@@ -33,16 +33,11 @@ class DailyShift {
   /// Closes an open check-in once the calendar day has rolled over.
   /// Returns true when a check-out was written.
   static Future<bool> autoCheckoutIfNewDay({required String userId}) async {
-    final client = Supabase.instance.client;
-    final response =
-        await client
-            .from('visit_checkins')
-            .select('id, checkin_at')
-            .eq('agent_id', userId)
-            .isFilter('checkout_at', null)
-            .order('checkin_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+    final api = ApiService();
+    final rows = await api.getAll('visit_checkins',
+        filter: {'agent_id': userId, 'checkout_at': {'is': null}},
+        orderBy: 'checkin_at', orderDir: 'DESC', limit: 1);
+    final response = rows.isEmpty ? null : rows.first;
     if (response == null) return false;
 
     final checkInTime = DateTime.parse(
@@ -51,15 +46,12 @@ class DailyShift {
     if (!shouldAutoCheckout(checkInTime)) return false;
 
     final checkoutTime = DateTime.now();
-    await client
-        .from('visit_checkins')
-        .update({
+    await api.patch('visit_checkins', response['id'].toString(), {
           'checkout_at': checkoutTime.toUtc().toIso8601String(),
           'duration_seconds': checkoutTime.difference(checkInTime).inSeconds,
           'auto_checkout': true,
           'notes': 'Auto check-out at midnight to start a new day',
-        })
-        .eq('id', response['id']);
+        });
     return true;
   }
 }

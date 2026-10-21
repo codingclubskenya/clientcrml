@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
+import '../../services/api_service.dart';
 
 class TeamAttendancePage extends StatefulWidget {
   const TeamAttendancePage({super.key});
@@ -10,7 +10,6 @@ class TeamAttendancePage extends StatefulWidget {
 }
 
 class _TeamAttendancePageState extends State<TeamAttendancePage> {
-  final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -68,14 +67,14 @@ class _TeamAttendancePageState extends State<TeamAttendancePage> {
     final dayEnd = dayStart.add(const Duration(days: 1));
 
     try {
-      final response = await _supabase
-          .from('visit_checkins')
-          .select(
-            'id, agent_id, agent_name, checkin_at, checkout_at, duration_seconds, auto_checkout, gps_lat, gps_lng, location_text',
-          )
-          .gte('checkin_at', dayStart.toUtc().toIso8601String())
-          .lt('checkin_at', dayEnd.toUtc().toIso8601String())
-          .order('checkin_at', ascending: false);
+      final response = await ApiService().getAll(
+        'visit_checkins',
+        filter: {'checkin_at': {
+          'gte': dayStart.toUtc().toIso8601String(),
+          'lt': dayEnd.toUtc().toIso8601String(),
+        }},
+        orderBy: 'checkin_at', orderDir: 'DESC', limit: 500,
+      );
 
       final records = List<Map<String, dynamic>>.from(response);
       final Map<String, _AgentDay> byAgent = {};

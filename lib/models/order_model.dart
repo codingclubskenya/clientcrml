@@ -91,7 +91,7 @@ class OrderModel {
       notes: map['notes'],
       submittedAt: _parseDate(map['submitted_at'] ?? map['submittedAt']),
       approvedAt: _parseDate(map['approved_at'] ?? map['approvedAt']),
-      isSynced: map['isSynced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
-import '../../models/event_model.dart';
+import '../../services/api_service.dart';
 import 'event_date_format.dart';
 
 class EventCreatePage extends StatefulWidget {
@@ -13,7 +12,6 @@ class EventCreatePage extends StatefulWidget {
 }
 
 class _EventCreatePageState extends State<EventCreatePage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   final _formKey = GlobalKey<FormState>();
 
@@ -56,16 +54,12 @@ class _EventCreatePageState extends State<EventCreatePage> {
 
   Future<void> _loadRegions() async {
     try {
-      final data = await _supabase
-          .from('regions')
-          .select('region, sub_region')
-          .order('region')
-          .order('sub_region');
+      final data = await ApiService().getAll('regions', orderBy: 'region', orderDir: 'ASC', limit: 500);
 
       final regionSet = <String>{};
       final subregionList = <Map<String, dynamic>>[];
 
-      for (final item in data as List) {
+      for (final item in data) {
         final region = item['region']?.toString() ?? '';
         final subregion = item['sub_region']?.toString() ?? '';
         if (region.isNotEmpty) regionSet.add(region);
@@ -85,11 +79,7 @@ class _EventCreatePageState extends State<EventCreatePage> {
 
   Future<void> _loadSchools() async {
     try {
-      final data = await _supabase
-          .from('schools')
-          .select('id, name, county, region')
-          .order('name')
-          .limit(500);
+      final data = await ApiService().getAll('schools', orderBy: 'name', orderDir: 'ASC', limit: 500);
 
       setState(() {
         _schools = List<Map<String, dynamic>>.from(data);
@@ -173,7 +163,6 @@ class _EventCreatePageState extends State<EventCreatePage> {
     setState(() => _saving = true);
 
     try {
-      final currentUser = _supabase.auth.currentUser;
       final payload = <String, dynamic>{
         'name': _name.text.trim(),
         'event_type': _eventType.text.trim(),
@@ -187,7 +176,7 @@ class _EventCreatePageState extends State<EventCreatePage> {
         'notes': _notes.text.trim(),
         'status': _status,
         'products': _products,
-        'created_by': currentUser?.id,
+        'created_by': _dbService.getCurrentUserId(),
       };
 
       if (_start != null)
@@ -198,7 +187,7 @@ class _EventCreatePageState extends State<EventCreatePage> {
 
       if (eventId != null && _targets.isNotEmpty) {
         for (final target in _targets) {
-          await _supabase.from('event_tasks').insert({
+          await _dbService.createEventTask({
             'event_id': eventId,
             'title': 'Target: ${target['name']}',
             'description': 'Target value: ${target['value']}',
@@ -209,13 +198,6 @@ class _EventCreatePageState extends State<EventCreatePage> {
       }
 
       if (mounted) Navigator.pop(context);
-    } on PostgrestException catch (e) {
-      debugPrint('Event insert error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Save failed: ${e.message}')));
-      }
     } catch (e) {
       debugPrint('Save exception: $e');
       if (mounted) {

@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 enum ProjectQuestionType {
   shortAnswer,
@@ -83,27 +83,22 @@ class ProjectFormResponse {
 class ProjectFormStore {
   ProjectFormStore._();
 
-  static SupabaseClient get _supabase => Supabase.instance.client;
+  static ApiService get _api => ApiService();
 
   static Future<void> publish(ProjectForm form) async {
-    await _supabase.from('project_forms').insert({
+    await _api.create('project_forms', {
       'title': form.title,
       'description': form.description,
       'questions': form.questions.map(_questionToMap).toList(),
       'published_at': form.publishedAt.toUtc().toIso8601String(),
-      'created_by': _supabase.auth.currentUser?.id,
+      'created_by': _api.currentUserId,
       'assigned_user_ids': form.assignedUserIds,
     });
   }
 
   static Future<List<ProjectForm>> fetchPublishedForms() async {
-    final data = await _supabase
-        .from('project_forms')
-        .select(
-          'id, title, description, questions, published_at, created_by, assigned_user_ids',
-        )
-        .order('published_at', ascending: false);
-    return (data as List<dynamic>)
+    final data = await _api.getAll('project_forms', orderBy: 'published_at', orderDir: 'DESC', limit: 500);
+    return data
         .map((row) => _formFromMap(Map<String, dynamic>.from(row as Map)))
         .toList();
   }
@@ -113,10 +108,10 @@ class ProjectFormStore {
     required String formTitle,
     required Map<String, dynamic> answers,
   }) async {
-    await _supabase.from('project_form_responses').insert({
+    await _api.create('project_form_responses', {
       'form_id': formId,
       'form_title': formTitle,
-      'respondent_id': _supabase.auth.currentUser?.id,
+      'respondent_id': _api.currentUserId,
       'answers': answers,
       'submitted_at': DateTime.now().toUtc().toIso8601String(),
     });
@@ -126,23 +121,10 @@ class ProjectFormStore {
     String? formNameFilter,
   }) async {
     final filter = formNameFilter?.trim() ?? '';
-    final data =
-        filter.isEmpty
-            ? await _supabase
-                .from('project_form_responses')
-                .select(
-                  'id, form_id, form_title, respondent_id, answers, submitted_at',
-                )
-                .order('submitted_at', ascending: false)
-            : await _supabase
-                .from('project_form_responses')
-                .select(
-                  'id, form_id, form_title, respondent_id, answers, submitted_at',
-                )
-                .filter('form_title', 'ilike', '%$filter%')
-                .order('submitted_at', ascending: false);
+    final data = await _api.getAll('project_form_responses', orderBy: 'submitted_at', orderDir: 'DESC', limit: 500);
+    if (filter.isNotEmpty) data.removeWhere((row) => !row['form_title'].toString().toLowerCase().contains(filter.toLowerCase()));
 
-    return (data as List<dynamic>).map((row) {
+    return data.map((row) {
       final map = Map<String, dynamic>.from(row as Map);
       return _responseFromMap(map);
     }).toList();
@@ -154,27 +136,12 @@ class ProjectFormStore {
     int pageSize = 50,
   }) async {
     final from = page * pageSize;
-    final to = from + pageSize - 1;
     final filter = formNameFilter?.trim() ?? '';
-    final data =
-        filter.isEmpty
-            ? await _supabase
-                .from('project_form_responses')
-                .select(
-                  'id, form_id, form_title, respondent_id, answers, submitted_at',
-                )
-                .order('submitted_at', ascending: false)
-                .range(from, to)
-            : await _supabase
-                .from('project_form_responses')
-                .select(
-                  'id, form_id, form_title, respondent_id, answers, submitted_at',
-                )
-                .filter('form_title', 'ilike', '%$filter%')
-                .order('submitted_at', ascending: false)
-                .range(from, to);
+    final data = await _api.getAll('project_form_responses', orderBy: 'submitted_at', orderDir: 'DESC', limit: 500);
+    if (filter.isNotEmpty) data.removeWhere((row) => !row['form_title'].toString().toLowerCase().contains(filter.toLowerCase()));
+    final pageData = data.skip(from).take(pageSize).toList();
 
-    return (data as List<dynamic>).map((row) {
+    return pageData.map((row) {
       final map = Map<String, dynamic>.from(row as Map);
       return _responseFromMap(map);
     }).toList();
@@ -183,31 +150,22 @@ class ProjectFormStore {
   static Future<List<ProjectFormResponse>> fetchMyResponsesForForm(
     String formId,
   ) async {
-    final userId = _supabase.auth.currentUser?.id;
+    final userId = _api.currentUserId;
     if (userId == null) return <ProjectFormResponse>[];
 
-    final data = await _supabase
-        .from('project_form_responses')
-        .select('id, form_id, form_title, respondent_id, answers, submitted_at')
-        .eq('form_id', formId)
-        .eq('respondent_id', userId)
-        .order('submitted_at', ascending: false);
+    final data = await _api.getAll('project_form_responses', filter: {'form_id': formId, 'respondent_id': userId}, orderBy: 'submitted_at', orderDir: 'DESC', limit: 500);
 
-    return (data as List<dynamic>).map((row) {
+    return data.map((row) {
       final map = Map<String, dynamic>.from(row as Map);
       return _responseFromMap(map);
     }).toList();
   }
 
   static Future<List<ProjectFormResponse>> fetchMyResponses() async {
-    final userId = _supabase.auth.currentUser?.id;
+    final userId = _api.currentUserId;
     if (userId == null) return <ProjectFormResponse>[];
-    final data = await _supabase
-        .from('project_form_responses')
-        .select('id, form_id, form_title, respondent_id, answers, submitted_at')
-        .eq('respondent_id', userId)
-        .order('submitted_at', ascending: false);
-    return (data as List<dynamic>)
+    final data = await _api.getAll('project_form_responses', filter: {'respondent_id': userId}, orderBy: 'submitted_at', orderDir: 'DESC', limit: 500);
+    return data
         .map((row) => _responseFromMap(Map<String, dynamic>.from(row as Map)))
         .toList();
   }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class AdminAgentTrackerScreen extends StatefulWidget {
   const AdminAgentTrackerScreen({super.key});
@@ -13,7 +13,6 @@ class AdminAgentTrackerScreen extends StatefulWidget {
 }
 
 class _AdminAgentTrackerScreenState extends State<AdminAgentTrackerScreen> {
-  final _supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> _users = [];
   String? _selectedUserId;
@@ -75,10 +74,9 @@ class _AdminAgentTrackerScreenState extends State<AdminAgentTrackerScreen> {
   Future<void> _fetchUsers() async {
     try {
       // Fetch all assignable users (excluding admins, where role == 1)
-      final response = await _supabase
-          .from('users')
-          .select('id, full_name, email, role')
-          .neq('role', 1);
+      final response = await ApiService().getAll(
+        'users', filter: {'role': {'neq': 1}}, limit: 500,
+      );
 
       if (mounted) {
         setState(() {
@@ -96,24 +94,21 @@ class _AdminAgentTrackerScreenState extends State<AdminAgentTrackerScreen> {
     setState(() => _isLoadingData = true);
     try {
       // Fetch tasks targeted strictly to this user
-      final tasksResponse = await _supabase
-          .from('tasks')
-          .select('*')
-          .eq('assigned_to', userId)
-          .order('due_at', ascending: true);
+      final tasksResponse = await ApiService().getAll(
+        'tasks', filter: {'assigned_to': userId},
+        orderBy: 'due_at', orderDir: 'ASC', limit: 500,
+      );
 
       // Fetch assigned geofences
-      final geofencesResponse = await _supabase
-          .from('geofences')
-          .select('*')
-          .eq('assigned_to', userId);
+      final geofencesResponse = await ApiService().getAll(
+        'geofences', filter: {'assigned_to': userId}, limit: 500,
+      );
 
       // Fetch assigned route plans
-      final routePlansResponse = await _supabase
-          .from('route_plans')
-          .select('*')
-          .eq('assigned_to', userId)
-          .order('route_date', ascending: true);
+      final routePlansResponse = await ApiService().getAll(
+        'route_plans', filter: {'assigned_to': userId},
+        orderBy: 'route_date', orderDir: 'ASC', limit: 500,
+      );
 
       if (mounted) {
         setState(() {

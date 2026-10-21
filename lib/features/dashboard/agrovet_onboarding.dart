@@ -8,12 +8,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
 import '../../models/farmer_model.dart';
 import 'client_type_selector.dart';
+import '../../services/api_service.dart';
 
 class SchoolOnboarding extends StatefulWidget {
   const SchoolOnboarding({super.key});
@@ -346,7 +346,10 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       phone: phone,
       county: county,
       focusAreas: focusAreas,
-      bookCategory: _selectedBookProgram,
+      bookCategory: _selectedBookProgram ??
+          (_selectedBookPrograms.isNotEmpty
+              ? _selectedBookPrograms.join(', ')
+              : null),
       dealerType: _dealerType,
       shopCategory: _shopCategory,
       selectedProduct: _selectedProduct,
@@ -1628,18 +1631,35 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       'shopName': _shopNameController.text,
       'county': _selectedCounty,
       'contactName': _contactNameController.text,
+      'contactPhone': _contactPhoneController.text,
       'contactEmail': _contactEmailController.text,
+      'contactTitle': _contactTitleController.text,
+      'dealerType': _dealerType,
+      'shopCategory': _shopCategory,
+      'selectedProduct': _selectedProduct,
+      'partnerSubtype': _partnerSubtype,
+      'bookCategory': _selectedBookProgram ??
+          (_selectedBookPrograms.isNotEmpty
+              ? _selectedBookPrograms.join(', ')
+              : null),
+      'bookPrograms': _selectedBookPrograms,
       'samplesLeft': _samplesLeft,
+      'samplesToBeReturned': _samplesToBeReturned,
+      'selectedSampleBooks': _selectedSampleBooks,
+      'selectedLearningMaterials': _selectedLearningMaterials,
       'sampleProofCaptured': _sampleProofPhoto != null,
       'schoolOwnership': _schoolOwnership,
       'schoolOwnershipOther': _schoolOwnershipOtherController.text,
       'schoolPopulation': _schoolPopulationController.text,
       'schoolLifecycleStatus': _schoolLifecycleStatus,
       'engagementType': _engagementType,
-      'photoPath': _capturedPhoto?.path,
+      'feedback': _feedbackController.text,
+      'notes': _notesController.text,
       'photoCaptured': _capturedPhoto != null,
+      'photoPath': _capturedPhoto?.path,
       'gpsLatitude': _currentPosition?.latitude,
       'gpsLongitude': _currentPosition?.longitude,
+      'gpsAccuracy': _currentPosition?.accuracy,
       'captureStatus': _captureStatus,
     };
   }
@@ -1649,7 +1669,6 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       return {'photoUrl': null, 'photoPath': null};
     }
 
-    final supabase = Supabase.instance.client;
     final fileExt = _capturedPhoto!.path.split('.').last.toLowerCase();
     final safeName =
         _shopNameController.text.trim().isEmpty
@@ -1663,15 +1682,12 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
     final bytes = await _capturedPhoto!.readAsBytes();
 
     try {
-      await supabase.storage
-          .from('schools')
-          .uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: const FileOptions(upsert: true),
-          );
+      final photoUrl = await ApiService().uploadFile(
+        bucket: 'schools', fileName: fileName, bytes: bytes,
+      );
+      if (photoUrl == null) throw Exception('Upload failed');
       return {
-        'photoUrl': supabase.storage.from('schools').getPublicUrl(fileName),
+        'photoUrl': photoUrl,
         'photoPath': fileName,
       };
     } catch (e) {
@@ -1722,7 +1738,6 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
       return {'proofUrl': null, 'proofPath': null};
     }
 
-    final supabase = Supabase.instance.client;
     final fileExt = _sampleProofPhoto!.path.split('.').last.toLowerCase();
     final safeSchool =
         _shopNameController.text.trim().isEmpty
@@ -1736,15 +1751,12 @@ class _SchoolOnboardingState extends State<SchoolOnboarding> {
     final bytes = await _sampleProofPhoto!.readAsBytes();
 
     try {
-      await supabase.storage
-          .from('schools')
-          .uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: const FileOptions(upsert: true),
-          );
+      final proofUrl = await ApiService().uploadFile(
+        bucket: 'schools', fileName: fileName, bytes: bytes,
+      );
+      if (proofUrl == null) throw Exception('Upload failed');
       return {
-        'proofUrl': supabase.storage.from('schools').getPublicUrl(fileName),
+        'proofUrl': proofUrl,
         'proofPath': fileName,
       };
     } catch (e) {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 class AuditLogPage extends StatefulWidget {
   const AuditLogPage({super.key, this.entityId});
@@ -11,7 +11,6 @@ class AuditLogPage extends StatefulWidget {
 }
 
 class _AuditLogPageState extends State<AuditLogPage> {
-  final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _logs = [];
 
@@ -25,46 +24,56 @@ class _AuditLogPageState extends State<AuditLogPage> {
     setState(() => _isLoading = true);
     try {
       // 1. Fetch from audit_events
-      var query = _supabase
-          .from('audit_events')
-          .select('*, users!actor_id(full_name)');
-      if (widget.entityId != null) {
-        query = query.eq('entity_id', widget.entityId!);
-      }
-      final auditRes = await query
-          .order('created_at', ascending: false)
-          .limit(100);
+      final auditRes = await ApiService().getAll(
+        'audit_events',
+        filter: widget.entityId == null ? null : {'entity_id': widget.entityId},
+        orderBy: 'created_at', orderDir: 'DESC', limit: 100,
+      );
 
       // 2. Fetch from pipeline_history
-      var pipeQuery = _supabase
-          .from('pipeline_history')
-          .select('*, users!changed_by(full_name)');
-      if (widget.entityId != null) {
-        pipeQuery = pipeQuery.eq('pipeline_id', widget.entityId!);
-      }
-      final pipeRes = await pipeQuery
-          .order('changed_at', ascending: false)
-          .limit(100);
+      final pipeRes = await ApiService().getAll(
+        'pipeline_history',
+        filter: widget.entityId == null ? null : {'pipeline_id': widget.entityId},
+        orderBy: 'changed_at', orderDir: 'DESC', limit: 100,
+      );
 
       final List<Map<String, dynamic>> combined = [];
 
-      for (var a in auditRes) {
+      for (final a in auditRes) {
+        Map<String, dynamic>? actor;
+        final actorId = a['actor_id']?.toString();
+        if (actorId != null) {
+          try {
+            actor = Map<String, dynamic>.from(
+              await ApiService().getById('users', actorId),
+            );
+          } catch (_) {}
+        }
         combined.add({
           'date': DateTime.parse(a['created_at'].toString()),
           'title': '${a['action']} ${a['entity_type']}',
-          'subtitle': 'By ${a['users']?['full_name'] ?? 'System'}',
+          'subtitle': 'By ${actor?['full_name'] ?? 'System'}',
           'details': 'ID: ${a['entity_id']}',
           'icon': Icons.history,
           'color': Colors.blue,
         });
       }
 
-      for (var p in pipeRes) {
+      for (final p in pipeRes) {
+        Map<String, dynamic>? actor;
+        final actorId = p['changed_by']?.toString();
+        if (actorId != null) {
+          try {
+            actor = Map<String, dynamic>.from(
+              await ApiService().getById('users', actorId),
+            );
+          } catch (_) {}
+        }
         combined.add({
           'date': DateTime.parse(p['changed_at'].toString()),
           'title': 'Pipeline Stage Change',
           'subtitle': '${p['old_stage'] ?? 'Lead'} → ${p['new_stage']}',
-          'details': 'By ${p['users']?['full_name'] ?? 'System'}',
+          'details': 'By ${actor?['full_name'] ?? 'System'}',
           'icon': Icons.swap_horiz,
           'color': Colors.purple,
         });

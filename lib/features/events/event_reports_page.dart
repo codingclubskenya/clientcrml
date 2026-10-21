@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import 'event_date_format.dart';
 
@@ -11,7 +10,6 @@ class EventReportsPage extends StatefulWidget {
 }
 
 class _EventReportsPageState extends State<EventReportsPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   Map<String, dynamic>? _report;
@@ -87,11 +85,10 @@ class _EventReportsPageState extends State<EventReportsPage> {
     setState(() => _generating = true);
     try {
       final summary = await _dbService.getEventSummary(id);
-      final currentUser = _supabase.auth.currentUser;
 
       final reportPayload = {
         'event_id': id,
-        'created_by': currentUser?.id,
+        'created_by': _dbService.getCurrentUserId(),
         'summary':
             _summaryController.text.trim().isEmpty
                 ? _generateAutoSummary(summary)

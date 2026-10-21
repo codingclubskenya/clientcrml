@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class AdminAssignTaskScreen extends StatefulWidget {
   const AdminAssignTaskScreen({super.key});
@@ -10,7 +10,6 @@ class AdminAssignTaskScreen extends StatefulWidget {
 }
 
 class _AdminAssignTaskScreenState extends State<AdminAssignTaskScreen> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
 
   final TextEditingController _titleController = TextEditingController();
@@ -44,10 +43,9 @@ class _AdminAssignTaskScreenState extends State<AdminAssignTaskScreen> {
   // Fetch all non-admin users so we can filter them by role
   Future<void> _fetchUsers() async {
     try {
-      final response = await _supabase
-          .from('users')
-          .select('id, full_name, email, role')
-          .neq('role', 1); // Exclude other admins
+      final response = await ApiService().getAll(
+        'users', filter: {'role': {'neq': 1}}, limit: 500,
+      ); // Exclude other admins
 
       if (mounted) {
         setState(() {

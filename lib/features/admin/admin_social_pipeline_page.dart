@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../database/database_service.dart';
 import '../profile/crm_notification_service.dart';
 import 'admin_social_inbox_page.dart';
+import '../../services/api_service.dart';
 
 class AdminSocialPipelinePage extends StatefulWidget {
   const AdminSocialPipelinePage({super.key});
@@ -14,7 +14,6 @@ class AdminSocialPipelinePage extends StatefulWidget {
 }
 
 class _AdminSocialPipelinePageState extends State<AdminSocialPipelinePage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -50,15 +49,13 @@ class _AdminSocialPipelinePageState extends State<AdminSocialPipelinePage> {
   Future<void> _loadPipeline() async {
     setState(() => _isLoading = true);
     try {
-      final schoolsRes = await _supabase
-          .from('schools')
-          .select('id,name,phone,source,captured_by,created_at')
-          .order('created_at', ascending: false);
+      final schoolsRes = await ApiService().getAll(
+        'schools', orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
 
-      final salesRes = await _supabase
-          .from('school_sales')
-          .select('id,school_id,sale_status,expected_value,stage_updated_at')
-          .order('stage_updated_at', ascending: false);
+      final salesRes = await ApiService().getAll(
+        'school_sales', orderBy: 'stage_updated_at', orderDir: 'DESC', limit: 500,
+      );
 
       final latestSaleBySchool = <String, Map<String, dynamic>>{};
       for (final sale in List<Map<String, dynamic>>.from(salesRes)) {

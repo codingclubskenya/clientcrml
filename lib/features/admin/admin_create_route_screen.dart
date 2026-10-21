@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class AdminCreateRouteScreen extends StatefulWidget {
   const AdminCreateRouteScreen({super.key});
@@ -10,7 +10,6 @@ class AdminCreateRouteScreen extends StatefulWidget {
 }
 
 class _AdminCreateRouteScreenState extends State<AdminCreateRouteScreen> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _users = [];
@@ -33,15 +32,12 @@ class _AdminCreateRouteScreenState extends State<AdminCreateRouteScreen> {
   Future<void> _fetchData() async {
     try {
       // Fetch all assignable users (excluding admins, where role == 1)
-      final usersResponse = await _supabase
-          .from('users')
-          .select('id, full_name, email, role')
-          .neq('role', 1);
+      final usersResponse = await ApiService().getAll(
+        'users', filter: {'role': {'neq': 1}}, limit: 500,
+      );
 
       // Fetch all schools
-      final schoolsResponse = await _supabase
-          .from('schools')
-          .select('id, name');
+      final schoolsResponse = await ApiService().getAll('schools', limit: 500);
 
       if (mounted) {
         setState(() {
@@ -150,7 +146,7 @@ class _AdminCreateRouteScreenState extends State<AdminCreateRouteScreen> {
           'school_ids': routeSchoolIds,
           'notes': 'Planned stops: ${routeSchoolNames.join(', ')}',
           'status': 'assigned',
-          'created_by': _supabase.auth.currentUser?.id,
+          'created_by': _dbService.getCurrentUserId(),
         },
       );
 

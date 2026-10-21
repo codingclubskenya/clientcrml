@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
+import '../../services/api_service.dart';
 
 class RoutePlansManagementPage extends StatefulWidget {
   const RoutePlansManagementPage({super.key});
@@ -12,7 +12,6 @@ class RoutePlansManagementPage extends StatefulWidget {
 }
 
 class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
-  final _supabase = Supabase.instance.client;
   final _titleController = TextEditingController();
   final _notesController = TextEditingController();
 
@@ -52,8 +51,8 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
+      final userId = ApiService().currentUserId;
+      if (userId == null) {
         if (!mounted) return;
         setState(() {
           _plans = [];
@@ -63,23 +62,19 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
         return;
       }
       final results = await Future.wait([
-        _supabase
-            .from('route_plans')
-            .select(
-              'id, title, route_date, status, school_ids, notes, assigned_to, created_by',
-            )
-            .eq('created_by', user.id)
-            .order('route_date', ascending: false),
-        _supabase
-            .from('users')
-            .select('id, full_name, email, role')
-            .inFilter('role', [4, 5])
-            .order('full_name', ascending: true),
+        ApiService().getAll(
+          'route_plans', filter: {'created_by': userId},
+          orderBy: 'route_date', orderDir: 'DESC', limit: 500,
+        ),
+        ApiService().getAll(
+          'users', filter: {'role': {'in': [4, 5]}},
+          orderBy: 'full_name', orderDir: 'ASC', limit: 500,
+        ),
       ]);
-      final agents = List<Map<String, dynamic>>.from(results[1] as List);
+      final agents = List<Map<String, dynamic>>.from(results[1]);
       if (!mounted) return;
       setState(() {
-        _plans = List<Map<String, dynamic>>.from(results[0] as List);
+        _plans = List<Map<String, dynamic>>.from(results[0]);
         _agents = agents;
         _agentNames = {
           for (final agent in agents)
@@ -240,8 +235,8 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
   }
 
   Future<bool> _savePlan() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return false;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return false;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       _showMessage('Enter a route plan title.', error: true);
@@ -258,14 +253,15 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
       };
       if (_editingPlan == null) {
         payload['school_ids'] = <String>[];
-        payload['created_by'] = user.id;
-        await _supabase.from('route_plans').insert(payload);
+        payload['created_by'] = userId;
+        await ApiService().create('route_plans', payload);
       } else {
-        await _supabase
-            .from('route_plans')
-            .update(payload)
-            .eq('id', _editingPlan!['id'])
-            .eq('created_by', user.id);
+        if (_editingPlan!['created_by']?.toString() != userId) {
+          throw StateError('You can only update route plans you created.');
+        }
+        await ApiService().patch(
+          'route_plans', _editingPlan!['id'].toString(), payload,
+        );
       }
       await _load();
       _showMessage(
@@ -327,11 +323,13 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
     );
     if (selected == null || selected.isEmpty) return;
     try {
-      await _supabase
-          .from('route_plans')
-          .update({'assigned_to': selected, 'status': 'assigned'})
-          .eq('id', plan['id'])
-          .eq('created_by', _supabase.auth.currentUser!.id);
+      final userId = ApiService().currentUserId;
+      if (userId == null || plan['created_by']?.toString() != userId) {
+        throw StateError('You can only assign route plans you created.');
+      }
+      await ApiService().patch('route_plans', plan['id'].toString(), {
+        'assigned_to': selected, 'status': 'assigned',
+      });
       await _load();
       _showMessage('Route plan assigned.');
     } catch (e) {
@@ -360,13 +358,11 @@ class _RoutePlansManagementPageState extends State<RoutePlansManagementPage> {
     );
     if (confirmed != true) return;
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      await _supabase
-          .from('route_plans')
-          .delete()
-          .eq('id', plan['id'])
-          .eq('created_by', user.id);
+      final userId = ApiService().currentUserId;
+      if (userId == null || plan['created_by']?.toString() != userId) {
+        throw StateError('You can only delete route plans you created.');
+      }
+      await ApiService().delete('route_plans', plan['id'].toString());
       await _load();
       _showMessage('Route plan deleted.');
     } catch (e) {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class BasAlertsPage extends StatefulWidget {
   const BasAlertsPage({super.key});
@@ -12,7 +12,7 @@ class BasAlertsPage extends StatefulWidget {
 }
 
 class _BasAlertsPageState extends State<BasAlertsPage> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final ApiService _api = ApiService();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -28,8 +28,8 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
   }
 
   Future<void> _loadData() async {
-    final currentUser = _supabase.auth.currentUser;
-    if (currentUser == null) {
+    final currentUserId = _api.currentUserId;
+    if (currentUserId == null) {
       setState(() {
         _isLoading = false;
         _errorMessage = 'You must be signed in to view BAS alerts.';
@@ -39,22 +39,11 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
 
     try {
       Future<_AlertsData> fetchAlertsFor(String userId) async {
-        final routePlansResponse = await _supabase
-            .from('route_plans')
-            .select('*')
-            .eq('assigned_to', userId)
-            .order('route_date', ascending: true);
+        final routePlansResponse = await _api.getAll('route_plans', filter: {'assigned_to': userId}, orderBy: 'route_date', orderDir: 'ASC', limit: 500);
 
-        final geofencesResponse = await _supabase
-            .from('geofences')
-            .select('*')
-            .eq('assigned_to', userId);
+        final geofencesResponse = await _api.getAll('geofences', filter: {'assigned_to': userId}, limit: 500);
 
-        final tasksResponse = await _supabase
-            .from('tasks')
-            .select('*')
-            .eq('assigned_to', userId)
-            .order('due_at', ascending: true);
+        final tasksResponse = await _api.getAll('tasks', filter: {'assigned_to': userId}, orderBy: 'due_at', orderDir: 'ASC', limit: 500);
 
         final routePlans = List<Map<String, dynamic>>.from(routePlansResponse);
         final schoolIds = <String>{};
@@ -67,12 +56,7 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
 
         List<Map<String, dynamic>> schools = [];
         if (schoolIds.isNotEmpty) {
-          final schoolsResponse = await _supabase
-              .from('schools')
-              .select(
-                'id, name, county, phone, latitude, longitude, book_category',
-              )
-              .inFilter('id', schoolIds.toList());
+          final schoolsResponse = await _api.getAll('schools', filter: {'id': {'in': schoolIds.toList()}}, limit: 500);
           schools = List<Map<String, dynamic>>.from(schoolsResponse);
         }
 
@@ -84,7 +68,7 @@ class _BasAlertsPageState extends State<BasAlertsPage> {
         );
       }
 
-      final alertsData = await fetchAlertsFor(currentUser.id);
+      final alertsData = await fetchAlertsFor(currentUserId);
 
       if (!mounted) return;
       setState(() {

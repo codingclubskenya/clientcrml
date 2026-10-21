@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/colors.dart';
 import 'login_page.dart';
-import '../../database/database_service.dart';
-import '../../../models/user_model.dart';
+import '../../../services/api_service.dart';
 
 class DeHeusRegister extends StatefulWidget {
   const DeHeusRegister({super.key});
@@ -20,7 +18,6 @@ class _DeHeusRegisterState extends State<DeHeusRegister> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
-  final DatabaseService _dbService = DatabaseService();
 
   @override
   void dispose() {
@@ -257,39 +254,17 @@ class _DeHeusRegisterState extends State<DeHeusRegister> {
 
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final authResponse = await supabase.auth.signUp(
+      await ApiService().register(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        data: {
-          'full_name': _fullNameController.text.trim(),
-          'phone': _phoneNumberController.text.trim(),
-          'role': 5,
-        },
+        fullName: _fullNameController.text.trim(),
+        phone: _phoneNumberController.text.trim(),
+        role: 5,
       );
-
-      final user = authResponse.user;
-      if (user != null) {
-        UserModel newUser = UserModel(
-          id: user.id,
-          email: _emailController.text.trim(),
-          fullName: _fullNameController.text.trim(),
-          phone: _phoneNumberController.text.trim(),
-          role: 5, // Default role
-        );
-        if (authResponse.session != null) {
-          await _dbService.saveUser(newUser);
-        }
-
-        if (!mounted) return;
-        final requiresEmailVerification = authResponse.session == null;
+      if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              requiresEmailVerification
-                  ? "Registration successful. Check your email to verify your account, then sign in."
-                  : "Registration successful. You can now sign in.",
-            ),
+            content: const Text("Registration successful. You can now sign in."),
             backgroundColor: AppColors.primaryGreen,
           ),
         );
@@ -297,17 +272,11 @@ class _DeHeusRegisterState extends State<DeHeusRegister> {
           context,
           MaterialPageRoute(builder: (context) => const DeHeusLogin()),
         );
-      }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      final message = e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
     } catch (e) {
       if (!mounted) return;
+      final message = ApiService().authErrorMessage(e);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) {

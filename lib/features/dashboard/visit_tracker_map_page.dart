@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class VisitTrackerMapPage extends StatefulWidget {
   final Position? currentPosition;
@@ -21,7 +21,6 @@ class VisitTrackerMapPage extends StatefulWidget {
 }
 
 class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
-  final _supabase = Supabase.instance.client;
   final MapController _mapController = MapController();
   List<Map<String, dynamic>> _history = [];
   bool _isLoading = true;
@@ -64,21 +63,17 @@ class _VisitTrackerMapPageState extends State<VisitTrackerMapPage> {
   }
 
   Future<void> _loadHistory() async {
-    final userId = _supabase.auth.currentUser?.id;
+    final userId = ApiService().currentUserId;
     if (userId == null) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
-      final response = await _supabase
-          .from('visit_checkins')
-          .select(
-            'id, checkin_at, checkout_at, gps_lat, gps_lng, location_text, duration_seconds, auto_checkout',
-          )
-          .eq('agent_id', userId)
-          .order('checkin_at', ascending: false)
-          .limit(30);
+      final response = await ApiService().getAll(
+        'visit_checkins', filter: {'agent_id': userId},
+        orderBy: 'checkin_at', orderDir: 'DESC', limit: 30,
+      );
       if (!mounted) return;
       setState(() {
         _history = List<Map<String, dynamic>>.from(response);

@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 import '../../core/constants/colors.dart';
 
@@ -15,7 +15,6 @@ class RegionsPage extends StatefulWidget {
 }
 
 class _RegionsPageState extends State<RegionsPage> {
-  final _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
   DateTime? _lastUpdatedAt;
@@ -77,44 +76,25 @@ class _RegionsPageState extends State<RegionsPage> {
     final nowIso = now.toIso8601String();
 
     final results = await Future.wait<List<Map<String, dynamic>>>([
-      _fetchRows(() => _supabase.from('users').select('id, region'), 'users'),
+      _fetchRows(() => ApiService().getAll('users', limit: 500), 'users'),
       _fetchRows(
-        () => _supabase
-            .from('schools')
-            .select(
-              'id, name, county, dealer_type, shop_category, selected_product, partner_subtype, book_category, captured_by',
-            ),
+        () => ApiService().getAll('schools', limit: 500),
         'schools',
       ),
       _fetchRows(
-        () => _supabase
-            .from('school_visits')
-            .select('id, school_id, visited_at, visit_status')
-            .gte('visited_at', previousYearStartIso)
-            .lte('visited_at', nowIso),
+        () => ApiService().getAll('school_visits', filter: {
+          'visited_at': {'gte': previousYearStartIso, 'lte': nowIso},
+        }, limit: 500),
         'visits',
       ),
       _fetchRows(
-        () => _supabase
-            .from('school_sales')
-            .select(
-              'id, school_id, expected_value, sale_status, created_at, closed_at, stage_updated_at',
-            )
-            .eq('sale_status', 'won')
-            .or(
-              'created_at.gte.$previousYearStartIso,closed_at.gte.$previousYearStartIso,stage_updated_at.gte.$previousYearStartIso',
-            )
-            .lte('created_at', nowIso),
+        () => ApiService().getAll('school_sales', filter: {'sale_status': 'won'}, limit: 500),
         'sales',
       ),
       _fetchRows(
-        () => _supabase
-            .from('opportunity_activities')
-            .select(
-              'id, school_id, activity_type, activity_outcome, notes, next_action, created_at',
-            )
-            .gte('created_at', previousYearStartIso)
-            .lte('created_at', nowIso),
+        () => ApiService().getAll('opportunity_activities', filter: {
+          'created_at': {'gte': previousYearStartIso, 'lte': nowIso},
+        }, limit: 500),
         'activities',
       ),
     ]);

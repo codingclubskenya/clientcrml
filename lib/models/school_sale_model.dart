@@ -42,7 +42,6 @@ class SchoolSaleModel {
       'id': id,
       'school_id': schoolId,
       'agent_id': agentId,
-      'region_id': regionId,
       'package_name': packageName,
       'expected_value': expectedValue,
       'notes': notes,
@@ -80,7 +79,7 @@ class SchoolSaleModel {
       ),
       probability: _toInt(map['probability']),
       closedAt: _parseDate(map['closed_at'] ?? map['closedAt']),
-      isSynced: map['isSynced'] ?? map['is_synced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1 || map['is_synced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );

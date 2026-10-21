@@ -23,11 +23,11 @@ import '../events/events_list_page.dart';
 import '../catalog/product_list_screen.dart';
 import '../consignments/consignment_list_screen.dart';
 import '../welcome/auth/login_page.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/agent_dashboard_page.dart';
 import '../../../features/profile/profile_page.dart';
 import '../../../core/constants/bas_dashboard_page.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -37,7 +37,6 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   int _totalTasks = 0;
   int _totalGeofences = 0;
@@ -65,18 +64,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _refreshData() async {
     try {
-      final taskCount = await _supabase.from('tasks').count(CountOption.exact);
-      final geofenceCount = await _supabase
-          .from('geofences')
-          .count(CountOption.exact);
-      final schoolCount = await _supabase
-          .from('schools')
-          .count(CountOption.exact);
+      final counts = await Future.wait([
+        _countRows('tasks'),
+        _countRows('geofences'),
+        _countRows('schools'),
+      ]);
       if (mounted) {
         setState(() {
-          _totalTasks = taskCount;
-          _totalGeofences = geofenceCount;
-          _totalSchools = schoolCount;
+          _totalTasks = counts[0];
+          _totalGeofences = counts[1];
+          _totalSchools = counts[2];
         });
       }
     } catch (e) {
@@ -84,8 +81,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<int> _countRows(String table) async {
+    var count = 0;
+    var offset = 0;
+    while (true) {
+      final page = await ApiService().getAll(table, limit: 500, offset: offset);
+      count += page.length;
+      if (page.length < 500) return count;
+      offset += page.length;
+    }
+  }
+
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    await ApiService().logout();
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -809,7 +817,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildWelcomeCard() {
-    final email = _supabase.auth.currentUser?.email ?? 'Sales Manager';
+    final email = ApiService().cachedUser?['email']?.toString() ?? 'Sales Manager';
     final name = email.split('@').first;
 
     return Card(

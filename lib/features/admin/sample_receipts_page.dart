@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
+import '../../services/api_service.dart';
 
 class SampleReceiptsPage extends StatefulWidget {
   const SampleReceiptsPage({super.key});
@@ -11,7 +11,6 @@ class SampleReceiptsPage extends StatefulWidget {
 }
 
 class _SampleReceiptsPageState extends State<SampleReceiptsPage> {
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
   bool _isDemoData = false;
@@ -35,35 +34,37 @@ class _SampleReceiptsPageState extends State<SampleReceiptsPage> {
     });
 
     try {
-      final receiptsRes = await _supabase
-          .from('school_sample_distributions')
-          .select(
-            'id, school_id, agent_id, sample_name, sample_category, quantity, notes, distributed_at, stamped_receipt_url, stamped_receipt_path, schools(name), users(full_name, email)',
-          )
-          .order('distributed_at', ascending: false)
-          .limit(300);
-
-      final schoolsRes = await _supabase
-          .from('schools')
-          .select('id,name,county,photo_url,sample_proof_url,created_at')
-          .order('created_at', ascending: false)
-          .limit(400);
-
-      final ordersRes = await _supabase
-          .from('orders')
-          .select('agent_id, checkout_amount, status')
-          .order('created_at', ascending: false)
-          .limit(2000);
-
-      final salesRes = await _supabase
-          .from('school_sales')
-          .select('school_id, agent_id, expected_value, sale_status')
-          .order('created_at', ascending: false)
-          .limit(2000);
-
-      final receiptRows = List<Map<String, dynamic>>.from(
-        (receiptsRes as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      final receiptsRes = await ApiService().getAll(
+        'school_sample_distributions', orderBy: 'distributed_at',
+        orderDir: 'DESC', limit: 300,
       );
+
+      final schoolsRes = await ApiService().getAll(
+        'schools', orderBy: 'created_at', orderDir: 'DESC', limit: 400,
+      );
+      final usersRes = await ApiService().getAll('users', limit: 500);
+
+      final ordersRes = await ApiService().getAll(
+        'orders', orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
+
+      final salesRes = await ApiService().getAll(
+        'school_sales', orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
+
+      final receiptRows = List<Map<String, dynamic>>.from(receiptsRes);
+      final schoolById = {
+        for (final school in schoolsRes) school['id'].toString(): school,
+      };
+      final userById = {
+        for (final user in usersRes) user['id'].toString(): user,
+      };
+      for (final row in receiptRows) {
+        final schoolId = row['school_id']?.toString();
+        final agentId = row['agent_id']?.toString();
+        row['schools'] = schoolById[schoolId];
+        row['users'] = userById[agentId];
+      }
       if (!mounted) return;
 
       final demoMode = receiptRows.isEmpty;
@@ -71,27 +72,15 @@ class _SampleReceiptsPageState extends State<SampleReceiptsPage> {
       final seededSchools =
           demoMode
               ? _demoSchools()
-              : List<Map<String, dynamic>>.from(
-                (schoolsRes as List).map(
-                  (e) => Map<String, dynamic>.from(e as Map),
-                ),
-              );
+              : List<Map<String, dynamic>>.from(schoolsRes);
       final seededOrders =
           demoMode
               ? _demoOrders()
-              : List<Map<String, dynamic>>.from(
-                (ordersRes as List).map(
-                  (e) => Map<String, dynamic>.from(e as Map),
-                ),
-              );
+              : List<Map<String, dynamic>>.from(ordersRes);
       final seededSales =
           demoMode
               ? _demoSales()
-              : List<Map<String, dynamic>>.from(
-                (salesRes as List).map(
-                  (e) => Map<String, dynamic>.from(e as Map),
-                ),
-              );
+              : List<Map<String, dynamic>>.from(salesRes);
 
       setState(() {
         _isDemoData = demoMode;

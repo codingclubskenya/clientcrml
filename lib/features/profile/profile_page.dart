@@ -17,9 +17,9 @@ import '../../features/database/database_service.dart';
 import '../../features/events/events_list_page.dart';
 import '../../models/task_model.dart';
 import '../project/role5_project_forms_page.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/region_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 
 class SalesDashboard extends StatefulWidget {
   const SalesDashboard({super.key});
@@ -61,34 +61,25 @@ class _SalesDashboardState extends State<SalesDashboard> {
   }
 
   Future<void> _refreshCheckInStatus() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final userId = _dbService.getCurrentUserId();
     if (userId == null) return;
     try {
-      final res = await Supabase.instance.client
-          .from('visit_checkins')
-          .select('id')
-          .eq('agent_id', userId)
-          .isFilter('checkout_at', null)
-          .limit(1);
+      final res = await ApiService().getAll('visit_checkins', filter: {'agent_id': userId, 'checkout_at': {'is': null}}, limit: 1);
       if (!mounted) return;
       setState(() {
-        _isCheckedIn = (res as List).isNotEmpty;
+        _isCheckedIn = res.isNotEmpty;
       });
     } catch (_) {}
   }
 
   Future<void> _checkEventAssignment() async {
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null) return;
-      final assignments = await Supabase.instance.client
-          .from('event_assignments')
-          .select('id')
-          .eq('agent_id', currentUser.id)
-          .limit(1);
+      final currentUserId = _dbService.getCurrentUserId();
+      if (currentUserId == null) return;
+      final assignments = await ApiService().getAll('event_assignments', filter: {'agent_id': currentUserId}, limit: 1);
       if (mounted) {
         setState(() {
-          _isAssignedToEvent = (assignments as List).isNotEmpty;
+          _isAssignedToEvent = assignments.isNotEmpty;
         });
       }
     } catch (e) {
@@ -99,9 +90,9 @@ class _SalesDashboardState extends State<SalesDashboard> {
 
   Future<void> _loadUserInfo() async {
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null) return;
-      final user = await _dbService.getUser(currentUser.id);
+      final currentUserId = _dbService.getCurrentUserId();
+      if (currentUserId == null) return;
+      final user = await _dbService.getUser(currentUserId);
       if (!mounted) return;
       if (user == null) return;
       final users = await _dbService.getAllUsers();
@@ -124,12 +115,12 @@ class _SalesDashboardState extends State<SalesDashboard> {
   Future<void> _assignSupervisor(String? agentId) async {
     if (agentId == null) return;
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null) return;
+      final currentUserId = _dbService.getCurrentUserId();
+      if (currentUserId == null) return;
       final agentMatch = _agents.where((u) => u.id == agentId).toList();
       if (agentMatch.isEmpty) return;
       final agent = agentMatch.first;
-      final user = await _dbService.getUser(currentUser.id);
+      final user = await _dbService.getUser(currentUserId);
       if (user == null) return;
       final updated = user.copyWith(
         regionId: agent.regionId,
@@ -375,16 +366,16 @@ class _SalesDashboardState extends State<SalesDashboard> {
     final dbTasks = await _dbService.getTasksForRole(role);
 
     // Add Route Plans (visitations) assigned to the current user
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final currentUserId = _dbService.getCurrentUserId();
     if (currentUserId != null) {
       try {
-        final visitations = await Supabase.instance.client
-            .from('visitations')
-            .select('id, visit_date, status, notes, schools(name)')
-            .eq('assigned_to', currentUserId);
+        final visitations = await ApiService().getAll('visitations', filter: {'assigned_to': currentUserId}, limit: 500);
+        final visitSchoolIds = visitations.map((v) => v['school_id']?.toString() ?? '').where((id) => id.isNotEmpty).toSet().toList();
+        final visitSchools = visitSchoolIds.isEmpty ? <dynamic>[] : await ApiService().getAll('schools', filter: {'id': {'in': visitSchoolIds}}, limit: 500);
+        final visitSchoolNameById = {for (final s in visitSchools) s['id'].toString(): s['name']?.toString()};
 
         for (final v in visitations) {
-          final schoolName = v['schools']?['name'] ?? 'School Visit';
+          final schoolName = visitSchoolNameById[v['school_id']?.toString()] ?? 'School Visit';
           final notes = v['notes'] ?? 'No notes';
           final visitDateStr = v['visit_date'] as String?;
           final status = v['status'] == 'completed' ? 'closed' : 'open';
@@ -403,10 +394,7 @@ class _SalesDashboardState extends State<SalesDashboard> {
         }
 
         // Route Plans (route_plans table) assigned to the current user
-        final routePlans = await Supabase.instance.client
-            .from('route_plans')
-            .select('id, title, route_date, status, notes, school_ids')
-            .eq('assigned_to', currentUserId);
+        final routePlans = await ApiService().getAll('route_plans', filter: {'assigned_to': currentUserId}, limit: 500);
 
         for (final rp in routePlans) {
           final rawSchoolIds = rp['school_ids'];
@@ -880,7 +868,7 @@ class _SalesDashboardState extends State<SalesDashboard> {
                               ),
                             );
                           } else if (value == 'logout') {
-                            await Supabase.instance.client.auth.signOut();
+                            await ApiService().logout();
                             if (context.mounted) {
                               Navigator.pushNamedAndRemoveUntil(
                                 context,
@@ -1213,12 +1201,8 @@ class _SalesDashboardState extends State<SalesDashboard> {
     final currentUserId = _dbService.getCurrentUserId();
     if (currentUserId != null) {
       try {
-        final consignmentData = await Supabase.instance.client
-            .from('orders')
-            .select('id')
-            .eq('agent_id', currentUserId)
-            .eq('order_type', 'consignment');
-        consignments = (consignmentData as List).length;
+        final consignmentData = await ApiService().getAll('orders', filter: {'agent_id': currentUserId, 'order_type': 'consignment'}, limit: 500);
+        consignments = consignmentData.length;
       } catch (e) {
         debugPrint('Error counting consignments: $e');
       }
@@ -1474,17 +1458,11 @@ class _SalesDashboardState extends State<SalesDashboard> {
       if (task.id.startsWith('visit_')) {
         final visitId = task.id.substring(6);
         final visitStatus = isDone ? 'completed' : 'pending';
-        await Supabase.instance.client
-            .from('visitations')
-            .update({'status': visitStatus})
-            .eq('id', visitId);
+        await ApiService().patch('visitations', visitId, {'status': visitStatus});
       } else if (task.id.startsWith('routeplan_')) {
         final planId = task.id.substring(10);
         final planStatus = isDone ? 'completed' : 'in_progress';
-        await Supabase.instance.client
-            .from('route_plans')
-            .update({'status': planStatus})
-            .eq('id', planId);
+        await ApiService().patch('route_plans', planId, {'status': planStatus});
       } else {
         await _dbService.updateTaskStatus(task.id, newStatus);
       }
@@ -1525,16 +1503,10 @@ class _SalesDashboardState extends State<SalesDashboard> {
     try {
       if (task.id.startsWith('visit_')) {
         final visitId = task.id.substring(6);
-        await Supabase.instance.client
-            .from('visitations')
-            .delete()
-            .eq('id', visitId);
+        await ApiService().delete('visitations', visitId);
       } else if (task.id.startsWith('routeplan_')) {
         final planId = task.id.substring(10);
-        await Supabase.instance.client
-            .from('route_plans')
-            .delete()
-            .eq('id', planId);
+        await ApiService().delete('route_plans', planId);
       } else {
         await _dbService.deleteTask(task.id);
       }

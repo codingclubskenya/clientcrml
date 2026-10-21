@@ -59,8 +59,8 @@ class MessageModel {
       body: map['body'] ?? '',
       relatedSchoolId: map['related_school_id'] ?? map['relatedSchoolId'],
       relatedTaskId: map['related_task_id'] ?? map['relatedTaskId'],
-      isRead: map['is_read'] ?? map['isRead'] ?? false,
-      isSynced: map['isSynced'] ?? false,
+      isRead: map['is_read'] == true || map['is_read'] == 1 || map['isRead'] == true || map['isRead'] == 1,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
 import 'event_date_format.dart';
@@ -14,7 +13,6 @@ class EventManagerDashboardPage extends StatefulWidget {
 
 class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
   final DatabaseService _dbService = DatabaseService();
-  final _supabase = Supabase.instance.client;
 
   Map<String, dynamic> _dashboardData = {};
   List<Map<String, dynamic>> _topEvents = [];
@@ -125,12 +123,9 @@ class _EventManagerDashboardPageState extends State<EventManagerDashboardPage> {
 
   Future<List<String>> _getRegions() async {
     try {
-      final data = await _supabase
-          .from('events')
-          .select('region')
-          .not('region', 'is', null);
+      final data = await _dbService.getEvents();
       final regions =
-          (data as List)
+          data
               .map((e) => e['region']?.toString() ?? '')
               .where((r) => r.isNotEmpty)
               .toSet()

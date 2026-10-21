@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 import '../../core/constants/bas_screens.dart';
 import '../../core/constants/colors.dart';
@@ -16,11 +16,11 @@ class BasDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = Supabase.instance.client.auth.currentUser;
+    final currentUser = ApiService().cachedUser;
     final displayName =
-        currentUser?.userMetadata?['full_name']?.toString() ??
-        currentUser?.userMetadata?['name']?.toString() ??
-        currentUser?.email?.split('@').first ??
+        currentUser?['full_name']?.toString() ??
+        currentUser?['name']?.toString() ??
+        currentUser?['email']?.toString().split('@').first ??
         'BAS User';
 
     return Scaffold(
@@ -32,7 +32,7 @@ class BasDashboardPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
+              await ApiService().logout();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
@@ -76,7 +76,7 @@ class BasDashboardPage extends StatelessWidget {
                     'My Consignments',
                     AppColors.primaryGreen,
                     ConsignmentListScreen(
-                      businessAssociateId: currentUser?.id,
+                      businessAssociateId: currentUser?['id']?.toString(),
                       businessAssociateName: displayName,
                     ),
                   ),

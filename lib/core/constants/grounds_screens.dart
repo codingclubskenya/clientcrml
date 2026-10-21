@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 import 'colors.dart';
 
@@ -25,14 +25,13 @@ class _GroundsRoutePlanScreenState extends State<GroundsRoutePlanScreen> {
 
   Future<void> _fetchRoutePlans() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       if (userId == null) return;
 
-      final response = await Supabase.instance.client
-          .from('route_plans')
-          .select()
-          .eq('assigned_to', userId)
-          .order('route_date', ascending: true);
+      final response = await ApiService().getAll(
+        'route_plans', filter: {'assigned_to': userId},
+        orderBy: 'route_date', orderDir: 'ASC', limit: 500,
+      );
 
       setState(() {
         _routePlans = List<Map<String, dynamic>>.from(response);
@@ -115,14 +114,19 @@ class _GroundsSchoolVisitsScreenState extends State<GroundsSchoolVisitsScreen> {
 
   Future<void> _fetchVisits() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       if (userId == null) return;
 
-      final response = await Supabase.instance.client
-          .from('school_visits')
-          .select('*, schools(name)')
-          .eq('agent_id', userId)
-          .order('visited_at', ascending: false);
+      final response = await ApiService().getAll(
+        'school_visits', filter: {'agent_id': userId},
+        orderBy: 'visited_at', orderDir: 'DESC', limit: 500,
+      );
+      for (final visit in response) {
+        final schoolId = visit['school_id']?.toString();
+        if (schoolId != null) {
+          try { visit['schools'] = await ApiService().getById('schools', schoolId); } catch (_) {}
+        }
+      }
 
       setState(() {
         _visits = List<Map<String, dynamic>>.from(response);
@@ -213,15 +217,20 @@ class _GroundsDeliveriesScreenState extends State<GroundsDeliveriesScreen> {
 
   Future<void> _fetchDeliveries() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       if (userId == null) return;
 
       // Grounds typically distribute 'Operations' materials like 'Delivery Check Sheets'
-      final response = await Supabase.instance.client
-          .from('school_sample_distributions')
-          .select('*, schools(name)')
-          .eq('agent_id', userId)
-          .order('distributed_at', ascending: false);
+      final response = await ApiService().getAll(
+        'school_sample_distributions', filter: {'agent_id': userId},
+        orderBy: 'distributed_at', orderDir: 'DESC', limit: 500,
+      );
+      for (final delivery in response) {
+        final schoolId = delivery['school_id']?.toString();
+        if (schoolId != null) {
+          try { delivery['schools'] = await ApiService().getById('schools', schoolId); } catch (_) {}
+        }
+      }
 
       setState(() {
         _deliveries = List<Map<String, dynamic>>.from(response);

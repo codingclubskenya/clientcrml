@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'school_profile_page.dart';
+import '../../services/api_service.dart';
 
 class DuplicateDetectionPage extends StatefulWidget {
   const DuplicateDetectionPage({super.key});
@@ -10,7 +10,6 @@ class DuplicateDetectionPage extends StatefulWidget {
 }
 
 class _DuplicateDetectionPageState extends State<DuplicateDetectionPage> {
-  final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _duplicates = [];
 
@@ -23,8 +22,8 @@ class _DuplicateDetectionPageState extends State<DuplicateDetectionPage> {
   Future<void> _fetchDuplicates() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _supabase.rpc('get_potential_duplicates');
-      _duplicates = List<Map<String, dynamic>>.from(response as List);
+      final response = await ApiService().getPotentialSchoolDuplicates();
+      _duplicates = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching duplicates: $e');
     } finally {

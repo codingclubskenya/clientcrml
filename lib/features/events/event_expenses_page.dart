@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 import 'event_date_format.dart';
 
 class EventExpensesPage extends StatefulWidget {
@@ -11,7 +11,6 @@ class EventExpensesPage extends StatefulWidget {
 }
 
 class _EventExpensesPageState extends State<EventExpensesPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _expenses = [];
   bool _loading = true;
@@ -60,10 +59,9 @@ class _EventExpensesPageState extends State<EventExpensesPage> {
     }
 
     try {
-      final currentUser = _supabase.auth.currentUser;
       await _dbService.createEventExpense({
         'event_id': id,
-        'submitted_by': currentUser?.id,
+        'submitted_by': _dbService.getCurrentUserId(),
         'expense_type': _typeController.text.trim(),
         'amount': double.tryParse(_amountController.text.trim()) ?? 0,
         'notes': _notesController.text.trim(),
@@ -138,14 +136,11 @@ class _EventExpensesPageState extends State<EventExpensesPage> {
 
     if (result == true && _typeController.text.isNotEmpty) {
       try {
-        await _supabase
-            .from('event_expenses')
-            .update({
+        await ApiService().patch('event_expenses', expense['id'].toString(), {
               'expense_type': _typeController.text.trim(),
               'amount': double.tryParse(_amountController.text.trim()) ?? 0,
               'notes': _notesController.text.trim(),
-            })
-            .eq('id', expense['id']);
+            });
         _typeController.clear();
         _amountController.clear();
         _notesController.clear();
@@ -183,7 +178,7 @@ class _EventExpensesPageState extends State<EventExpensesPage> {
 
     if (confirmed == true) {
       try {
-        await _supabase.from('event_expenses').delete().eq('id', expense['id']);
+        await ApiService().delete('event_expenses', expense['id'].toString());
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Expense deleted')));

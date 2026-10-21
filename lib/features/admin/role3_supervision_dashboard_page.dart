@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class Role3SupervisionDashboardPage extends StatefulWidget {
   const Role3SupervisionDashboardPage({super.key});
@@ -12,7 +12,7 @@ class Role3SupervisionDashboardPage extends StatefulWidget {
 
 class _Role3SupervisionDashboardPageState
     extends State<Role3SupervisionDashboardPage> {
-  final _supabase = Supabase.instance.client;
+  final _api = ApiService();
   final _dbService = DatabaseService();
   bool _isLoading = true;
   String? _selectedCounty;
@@ -86,23 +86,14 @@ class _Role3SupervisionDashboardPageState
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final currentUser = _supabase.auth.currentUser;
-      if (currentUser == null) return;
+      final currentUserId = _api.currentUserId;
+      if (currentUserId == null) return;
 
-      final currentUserRow =
-          await _supabase
-              .from('users')
-              .select('region, role')
-              .eq('id', currentUser.id)
-              .maybeSingle();
+      final currentUserRow = await _api.getById('users', currentUserId);
       final supervisorRegion =
           (currentUserRow?['region'] ?? '').toString().trim();
 
-      final usersResponse = await _supabase
-          .from('users')
-          .select('id, full_name, email, role, region')
-          .eq('role', 5)
-          .eq('region', supervisorRegion);
+      final usersResponse = await _api.getAll('users', filter: {'role': 5, 'region': supervisorRegion}, limit: 500);
       final users = List<Map<String, dynamic>>.from(usersResponse);
       final userIds = users.map((u) => u['id'].toString()).toList();
 
@@ -115,42 +106,22 @@ class _Role3SupervisionDashboardPageState
       List<Map<String, dynamic>> notes = [];
 
       if (userIds.isNotEmpty) {
-        final tasksResponse = await _supabase
-            .from('tasks')
-            .select('id, assigned_to, status, due_at, title')
-            .inFilter('assigned_to', userIds);
+        final tasksResponse = await _api.getAll('tasks', filter: {'assigned_to': {'in': userIds}}, limit: 500);
         tasks = List<Map<String, dynamic>>.from(tasksResponse);
 
-        final routesResponse = await _supabase
-            .from('route_plans')
-            .select('id, assigned_to, route_date, status')
-            .inFilter('assigned_to', userIds)
-            .order('route_date', ascending: false);
+        final routesResponse = await _api.getAll('route_plans', filter: {'assigned_to': {'in': userIds}}, orderBy: 'route_date', orderDir: 'DESC', limit: 500);
         routes = List<Map<String, dynamic>>.from(routesResponse);
 
-        final geofenceResponse = await _supabase
-            .from('geofences')
-            .select('id, name, region, assigned_to, updated_at')
-            .inFilter('assigned_to', userIds)
-            .order('updated_at', ascending: false);
+        final geofenceResponse = await _api.getAll('geofences', filter: {'assigned_to': {'in': userIds}}, orderBy: 'updated_at', orderDir: 'DESC', limit: 500);
         geofences = List<Map<String, dynamic>>.from(geofenceResponse);
 
         try {
-          final alertResponse = await _supabase
-              .from('supervisor_alerts')
-              .select('*')
-              .inFilter('user_id', userIds)
-              .order('created_at', ascending: false);
+          final alertResponse = await _api.getAll('supervisor_alerts', filter: {'user_id': {'in': userIds}}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
           alerts = List<Map<String, dynamic>>.from(alertResponse);
         } catch (_) {}
 
         try {
-          final breachResponse = await _supabase
-              .from('geofence_events')
-              .select('*')
-              .eq('event_type', 'breach')
-              .inFilter('user_id', userIds)
-              .order('created_at', ascending: false);
+          final breachResponse = await _api.getAll('geofence_events', filter: {'event_type': 'breach', 'user_id': {'in': userIds}}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
           breaches = List<Map<String, dynamic>>.from(breachResponse);
         } catch (_) {}
 
@@ -170,10 +141,7 @@ class _Role3SupervisionDashboardPageState
           final startIso = start.toIso8601String();
           final endIso = now.toIso8601String();
 
-          final scorecardsResponse = await _supabase.rpc(
-            'get_role5_performance',
-            params: {'p_start_date': startIso, 'p_end_date': endIso},
-          );
+          final scorecardsResponse = await _api.getRole5Performance(start: startIso, end: endIso);
 
           final allScorecards = List<Map<String, dynamic>>.from(
             scorecardsResponse as List,
@@ -187,12 +155,12 @@ class _Role3SupervisionDashboardPageState
         }
 
         try {
-          final notesResponse = await _supabase
-              .from('supervisor_notes')
-              .select('*, users!supervisor_notes_user_id_fkey(full_name)')
-              .inFilter('user_id', userIds)
-              .order('created_at', ascending: false);
+          final notesResponse = await _api.getAll('supervisor_notes', filter: {'user_id': {'in': userIds}}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
           notes = List<Map<String, dynamic>>.from(notesResponse);
+          final namesById = {for (final user in users) user['id'].toString(): user['full_name']?.toString() ?? user['email']?.toString() ?? 'Unknown'};
+          for (final note in notes) {
+            note['users'] = {'full_name': namesById[note['user_id']?.toString()] ?? 'Unknown'};
+          }
         } catch (_) {}
       }
 
@@ -270,7 +238,7 @@ class _Role3SupervisionDashboardPageState
         'status': 'open',
         'region': _selectedCounty,
         'notes': 'Escalated by supervisor from command center.',
-        'created_by': _supabase.auth.currentUser?.id,
+        'created_by': _api.currentUserId,
       },
     );
     await _loadData();
@@ -284,10 +252,7 @@ class _Role3SupervisionDashboardPageState
     if (candidate == null) return;
     final due = DateTime.tryParse((candidate['due_at'] ?? '').toString());
     if (due == null) return;
-    await _supabase
-        .from('tasks')
-        .update({'due_at': due.add(const Duration(days: 1)).toIso8601String()})
-        .eq('id', candidate['id']);
+    await _api.patch('tasks', candidate['id'].toString(), {'due_at': due.add(const Duration(days: 1)).toIso8601String()});
     await _loadData();
   }
 
@@ -395,7 +360,7 @@ class _Role3SupervisionDashboardPageState
         await _dbService.insertWithOfflineQueue(
           table: 'supervisor_notes',
           payload: {
-            'supervisor_id': _supabase.auth.currentUser?.id,
+            'supervisor_id': _api.currentUserId,
             'user_id': userId,
             'region': _selectedCounty,
             'context_type': contextType,
@@ -421,18 +386,15 @@ class _Role3SupervisionDashboardPageState
       orElse: () => null,
     );
     if (pending == null) return;
-    await _supabase
-        .from('route_plans')
-        .update({
+    await _api.patch('route_plans', pending['id'].toString(), {
           'status': approve ? 'approved' : 'rejected',
-          'reviewed_by': _supabase.auth.currentUser?.id,
+          'reviewed_by': _api.currentUserId,
           'reviewed_at': DateTime.now().toIso8601String(),
           'review_note':
               approve
                   ? 'Approved by Role 3 supervisor.'
                   : 'Rejected. Needs correction.',
-        })
-        .eq('id', pending['id']);
+        });
     await _loadData();
   }
 
@@ -441,14 +403,11 @@ class _Role3SupervisionDashboardPageState
     if (filtered.isEmpty) return;
     final newAssignee = filtered.first['id']?.toString();
     if (newAssignee == null) return;
-    await _supabase
-        .from('route_plans')
-        .update({'assigned_to': newAssignee})
-        .eq('id', routeId);
+    await _api.patch('route_plans', routeId, {'assigned_to': newAssignee});
     await _dbService.insertWithOfflineQueue(
       table: 'audit_events',
       payload: {
-        'actor_id': _supabase.auth.currentUser?.id,
+        'actor_id': _api.currentUserId,
         'action': 'reassign_route',
         'entity_type': 'route_plans',
         'entity_id': routeId,
@@ -464,14 +423,11 @@ class _Role3SupervisionDashboardPageState
     if (filtered.isEmpty) return;
     final newAssignee = filtered.first['id']?.toString();
     if (newAssignee == null) return;
-    await _supabase
-        .from('geofences')
-        .update({'assigned_to': newAssignee, 'region': _selectedCounty})
-        .eq('id', geofenceId);
+    await _api.patch('geofences', geofenceId, {'assigned_to': newAssignee, 'region': _selectedCounty});
     await _dbService.insertWithOfflineQueue(
       table: 'audit_events',
       payload: {
-        'actor_id': _supabase.auth.currentUser?.id,
+        'actor_id': _api.currentUserId,
         'action': 'reassign_geofence',
         'entity_type': 'geofences',
         'entity_id': geofenceId,

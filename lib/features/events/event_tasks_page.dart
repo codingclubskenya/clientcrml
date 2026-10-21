@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import 'event_date_format.dart';
+import '../../services/api_service.dart';
 
 class EventTasksPage extends StatefulWidget {
   const EventTasksPage({super.key});
@@ -11,7 +11,6 @@ class EventTasksPage extends StatefulWidget {
 }
 
 class _EventTasksPageState extends State<EventTasksPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _tasks = [];
   bool _loading = true;
@@ -139,13 +138,10 @@ class _EventTasksPageState extends State<EventTasksPage> {
 
     if (result == true && _titleController.text.isNotEmpty) {
       try {
-        await _supabase
-            .from('event_tasks')
-            .update({
+        await ApiService().patch('event_tasks', task['id'].toString(), {
               'title': _titleController.text.trim(),
               'description': _descriptionController.text.trim(),
-            })
-            .eq('id', task['id']);
+            });
         _titleController.clear();
         _descriptionController.clear();
         _load();
@@ -180,7 +176,7 @@ class _EventTasksPageState extends State<EventTasksPage> {
 
     if (confirmed == true) {
       try {
-        await _supabase.from('event_tasks').delete().eq('id', task['id']);
+        await ApiService().delete('event_tasks', task['id'].toString());
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Task deleted')));

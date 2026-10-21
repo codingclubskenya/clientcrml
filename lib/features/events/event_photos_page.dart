@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 import 'event_date_format.dart';
 
 class EventPhotosPage extends StatefulWidget {
@@ -13,7 +13,6 @@ class EventPhotosPage extends StatefulWidget {
 }
 
 class _EventPhotosPageState extends State<EventPhotosPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _photos = [];
   bool _loading = true;
@@ -62,16 +61,15 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       final file = File(image.path);
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
 
-      await _supabase.storage.from('event_photos').upload(fileName, file);
-
-      final imageUrl = _supabase.storage
-          .from('event_photos')
-          .getPublicUrl(fileName);
-
-      final currentUser = _supabase.auth.currentUser;
+      final imageUrl = await ApiService().uploadFile(
+        bucket: 'event_photos',
+        fileName: fileName,
+        bytes: await file.readAsBytes(),
+      );
+      if (imageUrl == null) throw Exception('The photo upload failed');
       await _dbService.uploadEventPhoto({
         'event_id': id,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'photo_url': imageUrl,
         'photo_path': fileName,
         'photo_type': 'General',
@@ -108,16 +106,15 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
       final file = File(image.path);
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
 
-      await _supabase.storage.from('event_photos').upload(fileName, file);
-
-      final imageUrl = _supabase.storage
-          .from('event_photos')
-          .getPublicUrl(fileName);
-
-      final currentUser = _supabase.auth.currentUser;
+      final imageUrl = await ApiService().uploadFile(
+        bucket: 'event_photos',
+        fileName: fileName,
+        bytes: await file.readAsBytes(),
+      );
+      if (imageUrl == null) throw Exception('The photo upload failed');
       await _dbService.uploadEventPhoto({
         'event_id': id,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'photo_url': imageUrl,
         'photo_path': fileName,
         'photo_type': 'Gallery',
@@ -162,12 +159,7 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
 
     if (confirmed == true) {
       try {
-        final photoPath = photo['photo_path']?.toString();
-        if (photoPath != null && photoPath.isNotEmpty) {
-          await _supabase.storage.from('event_photos').remove([photoPath]);
-        }
-
-        await _supabase.from('event_photos').delete().eq('id', photo['id']);
+        await ApiService().delete('event_photos', photo['id'].toString());
 
         if (mounted) {
           ScaffoldMessenger.of(
@@ -219,10 +211,9 @@ class _EventPhotosPageState extends State<EventPhotosPage> {
 
     if (result != null) {
       try {
-        await _supabase
-            .from('event_photos')
-            .update({'caption': result})
-            .eq('id', photo['id']);
+        await ApiService().patch('event_photos', photo['id'].toString(), {
+          'caption': result,
+        });
         _load();
       } catch (e) {
         if (mounted) {

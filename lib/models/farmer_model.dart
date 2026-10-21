@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 class SchoolModel {
@@ -99,20 +100,13 @@ class SchoolModel {
       'name': name,
       'phone': phone,
       'county': county,
-      'focusAreas': focusAreas,
+      'source': 'manual',
+      'focusAreas': jsonEncode(focusAreas),
       'book_category': bookCategory,
       'dealer_type': dealerType,
       'shop_category': shopCategory,
       'selected_product': selectedProduct,
       'partner_subtype': partnerSubtype,
-      'competitor_analysis': competitorAnalysis,
-      'school_level': schoolLevel,
-      'designation': designation,
-      'projected_quantity': projectedQuantity,
-      'samples_to_be_returned': samplesToBeReturned,
-      'learning_materials': learningMaterials,
-      'book_programs': bookPrograms,
-      'institution_category_other': institutionCategoryOther,
       'latitude': latitude,
       'longitude': longitude,
       'gps_accuracy_meters': gpsAccuracyMeters,
@@ -123,12 +117,11 @@ class SchoolModel {
       'capture_status': captureStatus,
       'contact_name': contactName,
       'contact_phone': contactPhone,
-      'contact_email': contactEmail,
       'contact_title': contactTitle,
       'feedback': feedback,
       'notes': notes,
       'samples_left': samplesLeft,
-      'sample_books': sampleBooks?.join(','),
+      'sample_book': sampleBooks?.join(','),
       'sample_proof_url': sampleProofUrl,
       'sample_proof_path': sampleProofPath,
       'school_ownership': schoolOwnership,
@@ -153,7 +146,7 @@ class SchoolModel {
       name: map['name'],
       phone: map['phone'],
       county: map['county'],
-      focusAreas: List<String>.from(map['focusAreas'] ?? const []),
+      focusAreas: _parseFocusAreas(map['focusAreas']),
       bookCategory: map['book_category'] ?? map['bookCategory'],
       dealerType: map['dealer_type'] ?? map['dealerType'],
       shopCategory: map['shop_category'] ?? map['shopCategory'],
@@ -202,7 +195,7 @@ class SchoolModel {
       schoolLifecycleStatus:
           map['school_lifecycle_status'] ?? map['schoolLifecycleStatus'],
       engagementType: map['engagement_type'] ?? map['engagementType'],
-      isSynced: map['isSynced'] ?? map['is_synced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1 || map['is_synced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );
@@ -213,6 +206,21 @@ class SchoolModel {
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
+  }
+
+  static List<String> _parseFocusAreas(dynamic value) {
+    if (value == null) return [];
+    if (value is List) return List<String>.from(value);
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) return List<String>.from(decoded);
+      } catch (e) {
+        // Not JSON - treat as single value
+      }
+      return [value];
+    }
+    return [];
   }
 
   static double? _parseDouble(dynamic value) {

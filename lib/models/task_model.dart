@@ -43,7 +43,7 @@ class TaskModel {
       dueAt: _parseDate(map['due_at'] ?? map['dueAt']),
       status: map['status'] ?? 'open',
       createdBy: map['created_by'] ?? map['createdBy'],
-      isSynced: map['isSynced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
     );
   }
 

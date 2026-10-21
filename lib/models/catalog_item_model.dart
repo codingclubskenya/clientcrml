@@ -61,8 +61,8 @@ class CatalogItemModel {
       unitPrice: _parseAmount(map['unit_price'] ?? map['unitPrice']),
       stockQty: _parseInt(map['stock_qty'] ?? map['stockQty']),
       description: map['description'],
-      isActive: map['is_active'] ?? map['isActive'] ?? true,
-      isSynced: map['isSynced'] ?? false,
+      isActive: map['is_active'] == true || map['is_active'] == 1 || map['isActive'] == true || map['isActive'] == 1,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );

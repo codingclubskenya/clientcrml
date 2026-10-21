@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/colors.dart';
 import 'login_page.dart';
+import '../../../services/api_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({
@@ -31,14 +31,17 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _showPasswordForm = false;
+  String? _resetToken;
 
   @override
   void initState() {
     super.initState();
     if (widget.code != null && widget.code!.isNotEmpty) {
-      _exchangeCodeAndShowPasswordForm();
-    } else if (widget.accessToken != null && widget.refreshToken != null) {
-      _setSessionAndShowPasswordForm();
+      _resetToken = widget.code;
+      _showPasswordForm = true;
+    } else if (widget.accessToken != null || widget.refreshToken != null) {
+      _resetToken = widget.accessToken ?? widget.refreshToken;
+      _showPasswordForm = true;
     }
   }
 
@@ -60,66 +63,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     return error.toString();
   }
 
-  Future<void> _exchangeCodeAndShowPasswordForm() async {
-    if (_isLoading) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final supabase = Supabase.instance.client;
-      await supabase.auth.exchangeCodeForSession(widget.code!);
-
-      if (!mounted) return;
-      setState(() => _showPasswordForm = true);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_friendlyErrorMessage(e)),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _setSessionAndShowPasswordForm() async {
-    if (_isLoading) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final supabase = Supabase.instance.client;
-      await supabase.auth.setSession(widget.refreshToken!);
-
-      if (!mounted) return;
-      setState(() => _showPasswordForm = true);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_friendlyErrorMessage(e)),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   Future<void> _sendResetLink() async {
     if (_isLoading) return;
 
@@ -137,25 +80,22 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final redirectTo = 'https://other-ashen.vercel.app/reset-password';
-      await supabase.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
+      final response = await ApiService().requestPasswordReset(email: email);
 
       if (!mounted) return;
+      _resetToken = response['resetToken']?.toString();
+      setState(() => _showPasswordForm = _resetToken != null);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'If an account exists for $email, a password reset link has been sent.',
+            _resetToken == null
+                ? 'If an account exists for $email, password reset instructions will be sent.'
+                : 'Reset token generated. Set your new password below.',
           ),
           backgroundColor: AppColors.primaryGreen,
         ),
       );
       Navigator.pop(context);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,8 +139,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      await supabase.auth.updateUser(UserAttributes(password: password));
+      final token = _resetToken;
+      if (token == null || token.isEmpty) {
+        throw StateError('Open a valid password reset link first.');
+      }
+      await ApiService().updatePassword(token: token, password: password);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -212,11 +155,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const DeHeusLogin()),
         (route) => false,
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;

@@ -101,7 +101,7 @@ class Product {
     minStock: _parseInt(map['minStock']),
     maxStock: _parseInt(map['maxStock']),
     imageUrl: _optStr(map['imageUrl']),
-    isActive: map['isActive'] == true,
+    isActive: map['isActive'] == true || map['isActive'] == 1,
     author: _optStr(map['author']),
     publisher: _optStr(map['publisher']),
     isbn: _optStr(map['isbn']),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import '../profile/crm_notification_service.dart';
+import '../../services/api_service.dart';
 
 class AdminPipelineDataPage extends StatefulWidget {
   const AdminPipelineDataPage({super.key});
@@ -11,7 +11,6 @@ class AdminPipelineDataPage extends StatefulWidget {
 }
 
 class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   bool _loading = true;
   String _stageFilter = 'all';
@@ -70,15 +69,14 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
       Future<List<Map<String, dynamic>>> runSalesQuery(
         String selectClause,
       ) async {
-        dynamic query = _supabase.from('school_sales').select(selectClause);
-        if (_stageFilter != 'all') {
-          query = query.eq('sale_status', _stageFilter.trim().toLowerCase());
-        }
-        query = query.order('updated_at', ascending: false);
-        final res = await query;
-        var rows = List<Map<String, dynamic>>.from(
-          (res as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        final res = await ApiService().getAll(
+          'school_sales',
+          filter: _stageFilter == 'all'
+              ? null
+              : {'sale_status': _stageFilter.trim().toLowerCase()},
+          orderBy: 'updated_at', orderDir: 'DESC', limit: 500,
         );
+        var rows = List<Map<String, dynamic>>.from(res);
         if (_stageFilter != 'all') {
           final wanted = _stageFilter.trim().toLowerCase();
           rows =
@@ -144,16 +142,10 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
       final schoolNamesById = <String, String>{};
       if (schoolIds.isNotEmpty) {
         try {
-          final schoolRows = await _supabase
-              .from('schools')
-              .select('id,name')
-              .filter(
-                'id',
-                'in',
-                '(${schoolIds.map((e) => '"$e"').join(',')})',
-              );
-          for (final item in schoolRows as List) {
-            final map = Map<String, dynamic>.from(item as Map);
+          final schoolRows = await ApiService().getAll('schools', filter: {
+            'id': {'in': schoolIds},
+          }, limit: 500);
+          for (final map in schoolRows) {
             schoolNamesById[map['id'].toString()] =
                 map['name']?.toString() ?? '-';
           }
@@ -163,26 +155,21 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
       final userNamesById = <String, String>{};
       if (userIds.isNotEmpty) {
         try {
-          final userRows = await _supabase
-              .from('users')
-              .select('id,full_name,email')
-              .filter('id', 'in', '(${userIds.map((e) => '"$e"').join(',')})');
-          for (final item in userRows as List) {
-            final map = Map<String, dynamic>.from(item as Map);
+          final userRows = await ApiService().getAll('users', filter: {
+            'id': {'in': userIds},
+          }, limit: 500);
+          for (final map in userRows) {
             userNamesById[map['id'].toString()] =
                 map['full_name']?.toString() ?? map['email']?.toString() ?? '-';
           }
         } catch (_) {}
       }
 
-      final ownersRes = await _supabase
-          .from('users')
-          .select('id,full_name,email,role')
-          .inFilter('role', [2, 3, 4, 5])
-          .order('full_name', ascending: true);
-      final owners = List<Map<String, dynamic>>.from(
-        (ownersRes as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      final ownersRes = await ApiService().getAll('users',
+        filter: {'role': {'in': [2, 3, 4, 5]}},
+        orderBy: 'full_name', orderDir: 'ASC', limit: 500,
       );
+      final owners = List<Map<String, dynamic>>.from(ownersRes);
 
       if (!mounted) return;
       setState(() {
@@ -246,16 +233,13 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
     );
     if (updated == null) return;
 
-    await _supabase
-        .from('school_sales')
-        .update({
+    await ApiService().patch('school_sales', row['id'].toString(), {
           'sale_status': updated,
           'probability': _probabilityForStage(updated),
           'stage_updated_at': DateTime.now().toIso8601String(),
           'closed_at':
               updated == 'won' ? DateTime.now().toIso8601String() : null,
-        })
-        .eq('id', row['id']);
+        });
     await _load();
   }
 
@@ -325,10 +309,9 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
       },
     );
     if (updated == null) return;
-    await _supabase
-        .from('school_sales')
-        .update({'agent_id': updated})
-        .eq('id', row['id']);
+    await ApiService().patch('school_sales', row['id'].toString(), {
+      'agent_id': updated,
+    });
     await _load();
   }
 
@@ -411,12 +394,10 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
     final schoolId = row['school_id']?.toString();
     if (schoolId == null || schoolId.isEmpty) return;
 
-    final followUps = await _supabase
-        .from('school_follow_ups')
-        .select('next_step,due_at,follow_up_status,created_at')
-        .eq('school_id', schoolId)
-        .order('created_at', ascending: false)
-        .limit(20);
+    final followUps = await ApiService().getAll(
+      'school_follow_ups', filter: {'school_id': schoolId},
+      orderBy: 'created_at', orderDir: 'DESC', limit: 20,
+    );
 
     if (!mounted) return;
 
@@ -425,7 +406,7 @@ class _AdminPipelineDataPageState extends State<AdminPipelineDataPage> {
       isScrollControlled: true,
       builder: (context) {
         final timelineItems = List<Map<String, dynamic>>.from(
-          (followUps as List).map((e) => Map<String, dynamic>.from(e as Map)),
+          followUps.map((e) => Map<String, dynamic>.from(e as Map)),
         );
         return SafeArea(
           child: Padding(

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import 'audit_log_page.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class SchoolProfilePage extends StatefulWidget {
   const SchoolProfilePage({super.key, required this.schoolId});
@@ -17,7 +17,7 @@ class SchoolProfilePage extends StatefulWidget {
 }
 
 class _SchoolProfilePageState extends State<SchoolProfilePage> {
-  final _supabase = Supabase.instance.client;
+  final _api = ApiService();
   bool _isLoading = true;
 
   Map<String, dynamic>? _schoolData;
@@ -37,31 +37,16 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
     setState(() => _isLoading = true);
     try {
       final responses = await Future.wait([
-        _supabase.from('schools').select().eq('id', widget.schoolId).single(),
-        _supabase
-            .from('school_sales')
-            .select()
-            .eq('school_id', widget.schoolId)
-            .maybeSingle(),
-        _supabase
-            .from('school_visits')
-            .select()
-            .eq('school_id', widget.schoolId)
-            .order('visited_at', ascending: false),
-        _supabase
-            .from('opportunity_activities')
-            .select()
-            .eq('school_id', widget.schoolId)
-            .order('created_at', ascending: false),
-        _supabase
-            .from('orders')
-            .select()
-            .eq('school_id', widget.schoolId)
-            .order('created_at', ascending: false),
+        _api.getById('schools', widget.schoolId),
+        _api.getAll('school_sales', filter: {'school_id': widget.schoolId}, limit: 1),
+        _api.getAll('school_visits', filter: {'school_id': widget.schoolId}, orderBy: 'visited_at'),
+        _api.getAll('opportunity_activities', filter: {'school_id': widget.schoolId}, orderBy: 'created_at'),
+        _api.getAll('orders', filter: {'school_id': widget.schoolId}, orderBy: 'created_at'),
       ]);
 
       _schoolData = responses[0] as Map<String, dynamic>;
-      _activeSale = responses[1] as Map<String, dynamic>?;
+      final sales = List<Map<String, dynamic>>.from(responses[1] as List);
+      _activeSale = sales.isEmpty ? null : sales.first;
       _visits = List<Map<String, dynamic>>.from(responses[2] as List);
       _activities = List<Map<String, dynamic>>.from(responses[3] as List);
       _orders = List<Map<String, dynamic>>.from(responses[4] as List);
@@ -702,9 +687,7 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
                           .toList();
 
                   try {
-                    await _supabase
-                        .from('schools')
-                        .update({
+                    await _api.patch('schools', widget.schoolId, {
                           'name': nameController.text.trim(),
                           'phone': phoneController.text.trim(),
                           'county': countyController.text.trim(),
@@ -723,7 +706,7 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
                               contactPhoneController.text.trim().isEmpty
                                   ? null
                                   : contactPhoneController.text.trim(),
-                          'focusAreas':
+                          'focus_areas':
                               focusAreas.isEmpty
                                   ? const ['General']
                                   : focusAreas,
@@ -732,8 +715,7 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
                                   ? null
                                   : notesController.text.trim(),
                           'updated_at': DateTime.now().toIso8601String(),
-                        })
-                        .eq('id', widget.schoolId);
+                        });
 
                     if (!context.mounted) return;
                     Navigator.pop(context, true);
@@ -847,13 +829,13 @@ class _SchoolProfilePageState extends State<SchoolProfilePage> {
                 onPressed: () async {
                   if (controller.text.isEmpty) return;
                   try {
-                    await _supabase.from('opportunity_activities').insert({
+                    await _api.create('opportunity_activities', {
                       'school_id': widget.schoolId,
                       'opportunity_id': _activeSale?['id'],
                       'activity_type': type,
                       'activity_outcome': outcomeController.text,
                       'notes': controller.text,
-                      'actor_id': _supabase.auth.currentUser?.id,
+                      'actor_id': _api.currentUserId,
                     });
                     if (mounted) Navigator.pop(this.context);
                     _fetchData();

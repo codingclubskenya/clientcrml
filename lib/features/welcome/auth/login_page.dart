@@ -9,7 +9,7 @@ import '../../../core/constants/colors.dart';
 import '../../admin/admin_dashboard_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../admin/admin_dashboard_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/api_service.dart';
 import '../../../core/constants/bas_dashboard_page.dart';
 import '../../../core/constants/agent_dashboard_page.dart';
 import '../../profile/profile_page.dart';
@@ -42,7 +42,7 @@ class _DeHeusLoginState extends State<DeHeusLogin> {
     if (error is TimeoutException) {
       return 'Connection timed out. Please try again.';
     }
-    return error.toString();
+    return ApiService().authErrorMessage(error);
   }
 
   Future<void> _loginUser() async {
@@ -50,24 +50,14 @@ class _DeHeusLoginState extends State<DeHeusLogin> {
 
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final authResponse = await supabase.auth.signInWithPassword(
+      final authResponse = await ApiService().login(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
-      final user = authResponse.user;
-      if (user != null) {
-        // Fetch the role directly from the public.users table to avoid model parsing errors
-        final userData =
-            await supabase
-                .from('users')
-                .select('role')
-                .eq('id', user.id)
-                .maybeSingle();
-
-        final metadataRole = user.userMetadata?['role']?.toString();
-        final dbRole = userData?['role'] as int?;
+      final userData = Map<String, dynamic>.from(authResponse['user'] as Map);
+      {
+        final metadataRole = userData['role']?.toString();
+        final dbRole = int.tryParse(metadataRole ?? '');
 
         if (!mounted) return;
         final resolvedRole =
@@ -112,12 +102,6 @@ class _DeHeusLoginState extends State<DeHeusLogin> {
           (route) => false,
         );
       }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      final message = e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

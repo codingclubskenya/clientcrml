@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import '../../core/constants/colors.dart';
@@ -60,15 +61,15 @@ class _CatalogImportPageState extends State<CatalogImportPage> {
         withData: true,
       );
 
-      if (result != null && result.files.single.bytes != null) {
-        final bytes = result.files.single.bytes!;
-        final content = utf8.decode(bytes);
+      if (result.isNotEmpty && result.single.path != null) {
+        final file = File(result.single.path!);
+        final content = utf8.decode(await file.readAsBytes());
         setState(() {
           _csvController.text = content;
-          _pickedFileName = result.files.single.name;
+          _pickedFileName = result.single.name;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loaded: ${result.files.single.name}')),
+          SnackBar(content: Text('Loaded: ${result.single.name}')),
         );
       }
     } catch (e) {

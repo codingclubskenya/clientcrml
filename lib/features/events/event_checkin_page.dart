@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../database/database_service.dart';
 import 'event_date_format.dart';
+import '../../services/api_service.dart';
 
 class EventCheckinPage extends StatefulWidget {
   const EventCheckinPage({super.key});
@@ -14,7 +14,6 @@ class EventCheckinPage extends StatefulWidget {
 }
 
 class _EventCheckinPageState extends State<EventCheckinPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _checkins = [];
@@ -39,7 +38,7 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
     setState(() => _loading = true);
     try {
       final checkins = await _dbService.getEventCheckins(id);
-      final currentUserId = _supabase.auth.currentUser?.id;
+      final currentUserId = _dbService.getCurrentUserId();
 
       bool hasCheckedIn = false;
       String? lastCheckinId;
@@ -107,8 +106,7 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
       final fileName =
           'selfie_${DateTime.now().millisecondsSinceEpoch}_${image.name}';
 
-      await _supabase.storage.from('event_selfies').upload(fileName, file);
-      return _supabase.storage.from('event_selfies').getPublicUrl(fileName);
+      return ApiService().uploadFile(bucket: 'event_selfies', fileName: fileName, bytes: await file.readAsBytes());
     } catch (e) {
       debugPrint('Selfie upload error: $e');
       return null;
@@ -128,10 +126,9 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
 
       final selfieUrl = await _takeSelfie();
 
-      final currentUser = _supabase.auth.currentUser;
       await _dbService.checkinToEvent({
         'event_id': id,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'gps_lat': position.latitude,
         'gps_lng': position.longitude,
         'geofence_verified': true,
@@ -165,10 +162,9 @@ class _EventCheckinPageState extends State<EventCheckinPage> {
 
       final selfieUrl = await _takeSelfie();
 
-      final currentUser = _supabase.auth.currentUser;
       await _dbService.checkinToEvent({
         'event_id': id,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'gps_lat': position.latitude,
         'gps_lng': position.longitude,
         'geofence_verified': true,

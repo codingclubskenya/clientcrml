@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import '../../core/constants/colors.dart';
 import '../../models/consignment_model.dart';
 import '../../models/user_model.dart';
 import '../../services/catalog_service.dart';
+import '../../services/api_service.dart';
 import '../consignments/consignment_list_screen.dart';
 
 class EventOrdersPage extends StatefulWidget {
@@ -15,7 +15,6 @@ class EventOrdersPage extends StatefulWidget {
 }
 
 class _EventOrdersPageState extends State<EventOrdersPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _eventOrders = [];
@@ -49,15 +48,12 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
   /// business-associate key when validating stock against the
   /// local consignment service.
   String? get _currentBusinessAssociateId =>
-      _currentUserModel?.id ?? _supabase.auth.currentUser?.id;
+      _currentUserModel?.id ?? _dbService.getCurrentUserId();
 
   String? get _currentBusinessAssociate {
-    final user = _supabase.auth.currentUser;
     final name =
         _currentUserModel?.fullName ??
-        user?.userMetadata?['full_name']?.toString() ??
-        user?.userMetadata?['name']?.toString() ??
-        user?.email?.split('@').first;
+        _currentUserModel?.email?.split('@').first;
     return (name == null || name.isEmpty) ? null : name;
   }
 
@@ -83,9 +79,10 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     if (id == null) return;
     setState(() => _loading = true);
     try {
-      final currentUser = _supabase.auth.currentUser;
-      final currentUserModel =
-          currentUser == null ? null : await _dbService.getUser(currentUser.id);
+      final currentUserId = _dbService.getCurrentUserId();
+      final currentUserModel = currentUserId == null
+          ? null
+          : await _dbService.getUser(currentUserId);
       final orders = await _dbService.getEventOrders(id);
       final available = await _getAvailableOrders(id);
       final products = await _loadProducts();
@@ -110,7 +107,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   Future<List<Map<String, dynamic>>> _loadProducts() async {
     // Merge the shared in-memory catalog (same source used by
-    // /consignments and /catalog/products) with the Supabase
+    // /consignments and /catalog/products) with the API
     // `catalog_items` table so event sales stay in sync.
     final serviceMap = <String, Map<String, dynamic>>{};
     for (final p in _catalog.products) {
@@ -127,12 +124,12 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     }
 
     try {
-      final data = await _supabase
-          .from('catalog_items')
-          .select('id, name, sku, unit_price, item_type')
-          .eq('is_active', true)
-          .order('name');
-      for (final row in List<Map<String, dynamic>>.from(data)) {
+      final data = await ApiService().getAll(
+        'catalog_items', filter: {'is_active': true},
+        orderBy: 'name', orderDir: 'ASC', limit: 500,
+      );
+      for (final raw in data) {
+        final row = Map<String, dynamic>.from(raw as Map);
         final id = row['id']?.toString() ?? '';
         if (id.isEmpty) continue;
         if (serviceMap.containsKey(id)) {
@@ -140,7 +137,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
           // updated by consignment sales) but keep DB metadata.
           serviceMap[id] = {...serviceMap[id]!, ...row};
         } else {
-          serviceMap[id] = {...row, '_source': 'supabase'};
+          serviceMap[id] = {...row, '_source': 'api'};
         }
       }
     } catch (e) {
@@ -151,48 +148,50 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   Future<List<Map<String, dynamic>>> _loadSales(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_sales')
-          .select('*, catalog_items(name, sku), users(full_name)')
-          .eq('event_id', eventId)
-          .order('sold_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
-    } catch (e) {
-      if (e is PostgrestException && e.code == 'PGRST205') {
-        debugPrint(
-          'event_sales table is missing from the current Supabase schema. '
-          'Apply supabase/schema_updates_event_sales.sql.',
-        );
-      } else {
-        debugPrint('Error loading sales: $e');
+      final data = await ApiService().getAll(
+        'event_sales', filter: {'event_id': eventId},
+        orderBy: 'sold_at', orderDir: 'DESC', limit: 500,
+      );
+      final rows = List<Map<String, dynamic>>.from(data);
+      for (final row in rows) {
+        final productId = row['product_id']?.toString();
+        final agentId = row['agent_id']?.toString();
+        if (productId != null) {
+          try { row['catalog_items'] = await ApiService().getById('catalog_items', productId); } catch (_) {}
+        }
+        if (agentId != null) {
+          try { row['users'] = await ApiService().getById('users', agentId); } catch (_) {}
+        }
       }
+      return rows;
+    } catch (e) {
+      debugPrint('Error loading sales: $e');
       return <Map<String, dynamic>>[];
     }
   }
 
   Future<List<Map<String, dynamic>>> _getAvailableOrders(String eventId) async {
     try {
-      final linkedOrderIds = await _supabase
-          .from('event_orders')
-          .select('order_id')
-          .eq('event_id', eventId);
+      final linkedOrderIds = await ApiService().getAll(
+        'event_orders', filter: {'event_id': eventId}, limit: 500,
+      );
 
       final linkedIds =
-          (linkedOrderIds as List)
+          linkedOrderIds
               .map((e) => e['order_id']?.toString() ?? '')
               .where((id) => id.isNotEmpty)
               .toList();
 
-      var query = _supabase
-          .from('orders')
-          .select(
-            'id, order_number, school_id, checkout_amount, status, created_at, schools(name)',
-          )
-          .order('created_at', ascending: false)
-          .limit(50);
-
-      final data = await query;
+      final data = await ApiService().getAll(
+        'orders', orderBy: 'created_at', orderDir: 'DESC', limit: 50,
+      );
       final allOrders = List<Map<String, dynamic>>.from(data);
+      for (final order in allOrders) {
+        final schoolId = order['school_id']?.toString();
+        if (schoolId != null) {
+          try { order['schools'] = await ApiService().getById('schools', schoolId); } catch (_) {}
+        }
+      }
 
       return allOrders
           .where((o) => !linkedIds.contains(o['id']?.toString()))
@@ -208,11 +207,10 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
     if (eventId == null) return;
 
     try {
-      final currentUser = _supabase.auth.currentUser;
       await _dbService.linkOrderToEvent({
         'event_id': eventId,
         'order_id': orderId,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
       });
 
       if (mounted) {
@@ -232,7 +230,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
   Future<void> _unlinkOrder(String eventOrderId) async {
     try {
-      await _supabase.from('event_orders').delete().eq('id', eventOrderId);
+      await ApiService().delete('event_orders', eventOrderId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Order unlinked from event')),
@@ -531,7 +529,7 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
   }
 
   /// Returns `true` if the sale was successfully recorded against
-  /// the user's consignment allocation and Supabase. When the user
+  /// the user's consignment allocation and the event sales record. When the user
   /// has no active consignment for the product, or the requested
   /// quantity exceeds the remaining allocation, the sale is rejected.
   Future<bool> _recordSale(
@@ -559,16 +557,15 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
 
     if (hasSeller && consignmentUpdated == null) {
       // Allocation missing or insufficient. Bail out before writing
-      // to Supabase so the rest of the system stays consistent.
+      // to the API so the rest of the system stays consistent.
       return false;
     }
 
     try {
-      final currentUser = _supabase.auth.currentUser;
-      await _supabase.from('event_sales').insert({
+      await ApiService().create('event_sales', {
         'event_id': eventId,
         'product_id': productId,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'quantity': quantity,
         'amount': amount,
         'payment_method': paymentMethod,
@@ -584,18 +581,6 @@ class _EventOrdersPageState extends State<EventOrdersPage> {
       _load();
       return true;
     } catch (e) {
-      if (e is PostgrestException && e.code == 'PGRST205') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Sales table is not set up yet. Apply the event_sales migration.',
-              ),
-            ),
-          );
-        }
-        return false;
-      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,

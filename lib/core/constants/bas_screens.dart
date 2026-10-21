@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 import 'colors.dart';
 
 // --- REGIONAL COVERAGE SCREEN ---
@@ -24,10 +24,9 @@ class _BasRegionalCoverageScreenState extends State<BasRegionalCoverageScreen> {
   Future<void> _fetchSchools() async {
     try {
       // Fetch schools to show regional footprint
-      final response = await Supabase.instance.client
-          .from('schools')
-          .select('name, county, phone')
-          .order('created_at', ascending: false);
+      final response = await ApiService().getAll(
+        'schools', orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
 
       if (mounted) {
         setState(() {
@@ -184,11 +183,10 @@ class _BasApproveOrdersScreenState extends State<BasApproveOrdersScreen> {
   Future<void> _fetchPendingOrders() async {
     try {
       // Try to fetch orders where status is pending
-      final response = await Supabase.instance.client
-          .from('orders')
-          .select()
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
+      final response = await ApiService().getAll(
+        'orders', filter: {'status': 'pending'},
+        orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
 
       if (mounted) {
         setState(() {

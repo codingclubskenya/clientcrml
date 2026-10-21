@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/farmer_model.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class ImportSchoolsPage extends StatefulWidget {
   const ImportSchoolsPage({super.key});
@@ -78,7 +78,7 @@ class _ImportSchoolsPageState extends State<ImportSchoolsPage> {
     setState(() => _importing = true);
     try {
       final headers = rows.first.map((h) => h.trim().toLowerCase()).toList();
-      final currentUser = Supabase.instance.client.auth.currentUser;
+      final currentUserId = ApiService().currentUserId;
       final schools = <SchoolModel>[];
 
       for (final row in rows.skip(1)) {
@@ -101,7 +101,7 @@ class _ImportSchoolsPageState extends State<ImportSchoolsPage> {
             county: county,
             focusAreas: const [],
             bookCategory: record['book_category']?.trim(),
-            capturedBy: currentUser?.id,
+            capturedBy: currentUserId,
             capturedAt: DateTime.now(),
             captureStatus: 'Imported via CSV',
             isSynced: false,

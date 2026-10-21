@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
-import '../../models/user_model.dart';
 import '../../models/region_model.dart';
+import '../../services/api_service.dart';
 
 class AddTeamMemberForm extends StatefulWidget {
   const AddTeamMemberForm({super.key});
@@ -21,13 +20,13 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
   final _regionController = TextEditingController();
   final _subRegionController = TextEditingController();
   final DatabaseService _dbService = DatabaseService();
-  final SupabaseClient _supabase = Supabase.instance.client;
   bool _isLoading = false;
   bool _regionLoaded = false;
   String? _currentRegionId;
   String? _currentRegion;
   String? _currentSubRegion;
   int _selectedRole = 4; // Default to Agent
+  int _currentUserRole = 5;
 
   static const List<(int, String)> _roleOptions = [
     (2, 'Sales Manager'),
@@ -36,6 +35,13 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
     (5, 'Sales Rep'),
   ];
 
+  List<(int, String)> get _allowedRoleOptions => _roleOptions.where((option) {
+    if (_currentUserRole == 1) return option.$1 > 1;
+    if (_currentUserRole == 2) return option.$1 == 4 || option.$1 == 5;
+    if (_currentUserRole == 3) return option.$1 == 5;
+    return false;
+  }).toList();
+
   @override
   void initState() {
     super.initState();
@@ -43,23 +49,23 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
   }
 
   Future<void> _loadCurrentUserRegion() async {
-    final currentUser = _supabase.auth.currentUser;
-    if (currentUser == null) {
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) {
       if (mounted) setState(() => _regionLoaded = true);
       return;
     }
     try {
-      final data =
-          await _supabase
-              .from('users')
-              .select('region_id, region, sub_region')
-              .eq('id', currentUser.id)
-              .maybeSingle();
+      final user = await _dbService.getUser(currentUserId);
       if (!mounted) return;
       setState(() {
-        _currentRegionId = data?['region_id']?.toString();
-        _currentRegion = data?['region']?.toString();
-        _currentSubRegion = data?['sub_region']?.toString();
+        _currentUserRole = user?.role ?? 5;
+        final options = _allowedRoleOptions;
+        if (!options.any((option) => option.$1 == _selectedRole) && options.isNotEmpty) {
+          _selectedRole = options.first.$1;
+        }
+        _currentRegionId = user?.regionId;
+        _currentRegion = user?.region;
+        _currentSubRegion = user?.subRegion;
         _regionLoaded = true;
       });
     } catch (e) {
@@ -79,6 +85,12 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
   }
 
   Future<void> _createTeamMember() async {
+    if (_allowedRoleOptions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You do not have permission to add team members.')),
+      );
+      return;
+    }
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final hasCurrentRegion =
         _currentRegionId != null &&
@@ -101,61 +113,34 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
       String? regionName = _currentRegion;
       String? subRegion = _currentSubRegion;
 
-      final authResponse = await _supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: tempPassword,
-        data: {
-          'full_name': _nameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'role': _selectedRole,
-          if (regionName != null) 'region': regionName,
-          if (subRegion != null) 'sub_region': subRegion,
-        },
-      );
-
-      final user = authResponse.user;
-      if (user == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to create user account.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
       if (regionId == null && _regionLoaded) {
-        final createdRegion =
-            await _supabase
-                .from('regions')
-                .insert(
-                  RegionModel(
-                    region: _regionController.text.trim(),
-                    subRegion: _subRegionController.text.trim(),
-                  ).toMap(),
-                )
-                .select('id, region, sub_region')
-                .single();
+        final createdRegion = await ApiService().create(
+          'regions',
+          RegionModel(
+            region: _regionController.text.trim(),
+            subRegion: _subRegionController.text.trim(),
+          ).toMap(),
+        );
         regionId = createdRegion['id']?.toString();
         regionName = createdRegion['region']?.toString();
         subRegion = createdRegion['sub_region']?.toString();
       }
 
-      final newUser = UserModel(
-        id: user.id,
+      final createdUser = await ApiService().createTeamMember(
         email: _emailController.text.trim(),
+        password: tempPassword,
         fullName: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         role: _selectedRole,
         regionId: regionId,
         region: regionName,
         subRegion: subRegion,
-        isSynced: true,
       );
-      await _dbService.saveUser(newUser);
+      final createdUserId = createdUser['id']?.toString();
       if (regionId != null) {
-        await _dbService.assignUserToRegion(regionId, user.id, _selectedRole);
+        if (createdUserId != null) {
+          await _dbService.assignUserToRegion(regionId, createdUserId, _selectedRole);
+        }
       }
 
       if (!mounted) return;
@@ -182,11 +167,6 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
           backgroundColor: AppColors.primaryGreen,
           duration: const Duration(seconds: 5),
         ),
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;
@@ -324,7 +304,9 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
               ],
               const SizedBox(height: 16),
               DropdownButtonFormField<int>(
-                value: _selectedRole,
+                value: _allowedRoleOptions.any((option) => option.$1 == _selectedRole)
+                    ? _selectedRole
+                    : null,
                 decoration: InputDecoration(
                   labelText: 'Role',
                   prefixIcon: const Icon(Icons.badge_outlined),
@@ -333,23 +315,25 @@ class _AddTeamMemberFormState extends State<AddTeamMemberForm> {
                   ),
                 ),
                 items:
-                    _roleOptions
+                    _allowedRoleOptions
                         .map(
                           (r) =>
                               DropdownMenuItem(value: r.$1, child: Text(r.$2)),
                         )
                         .toList(),
-                onChanged: (value) {
+                onChanged: _regionLoaded ? (value) {
                   if (value != null) {
                     setState(() => _selectedRole = value);
                   }
-                },
+                } : null,
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createTeamMember,
+                  onPressed: _isLoading || !_regionLoaded || _allowedRoleOptions.isEmpty
+                      ? null
+                      : _createTeamMember,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryDark,
                     foregroundColor: Colors.white,

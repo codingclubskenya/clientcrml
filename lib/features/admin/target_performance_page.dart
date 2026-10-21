@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../core/config/api_config.dart';
@@ -12,6 +11,7 @@ import '../../models/target_model.dart';
 import '../../models/region_model.dart';
 import '../../models/user_model.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 import 'utils/csv_download_stub.dart'
     if (dart.library.html) 'utils/csv_download_web.dart'
     if (dart.library.io) 'utils/csv_download_io.dart';
@@ -160,10 +160,10 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser != null) {
-        final user = await _dbService.getUser(currentUser.id);
-        _currentUserId = currentUser.id;
+      final currentUserId = _dbService.getCurrentUserId();
+      if (currentUserId != null) {
+        final user = await _dbService.getUser(currentUserId);
+        _currentUserId = currentUserId;
         _currentUserRole = user?.role ?? 5;
       }
 
@@ -213,23 +213,17 @@ class _TargetPerformancePageState extends State<TargetPerformancePage>
 
   Future<List<TargetModel>> _loadTargets() async {
     try {
-      var query = Supabase.instance.client.from('targets').select();
-
-      if (_selectedScope.isNotEmpty) {
-        query = query.eq('scope', _selectedScope);
-      }
-      if (_selectedTargetPeriod case final value?) {
-        query = query.eq('target_period', value);
-      }
-      if (_selectedRegionOptionId case final value?) {
-        query = query.eq('region_id', value);
-      }
-      if (_selectedAssigneeOptionId case final value?) {
-        query = query.eq('assigned_to', value);
-      }
-
-      final data = await query.order('created_at', ascending: false);
-      return (data as List)
+      final filter = <String, dynamic>{
+        if (_selectedScope.isNotEmpty) 'scope': _selectedScope,
+        if (_selectedTargetPeriod != null) 'target_period': _selectedTargetPeriod,
+        if (_selectedRegionOptionId != null) 'region_id': _selectedRegionOptionId,
+        if (_selectedAssigneeOptionId != null) 'assigned_to': _selectedAssigneeOptionId,
+      };
+      final data = await ApiService().getAll(
+        'targets', filter: filter, orderBy: 'created_at',
+        orderDir: 'DESC', limit: 500,
+      );
+      return data
           .map((item) => TargetModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {

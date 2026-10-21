@@ -62,7 +62,7 @@ class OrderItemModel {
       unitPrice: _parseAmount(map['unit_price'] ?? map['unitPrice']),
       lineTotal: _parseAmount(map['line_total'] ?? map['lineTotal']),
       notes: map['notes'],
-      isSynced: map['isSynced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
       createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
       updatedAt: _parseDate(map['updated_at'] ?? map['updatedAt']),
     );

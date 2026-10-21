@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/api_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../admin/admin_dashboard_page.dart';
 import '../../database/database_service.dart';
@@ -42,17 +42,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   Future<void> _loginAdmin() async {
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final authResponse = await supabase.auth.signInWithPassword(
+      final authResponse = await ApiService().login(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
-      final user = authResponse.user;
-      if (user == null) return;
-
-      final metadataRole = user.userMetadata?['role']?.toString();
-      final userModel = await _dbService.getUser(user.id);
+      final user = Map<String, dynamic>.from(authResponse['user'] as Map);
+      final metadataRole = user['role']?.toString();
+      final userModel = await _dbService.getUser(user['id'].toString());
       final resolvedRole =
           userModel?.role ??
           int.tryParse(metadataRole ?? '') ??
@@ -62,7 +58,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       if (!mounted) return;
       if (resolvedRole != 1) {
         final messenger = ScaffoldMessenger.of(context);
-        await supabase.auth.signOut();
+        await ApiService().logout();
         if (!mounted) return;
         messenger.showSnackBar(
           const SnackBar(
@@ -77,11 +73,6 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         context,
         MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
         (route) => false,
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../database/database_service.dart';
 
@@ -11,7 +10,6 @@ class EventDetailPage extends StatefulWidget {
 }
 
 class _EventDetailPageState extends State<EventDetailPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   Map<String, dynamic>? _event;
   bool _loading = true;
@@ -49,8 +47,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
     if (id == null) return;
     setState(() => _loading = true);
     try {
-      final row =
-          await _supabase.from('events').select().eq('id', id).maybeSingle();
+      final row = await _dbService.getEvent(id);
       if (row != null) setState(() => _event = Map<String, dynamic>.from(row));
     } catch (e) {
       if (mounted) {

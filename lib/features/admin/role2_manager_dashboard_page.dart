@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/constants/colors.dart';
+import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
-import '../../../models/region_model.dart';
-import '../../../models/user_model.dart';
+import '../../models/region_model.dart';
+import '../../models/user_model.dart';
 import 'add_team_member_form.dart';
+import '../../services/api_service.dart';
 
 class Role2ManagerDashboardPage extends StatefulWidget {
   const Role2ManagerDashboardPage({super.key});
@@ -18,7 +18,6 @@ class Role2ManagerDashboardPage extends StatefulWidget {
 
 class _Role2ManagerDashboardPageState extends State<Role2ManagerDashboardPage> {
   final DatabaseService _dbService = DatabaseService();
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   List<RegionModel> _regions = [];
   List<UserModel> _members = [];
@@ -73,12 +72,12 @@ class _Role2ManagerDashboardPageState extends State<Role2ManagerDashboardPage> {
 
   Future<List<UserModel>> _loadAgents() async {
     try {
-      final data = await _supabase
-          .from('users')
-          .select('id, full_name, email, phone, region, sub_region, role')
-          .inFilter('role', [2, 4])
-          .order('full_name');
-      return (data as List)
+      final data = await ApiService().getAll(
+        'users',
+        filter: {'role': {'in': [2, 4]}},
+        orderBy: 'full_name', orderDir: 'ASC', limit: 500,
+      );
+      return data
           .map((e) => UserModel.fromMap(Map<String, dynamic>.from(e)))
           .toList();
     } catch (e) {
@@ -89,13 +88,10 @@ class _Role2ManagerDashboardPageState extends State<Role2ManagerDashboardPage> {
 
   Future<List<Map<String, dynamic>>> _loadSchools() async {
     try {
-      final data = await _supabase
-          .from('schools')
-          .select(
-            'id, name, phone, county, source, contact_name, contact_phone, contact_email, school_lifecycle_status, notes, latitude, longitude, captured_by, created_at',
-          )
-          .order('name');
-      return (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
+      final data = await ApiService().getAll(
+        'schools', orderBy: 'name', orderDir: 'ASC', limit: 500,
+      );
+      return data.map((e) => Map<String, dynamic>.from(e)).toList();
     } catch (e) {
       debugPrint('Error loading schools: $e');
       return [];
@@ -104,12 +100,14 @@ class _Role2ManagerDashboardPageState extends State<Role2ManagerDashboardPage> {
 
   Future<List<Map<String, dynamic>>> _loadAllSales() async {
     try {
-      final data = await _supabase
-          .from('school_sales')
-          .select('school_id, expected_value, sale_status, created_at')
-          .gte('created_at', _getDateFilterStart())
-          .lte('created_at', _getDateFilterEnd());
-      return (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
+      final data = await ApiService().getAll(
+        'school_sales',
+        filter: {'created_at': {
+          'gte': _getDateFilterStart(), 'lte': _getDateFilterEnd(),
+        }},
+        limit: 500,
+      );
+      return data.map((e) => Map<String, dynamic>.from(e)).toList();
     } catch (e) {
       debugPrint('Error loading sales: $e');
       return [];

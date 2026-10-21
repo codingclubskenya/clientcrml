@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class EventAssignmentsPage extends StatefulWidget {
   const EventAssignmentsPage({super.key});
@@ -10,7 +10,6 @@ class EventAssignmentsPage extends StatefulWidget {
 }
 
 class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _assignments = [];
@@ -50,12 +49,7 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
 
   Future<List<Map<String, dynamic>>> _getAvailableAgents() async {
     try {
-      final data = await _supabase
-          .from('users')
-          .select('id, full_name, email, phone, role')
-          .inFilter('role', [4, 5])
-          .order('full_name');
-
+      final data = await ApiService().getAll('users', filter: {'role': {'in': [4, 5]}}, orderBy: 'full_name', orderDir: 'ASC', limit: 500);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('Error loading agents: $e');
@@ -183,7 +177,7 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
     if (eventId == null) return;
 
     try {
-      final currentUser = _supabase.auth.currentUser;
+      final currentUserId = _dbService.getCurrentUserId();
       final targets = <String, dynamic>{};
       if (target.isNotEmpty) {
         targets['sales_target'] = double.tryParse(target) ?? 0;
@@ -192,7 +186,7 @@ class _EventAssignmentsPageState extends State<EventAssignmentsPage> {
       await _dbService.assignAgentToEvent({
         'event_id': eventId,
         'agent_id': agentId,
-        'assigned_by': currentUser?.id,
+        'assigned_by': currentUserId,
         'schedule': {'notes': schedule},
         'targets': targets,
         'notes': notes,

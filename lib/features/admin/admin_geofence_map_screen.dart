@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class AdminGeofenceMapScreen extends StatefulWidget {
   const AdminGeofenceMapScreen({super.key});
@@ -14,7 +14,6 @@ class AdminGeofenceMapScreen extends StatefulWidget {
 }
 
 class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final MapController _mapController = MapController();
 
@@ -99,16 +98,13 @@ class _AdminGeofenceMapScreenState extends State<AdminGeofenceMapScreen> {
   Future<void> _fetchData() async {
     try {
       // Fetch all non-admin users to populate the dropdown
-      final usersResponse = await _supabase
-          .from('users')
-          .select('id, full_name, email, role, region')
-          .neq('role', 1);
+      final usersResponse = await ApiService().getAll(
+        'users', filter: {'role': {'neq': 1}}, limit: 500,
+      );
 
       // Fetch existing geofences to display on the map
-      final geofencesResponse = await _supabase.from('geofences').select('*');
-      final schoolsResponse = await _supabase
-          .from('schools')
-          .select('id, county, latitude, longitude');
+      final geofencesResponse = await ApiService().getAll('geofences', limit: 500);
+      final schoolsResponse = await ApiService().getAll('schools', limit: 500);
 
       if (mounted) {
         setState(() {

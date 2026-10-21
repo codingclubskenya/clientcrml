@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import 'event_date_format.dart';
 
@@ -11,7 +10,6 @@ class EventsListPage extends StatefulWidget {
 }
 
 class _EventsListPageState extends State<EventsListPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
@@ -40,13 +38,9 @@ class _EventsListPageState extends State<EventsListPage> {
   Future<void> _loadEvents() async {
     setState(() => _loading = true);
     try {
-      final data = await _supabase
-          .from('events')
-          .select()
-          .order('start_at', ascending: false);
+      final data = await _dbService.getEvents();
       setState(() {
-        _events =
-            (data as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        _events = data;
       });
     } catch (e) {
       if (mounted) {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../models/target_model.dart';
 import '../../models/region_model.dart';
 import '../../models/user_model.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class TargetsPage extends StatefulWidget {
   const TargetsPage({super.key});
@@ -80,17 +80,17 @@ class _TargetsPageState extends State<TargetsPage>
   }
 
   Future<List<TargetModel>> _loadTargets() async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return <TargetModel>[];
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) return <TargetModel>[];
 
     try {
-      final data = await Supabase.instance.client
-          .from('targets')
-          .select()
-          .or('assigned_to.eq.${currentUser.id},assigned_to.is.null')
-          .order('created_at', ascending: false);
+      final data = await ApiService().getAll(
+        'targets', orderBy: 'created_at', orderDir: 'DESC', limit: 500,
+      );
 
-      return (data as List)
+      return data
+          .where((item) => item['assigned_to'] == null ||
+              item['assigned_to'].toString() == currentUserId)
           .map((item) => TargetModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -102,12 +102,12 @@ class _TargetsPageState extends State<TargetsPage>
   Future<void> _saveTarget(TargetModel target) async {
     try {
       if (target.id.isEmpty) {
-        await Supabase.instance.client.from('targets').insert(target.toMap());
+        await ApiService().create('targets', target.toMap());
       } else {
-        await Supabase.instance.client
-            .from('targets')
-            .update(target.copyWith(updatedAt: DateTime.now()).toMap())
-            .eq('id', target.id);
+        await ApiService().patch(
+          'targets', target.id,
+          target.copyWith(updatedAt: DateTime.now()).toMap(),
+        );
       }
       await _loadInitialData();
     } catch (e) {
@@ -128,12 +128,12 @@ class _TargetsPageState extends State<TargetsPage>
       final currentTargets = _getCurrentPageTargets();
       for (final target in currentTargets) {
         if (target.id.isEmpty) {
-          await Supabase.instance.client.from('targets').insert(target.toMap());
+          await ApiService().create('targets', target.toMap());
         } else {
-          await Supabase.instance.client
-              .from('targets')
-              .update(target.copyWith(updatedAt: DateTime.now()).toMap())
-              .eq('id', target.id);
+          await ApiService().patch(
+            'targets', target.id,
+            target.copyWith(updatedAt: DateTime.now()).toMap(),
+          );
         }
       }
       await _loadInitialData();

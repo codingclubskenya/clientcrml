@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../project/project_form_store.dart';
+import '../../services/api_service.dart';
 
 enum _QuestionType {
   shortAnswer,
@@ -52,7 +52,6 @@ class ProjectFormBuilderPage extends StatefulWidget {
 }
 
 class _ProjectFormBuilderPageState extends State<ProjectFormBuilderPage> {
-  final _supabase = Supabase.instance.client;
   final TextEditingController _formTitleController = TextEditingController(
     text: 'Untitled Project Form',
   );
@@ -92,13 +91,12 @@ class _ProjectFormBuilderPageState extends State<ProjectFormBuilderPage> {
 
   Future<void> _loadRole5Users() async {
     try {
-      final res = await _supabase
-          .from('users')
-          .select('id, full_name, email')
-          .eq('role', 5)
-          .order('full_name');
+      final res = await ApiService().getAll(
+        'users', filter: {'role': 5},
+        orderBy: 'full_name', orderDir: 'ASC', limit: 500,
+      );
       _role5Users =
-          (res as List<dynamic>).map((row) {
+          res.map((row) {
             final map = Map<String, dynamic>.from(row as Map);
             final id = map['id']?.toString() ?? '';
             final name =

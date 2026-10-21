@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 import 'event_date_format.dart';
 
 class EventAssignmentsManagementPage extends StatefulWidget {
@@ -13,7 +13,6 @@ class EventAssignmentsManagementPage extends StatefulWidget {
 
 class _EventAssignmentsManagementPageState
     extends State<EventAssignmentsManagementPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _assignments = [];
@@ -80,11 +79,13 @@ class _EventAssignmentsManagementPageState
 
   Future<List<Map<String, dynamic>>> _getAvailableAgents() async {
     try {
-      final data = await _supabase
-          .from('users')
-          .select('id, full_name, email, phone, role, region')
-          .inFilter('role', [4, 5])
-          .order('full_name');
+      final data = await ApiService().getAll(
+        'users',
+        filter: {'role': {'in': [4, 5]}},
+        orderBy: 'full_name',
+        orderDir: 'ASC',
+        limit: 500,
+      );
 
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
@@ -227,7 +228,6 @@ class _EventAssignmentsManagementPageState
     if (eventId == null) return;
 
     try {
-      final currentUser = _supabase.auth.currentUser;
       final targets = <String, dynamic>{};
       if (target.isNotEmpty) {
         targets['sales_target'] = double.tryParse(target) ?? 0;
@@ -245,7 +245,7 @@ class _EventAssignmentsManagementPageState
       await _dbService.assignAgentToEvent({
         'event_id': eventId,
         'agent_id': agentId,
-        'assigned_by': currentUser?.id,
+        'assigned_by': _dbService.getCurrentUserId(),
         'schedule': {'notes': schedule},
         'targets': targets,
         'products': productList,
@@ -347,14 +347,11 @@ class _EventAssignmentsManagementPageState
           targets['sales_target'] = double.tryParse(targetController.text) ?? 0;
         }
 
-        await _supabase
-            .from('event_assignments')
-            .update({
+        await ApiService().patch('event_assignments', assignment['id'].toString(), {
               'schedule': {'notes': scheduleController.text.trim()},
               'targets': targets,
               'notes': notesController.text.trim(),
-            })
-            .eq('id', assignment['id']);
+            });
 
         if (mounted) {
           ScaffoldMessenger.of(

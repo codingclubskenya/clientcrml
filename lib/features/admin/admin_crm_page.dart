@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
 import '../profile/crm_notification_service.dart';
 import '../../core/constants/colors.dart';
 import 'school_profile_page.dart';
 import 'duplicate_detection_page.dart';
 import 'audit_log_page.dart';
+import '../../services/api_service.dart';
 
 class AdminCrmPage extends StatefulWidget {
   const AdminCrmPage({super.key});
@@ -15,7 +15,6 @@ class AdminCrmPage extends StatefulWidget {
 }
 
 class _AdminCrmPageState extends State<AdminCrmPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _schoolController = TextEditingController();
@@ -57,18 +56,15 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
   Future<void> _loadCrmData() async {
     setState(() => _isLoading = true);
     try {
-      final schoolsRes = await _supabase
-          .from('schools')
-          .select('id,name,phone,lead_score,latitude,longitude');
-      final usersRes = await _supabase
-          .from('users')
-          .select('id,full_name,email');
-      final salesRes = await _supabase
-          .from('school_sales')
-          .select(
-            'id,school_id,agent_id,expected_value,notes,sale_status,probability,next_action_date,stage_updated_at,created_at',
-          )
-          .order('updated_at', ascending: false);
+      final results = await Future.wait([
+        ApiService().getAll('schools', limit: 500),
+        ApiService().getAll('users', limit: 500),
+        ApiService().getAll('school_sales', orderBy: 'updated_at',
+          orderDir: 'DESC', limit: 500),
+      ]);
+      final schoolsRes = results[0];
+      final usersRes = results[1];
+      final salesRes = results[2];
 
       try {
         _dailyPerformance = await _dbService.getPerformanceMetrics(
@@ -398,9 +394,7 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
                       onPressed: () {
                         final parsed = double.tryParse(_valueController.text);
                         if (parsed == null) return;
-                        _supabase
-                            .from('school_sales')
-                            .update({
+                        ApiService().patch('school_sales', record.id, {
                               'expected_value': parsed,
                               'notes': _notesController.text.trim(),
                               'sale_status': _toDbStage(selectedStage),
@@ -412,9 +406,7 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
                                   DateTime.now()
                                       .add(const Duration(days: 2))
                                       .toIso8601String(),
-                            })
-                            .eq('id', record.id)
-                            .then((_) async {
+                            }).then((_) async {
                               if (mounted) {
                                 Navigator.pop(context);
                                 await _loadCrmData();
@@ -937,10 +929,7 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
                                 icon: const Icon(Icons.delete_outline),
                                 tooltip: 'Delete',
                                 onPressed: () {
-                                  _supabase
-                                      .from('school_sales')
-                                      .delete()
-                                      .eq('id', record.id)
+                                  ApiService().delete('school_sales', record.id)
                                       .then((_) {
                                         _loadCrmData();
                                       });
@@ -1035,10 +1024,7 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
                         const SizedBox(width: 8),
                         TextButton.icon(
                           onPressed: () {
-                            _supabase
-                                .from('school_sales')
-                                .delete()
-                                .eq('id', record.id)
+                            ApiService().delete('school_sales', record.id)
                                 .then((_) => _loadCrmData());
                           },
                           icon: const Icon(
@@ -1172,14 +1158,11 @@ class _AdminCrmPageState extends State<AdminCrmPage> {
         });
 
         try {
-          await _supabase
-              .from('school_sales')
-              .update({
+          await ApiService().patch('school_sales', record.id, {
                 'sale_status': _toDbStage(stage),
                 'probability': _probabilityByStage(stage),
                 'stage_updated_at': DateTime.now().toIso8601String(),
-              })
-              .eq('id', record.id);
+              });
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

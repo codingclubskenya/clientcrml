@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'features/admin/project_form_builder_page.dart';
+import 'services/api_service.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -10,7 +10,7 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  final _supabase = Supabase.instance.client;
+  final _api = ApiService();
   late Future<Map<String, dynamic>> _dashboardDataFuture;
   int _selectedIndex = 0;
 
@@ -21,43 +21,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<Map<String, dynamic>> _fetchDashboardData() async {
-    // Fetch counts from the main tables defined in schema.sql
-    final usersCount = await _supabase.from('users').count();
-    final schoolsCount = await _supabase.from('schools').count();
-    final tasksCount = await _supabase.from('tasks').count();
-    final ordersCount = await _supabase.from('orders').count();
-    final visitsCount = await _supabase.from('school_visits').count();
-    final catalogCount = await _supabase.from('catalog_items').count();
-
-    // Fetch the current super admin's profile
-    final userId = _supabase.auth.currentUser?.id;
-    Map<String, dynamic>? currentUserProfile;
-    if (userId != null) {
-      currentUserProfile =
-          await _supabase
-              .from('users')
-              .select('full_name, role, region')
-              .eq('id', userId)
-              .maybeSingle();
-    }
-
-    // Fetch recent orders for the data table
-    final recentOrders = await _supabase
-        .from('orders')
-        .select('order_number, school_name, status, checkout_amount')
-        .order('created_at', ascending: false)
-        .limit(5);
+    final dashboard = await _api.getAdminDashboard();
+    final rawCounts = Map<String, dynamic>.from(dashboard['counts'] as Map);
+    final currentUserProfile = dashboard['currentUserProfile'] == null
+        ? null
+        : Map<String, dynamic>.from(dashboard['currentUserProfile'] as Map);
 
     return {
       'counts': {
-        'Users': usersCount,
-        'Schools': schoolsCount,
-        'Tasks': tasksCount,
-        'Orders': ordersCount,
-        'Visits': visitsCount,
-        'Catalog Items': catalogCount,
+        'Users': (rawCounts['users'] as num).toInt(),
+        'Schools': (rawCounts['schools'] as num).toInt(),
+        'Tasks': (rawCounts['tasks'] as num).toInt(),
+        'Orders': (rawCounts['orders'] as num).toInt(),
+        'Visits': (rawCounts['visits'] as num).toInt(),
+        'Catalog Items': (rawCounts['catalog_items'] as num).toInt(),
       },
-      'recentOrders': recentOrders,
+      'recentOrders': dashboard['recentOrders'],
       'currentUserProfile': currentUserProfile,
     };
   }
@@ -69,7 +48,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<void> _signOut() async {
-    await _supabase.auth.signOut();
+    await _api.logout();
     if (mounted) {
       Navigator.of(context).pushReplacementNamed('/');
     }
@@ -184,7 +163,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
           final adminName =
               userProfile?['full_name'] ??
-              _supabase.auth.currentUser?.email ??
+              userProfile?['email'] ??
               'Super Admin';
           final region = userProfile?['region'] ?? 'All Regions';
 

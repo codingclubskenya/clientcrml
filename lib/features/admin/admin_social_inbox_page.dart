@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class AdminSocialInboxPage extends StatefulWidget {
   const AdminSocialInboxPage({super.key});
@@ -11,7 +11,6 @@ class AdminSocialInboxPage extends StatefulWidget {
 }
 
 class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final _replyController = TextEditingController();
   final _uuid = const Uuid();
@@ -38,12 +37,10 @@ class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
   Future<void> _loadConversations() async {
     setState(() => _isLoading = true);
     try {
-      final rows = await _supabase
-          .from('social_conversations')
-          .select(
-            'id,channel,participant_display,participant_phone,last_message_preview,last_message_at,updated_at',
-          )
-          .order('last_message_at', ascending: false);
+      final rows = await ApiService().getAll(
+        'social_conversations', orderBy: 'last_message_at',
+        orderDir: 'DESC', limit: 500,
+      );
 
       final list = List<Map<String, dynamic>>.from(rows);
       final seeded = list.isEmpty ? _dummyConversations() : list;
@@ -69,11 +66,10 @@ class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
       return;
     }
     try {
-      final rows = await _supabase
-          .from('social_messages')
-          .select('id,sender_name,sender_id,body,sent_at,created_at')
-          .eq('conversation_id', _selectedConversationId!)
-          .order('sent_at', ascending: true);
+      final rows = await ApiService().getAll(
+        'social_messages', filter: {'conversation_id': _selectedConversationId},
+        orderBy: 'sent_at', orderDir: 'ASC', limit: 500,
+      );
       if (!mounted) return;
       final dbMessages = List<Map<String, dynamic>>.from(rows);
       setState(
@@ -98,29 +94,26 @@ class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
 
     setState(() => _isSending = true);
     try {
-      final user = _supabase.auth.currentUser;
+      final user = ApiService().cachedUser;
       await _dbService.insertWithOfflineQueue(
         table: 'social_messages',
         payload: {
           'conversation_id': _selectedConversationId,
           'channel': _selectedChannel,
           'external_message_id': 'local-${_uuid.v4()}',
-          'sender_name': (user?.email ?? 'Admin'),
-          'sender_id': user?.id,
+          'sender_name': (user?['email'] ?? 'Admin'),
+          'sender_id': ApiService().currentUserId,
           'body': text,
           'sent_at': DateTime.now().toUtc().toIso8601String(),
           'raw_payload': {'origin': 'admin_ui', 'status': 'pending_dispatch'},
         },
       );
 
-      await _supabase
-          .from('social_conversations')
-          .update({
+      await ApiService().patch('social_conversations', _selectedConversationId!, {
             'last_message_preview': text,
             'last_message_at': DateTime.now().toUtc().toIso8601String(),
             'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', _selectedConversationId!);
+          });
 
       _replyController.clear();
       await _loadMessages();
@@ -210,7 +203,7 @@ class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
                       final m = _messages[index];
                       final isMine =
                           (m['sender_id'] ?? '').toString() ==
-                          (_supabase.auth.currentUser?.id ?? '');
+                          (ApiService().currentUserId ?? '');
                       return Align(
                         alignment:
                             isMine
@@ -313,7 +306,7 @@ class _AdminSocialInboxPageState extends State<AdminSocialInboxPage> {
   }
 
   List<Map<String, dynamic>> _dummyMessages(String conversationId) {
-    final me = _supabase.auth.currentUser?.id ?? 'admin-user';
+    final me = ApiService().currentUserId ?? 'admin-user';
     if (conversationId == 'dummy-fb-1') {
       return [
         {

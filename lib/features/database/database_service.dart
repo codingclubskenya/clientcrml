@@ -10,8 +10,8 @@ import '../../models/region_model.dart';
 import '../../models/pipeline_stage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../services/api_service.dart';
 
 class DatabaseService {
   static Future<Box<dynamic>>? _schoolBoxFuture;
@@ -48,7 +48,52 @@ class DatabaseService {
        _upsertCatalogOverride = upsertCatalogOverride,
        _currentUserRoleOverride = currentUserRoleOverride;
 
-  SupabaseClient get _supabase => Supabase.instance.client;
+  String? get _currentUserId => ApiService().currentUserId;
+
+  Future<void> _deleteMatching(String table, Map<String, dynamic> filter) async {
+    final rows = await ApiService().getAll(table, filter: filter, limit: 500);
+    for (final row in rows) {
+      final id = row['id']?.toString();
+      if (id != null && id.isNotEmpty) await ApiService().delete(table, id);
+    }
+  }
+
+  Future<void> _patchMatching(String table, Map<String, dynamic> filter,
+      Map<String, dynamic> payload) async {
+    final rows = await ApiService().getAll(table, filter: filter, limit: 500);
+    for (final row in rows) {
+      final id = row['id']?.toString();
+      if (id != null && id.isNotEmpty) await ApiService().patch(table, id, payload);
+    }
+  }
+
+  Future<void> _upsertRemote(String table, Map<String, dynamic> payload,
+      {String? onConflict}) async {
+    final key = onConflict?.split(',').first.trim() ?? 'id';
+    final value = payload[key];
+    if (value != null) {
+      final matches = await ApiService().getAll(table, filter: {key: value}, limit: 1);
+      if (matches.isNotEmpty && matches.first['id'] != null) {
+        await ApiService().patch(table, matches.first['id'].toString(), payload);
+        return;
+      }
+    }
+    await ApiService().create(table, payload);
+  }
+
+  Future<List<Map<String, dynamic>>> _attachRows(
+    List<Map<String, dynamic>> rows, {
+    required String foreignKey,
+    required String table,
+    required String alias,
+  }) async {
+    final ids = rows.map((r) => r[foreignKey]?.toString() ?? '').where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return rows;
+    final related = await ApiService().getAll(table, filter: {'id': {'in': ids}}, limit: 500);
+    final byId = {for (final row in related) row['id'].toString(): Map<String, dynamic>.from(row)};
+    for (final row in rows) { row[alias] = byId[row[foreignKey]?.toString()]; }
+    return rows;
+  }
 
   Future<Box<dynamic>> get _box async {
     if (_schoolBoxProvider != null) return _schoolBoxProvider();
@@ -109,8 +154,18 @@ class DatabaseService {
   // User management methods
   Future<void> saveUser(UserModel user) async {
     try {
-      await _supabase.from('users').upsert(user.toMap());
-      debugPrint("User ${user.email} saved to Supabase.");
+      final data = user.toMap();
+      final id = data['id']?.toString();
+      if (id == null || id.isEmpty) {
+        await ApiService().create('users', data);
+      } else {
+        try {
+          await ApiService().update('users', id, data);
+        } catch (_) {
+          await ApiService().create('users', data);
+        }
+      }
+      debugPrint("User ${user.email} saved through API.");
     } catch (e) {
       debugPrint("Error saving user to Supabase: $e");
       rethrow;
@@ -119,8 +174,7 @@ class DatabaseService {
 
   Future<UserModel?> getUser(String uid) async {
     try {
-      final data =
-          await _supabase.from('users').select().eq('id', uid).maybeSingle();
+      final data = await ApiService().getById('users', uid);
       if (data != null) {
         return UserModel.fromMap(data);
       }
@@ -132,8 +186,8 @@ class DatabaseService {
 
   Future<List<UserModel>> getAllUsers() async {
     try {
-      final data = await _supabase.from('users').select().order('created_at');
-      return (data as List)
+      final data = await ApiService().getAll('users', orderBy: 'created_at', orderDir: 'ASC');
+      return data
           .map((item) => UserModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -144,7 +198,7 @@ class DatabaseService {
 
   Future<void> updateUserRole(String uid, int role) async {
     try {
-      await _supabase.from('users').update({'role': role}).eq('id', uid);
+      await ApiService().patch('users', uid, {'role': role});
       debugPrint("User $uid role updated to $role.");
     } catch (e) {
       debugPrint("Error updating user role: $e");
@@ -154,12 +208,9 @@ class DatabaseService {
 
   Future<List<RegionModel>> getAllRegions() async {
     try {
-      final data = await _supabase
-          .from('regions')
-          .select()
-          .order('region')
-          .order('sub_region');
-      return (data as List)
+      final data = await ApiService().getAll('regions', orderBy: 'region', orderDir: 'ASC');
+      data.sort((a, b) => (a['sub_region'] ?? '').toString().compareTo((b['sub_region'] ?? '').toString()));
+      return data
           .map((item) => RegionModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -189,11 +240,8 @@ class DatabaseService {
 
   Future<List<String>> getDistinctSubRegions() async {
     try {
-      final data = await _supabase
-          .from('targets')
-          .select('sub_region')
-          .not('sub_region', 'is', null);
-      return (data as List)
+      final data = await ApiService().getAll('targets', filter: {'sub_region': {'neq': null}}, orderBy: 'sub_region');
+      return data
           .map((item) => item['sub_region']?.toString() ?? '')
           .where((s) => s.isNotEmpty)
           .toSet()
@@ -208,11 +256,9 @@ class DatabaseService {
     List<int> roles,
   ) async {
     try {
-      final data = await _supabase
-          .from('users')
-          .select('id, full_name, email, role');
+      final data = await ApiService().getAll('users', limit: 500);
       final roleSet = roles.toSet();
-      return (data as List)
+      return data
           .where((item) => roleSet.contains((item['role'] as int?) ?? 5))
           .map(
             (item) => {
@@ -231,12 +277,9 @@ class DatabaseService {
 
   Future<List<Map<String, String>>> getRegionOptions() async {
     try {
-      final data = await _supabase
-          .from('regions')
-          .select('id, region, sub_region')
-          .order('region')
-          .order('sub_region');
-      return (data as List)
+      final data = await ApiService().getAll('regions', orderBy: 'region', orderDir: 'ASC');
+      data.sort((a, b) => (a['sub_region'] ?? '').toString().compareTo((b['sub_region'] ?? '').toString()));
+      return data
           .map(
             (item) => {
               'id': item['id']?.toString() ?? '',
@@ -269,8 +312,7 @@ class DatabaseService {
 
   Future<RegionModel?> getRegion(String id) async {
     try {
-      final data =
-          await _supabase.from('regions').select().eq('id', id).maybeSingle();
+      final data = await ApiService().getById('regions', id);
       if (data != null) {
         return RegionModel.fromMap(data);
       }
@@ -282,7 +324,7 @@ class DatabaseService {
 
   Future<void> createRegion(RegionModel region) async {
     try {
-      await _supabase.from('regions').insert(region.toMap());
+      await ApiService().create('regions', region.toMap());
       debugPrint("Region created: ${region.region} - ${region.subRegion}");
     } catch (e) {
       debugPrint("Error creating region: $e");
@@ -292,10 +334,7 @@ class DatabaseService {
 
   Future<void> updateRegion(RegionModel region) async {
     try {
-      await _supabase
-          .from('regions')
-          .update(region.toMap())
-          .eq('id', region.id!);
+      await ApiService().patch('regions', region.id!, region.toMap());
       debugPrint("Region updated: ${region.region} - ${region.subRegion}");
     } catch (e) {
       debugPrint("Error updating region: $e");
@@ -305,20 +344,18 @@ class DatabaseService {
 
   Future<void> deleteRegion(String id) async {
     try {
-      await _supabase.from('region_assignments').delete().eq('region_id', id);
+      await _deleteMatching('region_assignments', {'region_id': id});
       final region = await getRegion(id);
-      await _supabase.from('regions').delete().eq('id', id);
+      await ApiService().delete('regions', id);
       if (region != null) {
-        await _supabase
-            .from('users')
-            .update({'region': null, 'region_id': null})
-            .eq('region_id', id);
+        await _patchMatching('users', {'region_id': id}, {'region': null, 'region_id': null});
         final regionName = region.region;
         if (regionName.isNotEmpty) {
-          await _supabase
-              .from('users')
-              .update({'region': null})
-              .or('region.eq.$regionName,sub_region.eq.${region.subRegion}');
+          final users = await ApiService().getAll('users', limit: 500);
+          for (final user in users.where((u) => u['region'] == regionName || u['sub_region'] == region.subRegion)) {
+            final userId = user['id']?.toString();
+            if (userId != null) await ApiService().patch('users', userId, {'region': null});
+          }
         }
       }
       debugPrint("Region deleted: $id");
@@ -334,20 +371,14 @@ class DatabaseService {
       if (region == null) {
         throw Exception('Region not found');
       }
-      await _supabase
-          .from('regions')
-          .update({'assigned_to': agentId})
-          .eq('id', regionId);
-      await _supabase
-          .from('users')
-          .update({
+      await ApiService().patch('regions', regionId, {'assigned_to': agentId});
+      await ApiService().patch('users', agentId, {
             'role_ref': 'agent',
             'region': region.region,
             'region_id': regionId,
-          })
-          .eq('id', agentId);
+          });
       try {
-        await _supabase.from('region_assignments').insert({
+        await ApiService().create('region_assignments', {
           'region_id': regionId,
           'user_id': agentId,
           'role': 4,
@@ -374,20 +405,14 @@ class DatabaseService {
       if (region == null) {
         throw Exception('Region not found');
       }
-      await _supabase
-          .from('regions')
-          .update({'supervisor_id': supervisorId})
-          .eq('id', regionId);
-      await _supabase
-          .from('users')
-          .update({
+      await ApiService().patch('regions', regionId, {'supervisor_id': supervisorId});
+      await ApiService().patch('users', supervisorId, {
             'role_ref': 'supervisor',
             'region': region.region,
             'region_id': regionId,
-          })
-          .eq('id', supervisorId);
+          });
       try {
-        await _supabase.from('region_assignments').insert({
+        await ApiService().create('region_assignments', {
           'region_id': regionId,
           'user_id': supervisorId,
           'role': 3,
@@ -409,22 +434,12 @@ class DatabaseService {
     try {
       final region = await getRegion(regionId);
       final previousSupervisorId = region?.supervisorId;
-      await _supabase
-          .from('regions')
-          .update({'supervisor_id': null})
-          .eq('id', regionId);
+      await ApiService().patch('regions', regionId, {'supervisor_id': null});
       if (previousSupervisorId != null) {
-        await _supabase
-            .from('users')
-            .update({'region': null, 'region_id': null})
-            .eq('id', previousSupervisorId);
+        await ApiService().patch('users', previousSupervisorId, {'region': null, 'region_id': null});
       }
       try {
-        await _supabase
-            .from('region_assignments')
-            .delete()
-            .eq('region_id', regionId)
-            .eq('role', 3);
+        await _deleteMatching('region_assignments', {'region_id': regionId, 'role': 3});
       } catch (e) {
         debugPrint('region_assignments delete failed: $e');
         throw Exception(
@@ -444,10 +459,7 @@ class DatabaseService {
       if (region == null) {
         throw Exception('Region not found');
       }
-      await _supabase
-          .from('users')
-          .update({'region': region.region, 'region_id': regionId})
-          .eq('id', memberId);
+      await ApiService().patch('users', memberId, {'region': region.region, 'region_id': regionId});
       debugPrint("Member $memberId added to region $regionId");
     } catch (e) {
       debugPrint("Error adding member to region: $e");
@@ -465,14 +477,11 @@ class DatabaseService {
       if (region == null) {
         throw Exception('Region not found');
       }
-      await _supabase
-          .from('users')
-          .update({
+      await ApiService().patch('users', memberId, {
             'role': role,
             'region': region.region,
             'region_id': regionId,
-          })
-          .eq('id', memberId);
+          });
       debugPrint("Member $memberId promoted to role $role in region $regionId");
     } catch (e) {
       debugPrint("Error promoting member to agent: $e");
@@ -484,22 +493,12 @@ class DatabaseService {
     try {
       final region = await getRegion(regionId);
       final previousAgentId = region?.assignedTo;
-      await _supabase
-          .from('regions')
-          .update({'assigned_to': null})
-          .eq('id', regionId);
+      await ApiService().patch('regions', regionId, {'assigned_to': null});
       if (previousAgentId != null) {
-        await _supabase
-            .from('users')
-            .update({'region': null, 'region_id': null})
-            .eq('id', previousAgentId);
+        await ApiService().patch('users', previousAgentId, {'region': null, 'region_id': null});
       }
       try {
-        await _supabase
-            .from('region_assignments')
-            .delete()
-            .eq('region_id', regionId)
-            .eq('role', 4);
+        await _deleteMatching('region_assignments', {'region_id': regionId, 'role': 4});
       } catch (e) {
         debugPrint('region_assignments delete failed: $e');
         throw Exception(
@@ -515,12 +514,9 @@ class DatabaseService {
 
   Future<List<UserModel>> getRegionAssignments(String regionId) async {
     try {
-      final data = await _supabase
-          .from('region_assignments')
-          .select('user_id, role')
-          .eq('region_id', regionId);
+      final data = await ApiService().getAll('region_assignments', filter: {'region_id': regionId});
       final userIds =
-          (data as List)
+          data
               .map((e) => (e['user_id'] ?? '').toString())
               .where((id) => id.isNotEmpty)
               .toSet()
@@ -544,7 +540,7 @@ class DatabaseService {
     int role,
   ) async {
     try {
-      await _supabase.from('region_assignments').insert({
+      await ApiService().create('region_assignments', {
         'region_id': regionId,
         'user_id': userId,
         'role': role,
@@ -558,11 +554,7 @@ class DatabaseService {
 
   Future<void> unassignUserFromRegion(String regionId, String userId) async {
     try {
-      await _supabase
-          .from('region_assignments')
-          .delete()
-          .eq('region_id', regionId)
-          .eq('user_id', userId);
+      await _deleteMatching('region_assignments', {'region_id': regionId, 'user_id': userId});
       debugPrint("User $userId unassigned from region $regionId");
     } catch (e) {
       debugPrint("Error unassigning user from region: $e");
@@ -575,7 +567,7 @@ class DatabaseService {
     String supervisorId,
   ) async {
     try {
-      await _supabase.from('region_assignments').insert({
+      await ApiService().create('region_assignments', {
         'region_id': regionId,
         'user_id': supervisorId,
         'role': 3,
@@ -589,7 +581,7 @@ class DatabaseService {
 
   Future<void> addAgentToRegion(String regionId, String agentId) async {
     try {
-      await _supabase.from('region_assignments').insert({
+      await ApiService().create('region_assignments', {
         'region_id': regionId,
         'user_id': agentId,
         'role': 4,
@@ -615,7 +607,9 @@ class DatabaseService {
       await _upsertSchoolOverride(school.toMap());
       return;
     }
-    await _supabase.from('schools').upsert(school.toMap());
+    final data = school.toMap();
+    final id = data['id']?.toString() ?? school.id;
+    await _upsertRemote('schools', data);
   }
 
   Future<void> _syncSchoolEngagement(SchoolModel school) async {
@@ -682,12 +676,7 @@ class DatabaseService {
 
   Future<bool> isSchoolSyncedRemotely(String schoolId) async {
     try {
-      final row =
-          await _supabase
-              .from('schools')
-              .select('id')
-              .eq('id', schoolId)
-              .maybeSingle();
+      final row = await ApiService().getById('schools', schoolId);
       return row != null;
     } catch (_) {
       return false;
@@ -793,9 +782,7 @@ class DatabaseService {
           if (_upsertCatalogOverride != null) {
             await _upsertCatalogOverride(catalog.toMap());
           } else {
-            await _supabase
-                .from('catalog_items')
-                .upsert(catalog.toMap(), onConflict: 'sku');
+            await _upsertRemote('catalog_items', catalog.toMap(), onConflict: 'sku');
           }
 
           // Update local status to synced
@@ -841,9 +828,9 @@ class DatabaseService {
 
     final localSchools = await getAllSchoolProfiles();
     try {
-      final data = await _supabase.from('schools').select().order('created_at');
+      final data = await ApiService().getAll('schools', orderBy: 'created_at', orderDir: 'ASC', limit: 500);
       final remoteSchools =
-          (data as List)
+          data
               .map(
                 (item) => SchoolModel.fromMap(
                   Map<String, dynamic>.from(item),
@@ -864,7 +851,7 @@ class DatabaseService {
   }
 
   Future<List<SchoolModel>> getMySchools() async {
-    final currentUserId = _supabase.auth.currentUser?.id;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return <SchoolModel>[];
 
     try {
@@ -878,13 +865,9 @@ class DatabaseService {
         localSchools.where((s) => s.capturedBy == currentUserId).toList();
 
     try {
-      final data = await _supabase
-          .from('schools')
-          .select()
-          .eq('captured_by', currentUserId)
-          .order('created_at');
+      final data = await ApiService().getAll('schools', filter: {'captured_by': currentUserId}, orderBy: 'created_at', orderDir: 'ASC', limit: 500);
       final remoteSchools =
-          (data as List)
+          data
               .map(
                 (item) => SchoolModel.fromMap(
                   Map<String, dynamic>.from(item),
@@ -906,11 +889,8 @@ class DatabaseService {
 
   Future<List<TaskModel>> getAllTasks() async {
     try {
-      final data = await _supabase
-          .from('tasks')
-          .select()
-          .order('created_at', ascending: false);
-      return (data as List)
+      final data = await ApiService().getAll('tasks', orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      return data
           .map((item) => TaskModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -921,15 +901,11 @@ class DatabaseService {
 
   Future<List<TaskModel>> getTasksForRole(int role) async {
     try {
-      final currentUserId = _supabase.auth.currentUser?.id;
+      final currentUserId = _currentUserId;
       if (currentUserId == null) return <TaskModel>[];
 
-      final data = await _supabase
-          .from('tasks')
-          .select()
-          .or('target_role.eq.$role,assigned_to.eq.$currentUserId')
-          .order('created_at', ascending: false);
-      return (data as List)
+      final data = await ApiService().getAll('tasks', orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      return data.where((item) => item['target_role'] == role || item['assigned_to']?.toString() == currentUserId)
           .map((item) => TaskModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -942,7 +918,7 @@ class DatabaseService {
     required String period,
     String? targetType,
   }) async {
-    final currentUserId = _supabase.auth.currentUser?.id;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return {};
 
     try {
@@ -954,20 +930,10 @@ class DatabaseService {
       };
       final dbPeriod = periodMap[period] ?? period;
 
-      var query = _supabase
-          .from('targets')
-          .select('target_type, target_period, target_data')
-          .or('assigned_to.eq.$currentUserId,assigned_to.is.null')
-          .eq('target_period', dbPeriod);
-
-      if (targetType != null) {
-        query = query.eq('target_type', targetType);
-      }
-
-      final data = await query;
+      final data = await ApiService().getAll('targets', filter: {'target_period': dbPeriod, if (targetType != null) 'target_type': targetType}, limit: 500);
       final targets = <String, double>{};
 
-      for (final item in data as List) {
+      for (final item in data.where((item) => item['assigned_to'] == null || item['assigned_to']?.toString() == currentUserId)) {
         final type = (item['target_type'] ?? '').toString();
         final targetData = item['target_data'];
         if (targetData is! Map) continue;
@@ -1013,7 +979,7 @@ class DatabaseService {
             : DateTime(now.year, 1, 1);
     final target = await getTargetsForCurrentUser(period: period);
     final targetValue = target['product_sales'] ?? target['total'] ?? 0.0;
-    final currentUserId = _supabase.auth.currentUser?.id;
+    final currentUserId = _currentUserId;
     final agentId = role == 1 ? null : currentUserId;
     // Align the window to UTC so it matches the database's stored
     // timestamptz (created_at / visited_at) regardless of device timezone.
@@ -1026,16 +992,15 @@ class DatabaseService {
       String? status,
       String? statusColumn,
     }) async {
-      var query = _supabase.from(table).select('id');
+      final filter = <String, dynamic>{dateColumn: {'gte': startIso, 'lte': nowIso}};
       if (agentId != null) {
-        query = query.eq('agent_id', agentId);
+        filter['agent_id'] = agentId;
       }
-      query = query.gte(dateColumn, startIso).lte(dateColumn, nowIso);
       if (status != null) {
-        query = query.eq(statusColumn ?? 'status', status);
+        filter[statusColumn ?? 'status'] = status;
       }
-      final response = await query;
-      return (response as List).length;
+      final response = await ApiService().getAll(table, filter: filter, limit: 500);
+      return response.length;
     }
 
     Future<int> sumRows(
@@ -1043,13 +1008,12 @@ class DatabaseService {
       String dateColumn, {
       required String valueColumn,
     }) async {
-      var query = _supabase.from(table).select('id, $valueColumn');
+      final filter = <String, dynamic>{dateColumn: {'gte': startIso, 'lte': nowIso}};
       if (agentId != null) {
-        query = query.eq('agent_id', agentId);
+        filter['agent_id'] = agentId;
       }
-      query = query.gte(dateColumn, startIso).lte(dateColumn, nowIso);
-      final response = await query;
-      return (response as List).fold<int>(0, (sum, row) {
+      final response = await ApiService().getAll(table, filter: filter, limit: 500);
+      return response.fold<int>(0, (sum, row) {
         final value = row[valueColumn];
         if (value is num) return sum + value.toInt();
         return sum;
@@ -1057,13 +1021,12 @@ class DatabaseService {
     }
 
     Future<int> countVisitedSchools() async {
-      var query = _supabase.from('school_visits').select('school_id');
+      final filter = <String, dynamic>{'visited_at': {'gte': startIso, 'lte': nowIso}};
       if (agentId != null) {
-        query = query.eq('agent_id', agentId);
+        filter['agent_id'] = agentId;
       }
-      query = query.gte('visited_at', startIso).lte('visited_at', nowIso);
-      final response = await query;
-      return (response as List)
+      final response = await ApiService().getAll('school_visits', filter: filter, limit: 500);
+      return response
           .map((row) => row['school_id']?.toString())
           .whereType<String>()
           .where((id) => id.isNotEmpty)
@@ -1128,13 +1091,12 @@ class DatabaseService {
       String? status,
       String? statusColumn,
     }) async {
-      var query = _supabase.from(table).select('id').eq('agent_id', agentId);
-      query = query.gte(dateColumn, startIso).lte(dateColumn, nowIso);
+      final filter = <String, dynamic>{'agent_id': agentId, dateColumn: {'gte': startIso, 'lte': nowIso}};
       if (status != null) {
-        query = query.eq(statusColumn ?? 'status', status);
+        filter[statusColumn ?? 'status'] = status;
       }
-      final response = await query;
-      return (response as List).length;
+      final response = await ApiService().getAll(table, filter: filter, limit: 500);
+      return response.length;
     }
 
     String classifySchoolType(Map<String, dynamic> school) {
@@ -1169,25 +1131,13 @@ class DatabaseService {
 
     final visitsFuture =
         (() async {
-          final response = await _supabase
-              .from('school_visits')
-              .select('school_id')
-              .eq('agent_id', agentId)
-              .gte('visited_at', startIso)
-              .lte('visited_at', nowIso);
-          return List<Map<String, dynamic>>.from(response as List<dynamic>);
+          final response = await ApiService().getAll('school_visits', filter: {'agent_id': agentId, 'visited_at': {'gte': startIso, 'lte': nowIso}}, limit: 500);
+          return List<Map<String, dynamic>>.from(response);
         })();
     final onboardedFuture =
         (() async {
-          final response = await _supabase
-              .from('schools')
-              .select(
-                'id, dealer_type, shop_category, school_level, partner_subtype, name',
-              )
-              .eq('captured_by', agentId)
-              .gte('captured_at', startIso)
-              .lte('captured_at', nowIso);
-          return List<Map<String, dynamic>>.from(response as List<dynamic>);
+          final response = await ApiService().getAll('schools', filter: {'captured_by': agentId, 'captured_at': {'gte': startIso, 'lte': nowIso}}, limit: 500);
+          return List<Map<String, dynamic>>.from(response);
         })();
 
     final results = await Future.wait<dynamic>([
@@ -1231,17 +1181,10 @@ class DatabaseService {
     final visitedSchools = <String>{...schoolIds, ...onboardedIds}.length;
 
     if (allIds.isNotEmpty) {
-      final schoolTypeRows =
-          (await _supabase
-                  .from('schools')
-                  .select(
-                    'id, dealer_type, shop_category, school_level, partner_subtype, name',
-                  )
-                  .inFilter('id', allIds))
-              as List<dynamic>;
+      final schoolTypeRows = await ApiService().getAll('schools', filter: {'id': {'in': allIds}}, limit: 500);
       final schoolTypeById = <String, String>{};
       for (final row in schoolTypeRows) {
-        final school = Map<String, dynamic>.from(row as Map);
+        final school = Map<String, dynamic>.from(row);
         final id = school['id']?.toString() ?? '';
         if (id.isEmpty) continue;
         schoolTypeById[id] = classifySchoolType(school);
@@ -1288,7 +1231,7 @@ class DatabaseService {
 
   Future<void> createTask(TaskModel task) async {
     try {
-      await _supabase.from('tasks').insert(task.toMap());
+      await ApiService().create('tasks', task.toMap());
       debugPrint("Task ${task.title} saved to Supabase.");
     } catch (e) {
       debugPrint("Error saving task to Supabase: $e");
@@ -1321,24 +1264,19 @@ class DatabaseService {
   }
 
   Future<int> getCurrentUserRole() async {
-    final currentUser = _supabase.auth.currentUser;
-    if (currentUser == null) return 3; // Default to field agent
-    final user = await getUser(currentUser.id);
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return 3;
+    final user = await getUser(currentUserId);
     return user?.role ?? 3;
   }
 
   String? getCurrentUserId() {
-    return _supabase.auth.currentUser?.id;
+    return _currentUserId;
   }
 
   Future<bool> schoolExists(String schoolId) async {
     try {
-      final row =
-          await _supabase
-              .from('schools')
-              .select('id')
-              .eq('id', schoolId)
-              .maybeSingle();
+      final row = await ApiService().getById('schools', schoolId);
       return row != null;
     } catch (e) {
       debugPrint("Error checking school existence for $schoolId: $e");
@@ -1348,18 +1286,15 @@ class DatabaseService {
 
   Future<List<MessageModel>> getMessagesForCurrentUser() async {
     try {
-      final currentUser = _supabase.auth.currentUser;
-      if (currentUser == null) return <MessageModel>[];
+      final currentUserId = _currentUserId;
+      if (currentUserId == null) return <MessageModel>[];
+      final sent = await ApiService().getAll('messages', filter: {'sender_id': currentUserId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      final received = await ApiService().getAll('messages', filter: {'recipient_id': currentUserId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      final dataById = <String, Map<String, dynamic>>{};
+      for (final item in [...sent, ...received]) { dataById[item['id'].toString()] = Map<String, dynamic>.from(item); }
+      final data = dataById.values.toList()..sort((a, b) => (b['created_at'] ?? '').toString().compareTo((a['created_at'] ?? '').toString()));
 
-      final data = await _supabase
-          .from('messages')
-          .select()
-          .or(
-            'sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}',
-          )
-          .order('created_at', ascending: false);
-
-      return (data as List)
+      return data
           .map((item) => MessageModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -1370,7 +1305,7 @@ class DatabaseService {
 
   Future<void> sendMessage(MessageModel message) async {
     try {
-      await _supabase.from('messages').insert(message.toMap());
+      await ApiService().create('messages', message.toMap());
       debugPrint("Message ${message.id} saved to Supabase.");
     } catch (e) {
       debugPrint("Error saving message to Supabase: $e");
@@ -1386,22 +1321,10 @@ class DatabaseService {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
       if (!connectivityResult.contains(ConnectivityResult.none)) {
-        final response =
-            itemType == null
-                ? await _supabase
-                    .from('catalog_items')
-                    .select()
-                    .order('category')
-                    .order('name')
-                : await _supabase
-                    .from('catalog_items')
-                    .select()
-                    .eq('item_type', itemType)
-                    .order('category')
-                    .order('name');
+        final response = await ApiService().getAll('catalog_items', filter: itemType == null ? null : {'item_type': itemType}, orderBy: 'category', orderDir: 'ASC', limit: 500);
 
         final items =
-            (response as List)
+            (response..sort((a, b) => (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString())))
                 .map(
                   (item) => CatalogItemModel.fromMap(
                     Map<String, dynamic>.from(item as Map),
@@ -1438,15 +1361,12 @@ class DatabaseService {
 
   Future<List<CatalogItemModel>> getSampleCatalogItemsFromTable() async {
     try {
-      final response = await _supabase
-          .from('catalog_items')
-          .select()
-          .order('name', ascending: true);
+      final response = await ApiService().getAll('catalog_items', orderBy: 'name', orderDir: 'ASC', limit: 500);
 
       final items =
           List<Map<String, dynamic>>.from(response)
               .where((row) {
-                final isActive = (row['is_active'] ?? true) == true;
+                final isActive = (row['is_active'] == true || row['is_active'] == 1);
                 final itemType =
                     (row['item_type'] ?? '').toString().toLowerCase();
                 return isActive && itemType.contains('sample');
@@ -1509,18 +1429,10 @@ class DatabaseService {
 
   Future<void> decrementCatalogStock(String itemId, int quantity) async {
     try {
-      final current =
-          await _supabase
-              .from('catalog_items')
-              .select('stock_qty')
-              .eq('id', itemId)
-              .maybeSingle();
+          final current = await ApiService().getById('catalog_items', itemId);
       final currentStock = (current?['stock_qty'] as num?)?.toInt() ?? 0;
       final newStock = (currentStock - quantity).clamp(0, 1 << 30);
-      await _supabase
-          .from('catalog_items')
-          .update({'stock_qty': newStock})
-          .eq('id', itemId);
+      await ApiService().patch('catalog_items', itemId, {'stock_qty': newStock});
     } catch (e) {
       debugPrint("Error updating catalog stock: $e");
       rethrow;
@@ -1599,10 +1511,7 @@ class DatabaseService {
     int returnedQty,
   ) async {
     try {
-      await _supabase
-          .from('school_sample_distributions')
-          .update({'returned_qty': returnedQty < 0 ? 0 : returnedQty})
-          .eq('id', distributionId);
+      await ApiService().patch('school_sample_distributions', distributionId, {'returned_qty': returnedQty < 0 ? 0 : returnedQty});
     } catch (e) {
       debugPrint("Error updating returned sample quantity: $e");
       rethrow;
@@ -1615,24 +1524,8 @@ class DatabaseService {
     String? schoolId,
   }) async {
     try {
-      var query = _supabase
-          .from('school_sample_distributions')
-          .select(
-            'id, school_id, sample_name, sample_category, client_type, quantity, returned_qty, notes, distributed_at, schools(name, county, dealer_type)',
-          );
-      if (agentId != null) {
-        query = query.eq('agent_id', agentId);
-      }
-      if (clientType != null) {
-        query = query.eq('client_type', clientType);
-      }
-      if (schoolId != null) {
-        query = query.eq('school_id', schoolId);
-      }
-      final res = await query
-          .order('distributed_at', ascending: false)
-          .limit(5000);
-      return List<Map<String, dynamic>>.from(res);
+      final res = await ApiService().getAll('school_sample_distributions', filter: {if (agentId != null) 'agent_id': agentId, if (clientType != null) 'client_type': clientType, if (schoolId != null) 'school_id': schoolId}, orderBy: 'distributed_at', orderDir: 'DESC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(res), foreignKey: 'school_id', table: 'schools', alias: 'schools');
     } catch (e) {
       debugPrint("Error loading sample distributions: $e");
       return <Map<String, dynamic>>[];
@@ -1662,12 +1555,7 @@ class DatabaseService {
       'requested_at': DateTime.now().toIso8601String(),
       'items': items,
     };
-    final res =
-        await _supabase
-            .from('sample_requests')
-            .insert(payload)
-            .select()
-            .single();
+    final res = await ApiService().create('sample_requests', payload);
     return Map<String, dynamic>.from(res);
   }
 
@@ -1677,24 +1565,8 @@ class DatabaseService {
     String? schoolId,
   }) async {
     try {
-      var query = _supabase
-          .from('sample_requests')
-          .select(
-            'id, request_code, school_id, client_type, purpose, notes, status, rejection_reason, needed_by, requested_at, reviewed_at, items, schools(name, county)',
-          );
-      if (status != null) {
-        query = query.eq('status', status);
-      }
-      if (agentId != null) {
-        query = query.eq('requested_by', agentId);
-      }
-      if (schoolId != null) {
-        query = query.eq('school_id', schoolId);
-      }
-      final res = await query
-          .order('requested_at', ascending: false)
-          .limit(5000);
-      return List<Map<String, dynamic>>.from(res);
+      final res = await ApiService().getAll('sample_requests', filter: {if (status != null) 'status': status, if (agentId != null) 'requested_by': agentId, if (schoolId != null) 'school_id': schoolId}, orderBy: 'requested_at', orderDir: 'DESC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(res), foreignKey: 'school_id', table: 'schools', alias: 'schools');
     } catch (e) {
       debugPrint('Error loading sample requests: $e');
       return <Map<String, dynamic>>[];
@@ -1719,7 +1591,7 @@ class DatabaseService {
     if (status == 'APPROVED' && approvedItems != null) {
       payload['items'] = approvedItems;
     }
-    await _supabase.from('sample_requests').update(payload).eq('id', requestId);
+    await ApiService().patch('sample_requests', requestId, payload);
   }
 
   Future<void> saveDebtCollection({
@@ -1748,7 +1620,7 @@ class DatabaseService {
   }) async {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!connectivityResult.contains(ConnectivityResult.none)) {
-      await _supabase.from(table).insert(payload);
+      await ApiService().create(table, payload);
       return;
     }
     final pendingBox = await _pendingOpsBox;
@@ -1774,7 +1646,16 @@ class DatabaseService {
   }) async {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!connectivityResult.contains(ConnectivityResult.none)) {
-      await _supabase.from(table).upsert(payload, onConflict: onConflict);
+      final conflictColumn = onConflict?.split(',').first.trim() ?? 'id';
+      final conflictValue = payload[conflictColumn];
+      if (conflictValue != null) {
+        final existing = await ApiService().getAll(table, filter: {conflictColumn: conflictValue}, limit: 1);
+        if (existing.isNotEmpty && existing.first['id'] != null) {
+          await ApiService().patch(table, existing.first['id'].toString(), payload);
+          return;
+        }
+      }
+      await ApiService().create(table, payload);
       return;
     }
     final pendingBox = await _pendingOpsBox;
@@ -1795,7 +1676,7 @@ class DatabaseService {
   }) async {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!connectivityResult.contains(ConnectivityResult.none)) {
-      await _supabase.from(table).update(payload).eq('id', id);
+      await ApiService().patch(table, id, payload);
       return;
     }
     final pendingBox = await _pendingOpsBox;
@@ -1814,7 +1695,7 @@ class DatabaseService {
   }) async {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!connectivityResult.contains(ConnectivityResult.none)) {
-      await _supabase.from(table).delete().eq('id', id);
+      await ApiService().delete(table, id);
       return;
     }
     final pendingBox = await _pendingOpsBox;
@@ -1847,29 +1728,34 @@ class DatabaseService {
             continue;
           }
           final payload = Map<String, dynamic>.from(payloadRaw);
-          await _supabase
-              .from(table)
-              .upsert(payload, onConflict: raw['on_conflict']?.toString());
+          final conflictColumn = raw['on_conflict']?.toString().split(',').first.trim() ?? 'id';
+          final conflictValue = payload[conflictColumn];
+          final existing = conflictValue == null ? <dynamic>[] : await ApiService().getAll(table, filter: {conflictColumn: conflictValue}, limit: 1);
+          if (existing.isNotEmpty && existing.first['id'] != null) {
+            await ApiService().patch(table, existing.first['id'].toString(), payload);
+          } else {
+            await ApiService().create(table, payload);
+          }
         } else if (opType == 'update') {
           if (rowId == null || payloadRaw is! Map) {
             await pendingBox.delete(key);
             continue;
           }
           final payload = Map<String, dynamic>.from(payloadRaw);
-          await _supabase.from(table).update(payload).eq('id', rowId);
+          await ApiService().patch(table, rowId, payload);
         } else if (opType == 'delete') {
           if (rowId == null) {
             await pendingBox.delete(key);
             continue;
           }
-          await _supabase.from(table).delete().eq('id', rowId);
+          await ApiService().delete(table, rowId);
         } else {
           if (payloadRaw is! Map) {
             await pendingBox.delete(key);
             continue;
           }
           final payload = Map<String, dynamic>.from(payloadRaw);
-          await _supabase.from(table).insert(payload);
+          await ApiService().create(table, payload);
         }
         await pendingBox.delete(key);
       } catch (e) {
@@ -1880,11 +1766,8 @@ class DatabaseService {
 
   Future<List<OrderModel>> getOrdersForCurrentUser() async {
     try {
-      final data = await _supabase
-          .from('orders')
-          .select()
-          .order('created_at', ascending: false);
-      return (data as List)
+      final data = await ApiService().getAll('orders', orderBy: 'created_at', orderDir: 'DESC');
+      return data
           .map((item) => OrderModel.fromMap(Map<String, dynamic>.from(item)))
           .toList();
     } catch (e) {
@@ -1895,12 +1778,8 @@ class DatabaseService {
 
   Future<List<OrderItemModel>> getOrderItems(String orderId) async {
     try {
-      final data = await _supabase
-          .from('order_items')
-          .select()
-          .eq('order_id', orderId)
-          .order('created_at', ascending: true);
-      return (data as List)
+      final data = await ApiService().getAll('order_items', filter: {'order_id': orderId}, orderBy: 'created_at', orderDir: 'ASC');
+      return data
           .map(
             (item) => OrderItemModel.fromMap(Map<String, dynamic>.from(item)),
           )
@@ -1917,12 +1796,7 @@ class DatabaseService {
   }) async {
     OrderModel? savedOrder;
     try {
-      final insertedOrder =
-          await _supabase
-              .from('orders')
-              .insert(order.toMap())
-              .select()
-              .single();
+      final insertedOrder = await ApiService().create('orders', order.toMap());
       savedOrder = OrderModel.fromMap(
         Map<String, dynamic>.from(insertedOrder as Map),
       );
@@ -1935,7 +1809,9 @@ class DatabaseService {
               map['order_id'] = currentSavedOrder.id;
               return map;
             }).toList();
-        await _supabase.from('order_items').insert(payload);
+        for (final item in payload) {
+          await ApiService().create('order_items', item);
+        }
       }
 
       debugPrint("Order ${savedOrder.orderNumber} saved to Supabase.");
@@ -1943,7 +1819,7 @@ class DatabaseService {
     } catch (e) {
       if (savedOrder != null) {
         try {
-          await _supabase.from('orders').delete().eq('id', savedOrder.id);
+          await ApiService().delete('orders', savedOrder.id);
         } catch (rollbackError) {
           debugPrint(
             "Rollback failed for order ${savedOrder.id}: $rollbackError",
@@ -1961,13 +1837,10 @@ class DatabaseService {
     required SchoolSaleModel sale,
   }) async {
     try {
-      final result = await _supabase.rpc(
-        'create_school_sale_checkout',
-        params: {
-          'order_payload': order.toMap(),
-          'items_payload': items.map((item) => item.toMap()).toList(),
-          'sale_payload': sale.toMap(),
-        },
+      final result = await ApiService().createSchoolSaleCheckout(
+        order: order.toMap(),
+        items: items.map((item) => item.toMap()).toList(),
+        sale: sale.toMap(),
       );
 
       final response = Map<String, dynamic>.from(result as Map);
@@ -2003,14 +1876,8 @@ class DatabaseService {
 
   Future<SchoolSaleModel?> getLatestSchoolSale(String schoolId) async {
     try {
-      final data =
-          await _supabase
-              .from('school_sales')
-              .select()
-              .eq('school_id', schoolId)
-              .order('updated_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+      final rows = await ApiService().getAll('school_sales', filter: {'school_id': schoolId}, orderBy: 'updated_at', orderDir: 'DESC', limit: 1);
+      final data = rows.isEmpty ? null : rows.first;
       if (data == null) return null;
       return SchoolSaleModel.fromMap(Map<String, dynamic>.from(data));
     } catch (e) {
@@ -2021,7 +1888,7 @@ class DatabaseService {
 
   Future<void> saveSchoolSale(SchoolSaleModel sale) async {
     try {
-      await _supabase.from('school_sales').upsert(sale.toMap());
+      await _upsertRemote('school_sales', sale.toMap());
     } catch (e) {
       debugPrint("Error saving school sale: $e");
       rethrow;
@@ -2035,7 +1902,7 @@ class DatabaseService {
     String? notes,
   }) async {
     try {
-      await _supabase.from('school_follow_ups').insert({
+      await ApiService().create('school_follow_ups', {
         'school_id': schoolId,
         'agent_id': getCurrentUserId(),
         'next_step': nextStep,
@@ -2142,10 +2009,7 @@ class DatabaseService {
     String? region,
   }) async {
     try {
-      var query = _supabase.from('events').select();
-      if (status != null) query = query.eq('status', status);
-      if (region != null) query = query.eq('region', region);
-      final data = await query.order('start_at', ascending: false);
+      final data = await ApiService().getAll('events', filter: {if (status != null) 'status': status, if (region != null) 'region': region}, orderBy: 'start_at', orderDir: 'DESC', limit: 500);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('Error getting events: $e');
@@ -2155,8 +2019,7 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getEvent(String id) async {
     try {
-      final data =
-          await _supabase.from('events').select().eq('id', id).maybeSingle();
+      final data = await ApiService().getById('events', id);
       return data != null ? Map<String, dynamic>.from(data) : null;
     } catch (e) {
       debugPrint('Error getting event: $e');
@@ -2166,8 +2029,7 @@ class DatabaseService {
 
   Future<String?> createEvent(Map<String, dynamic> payload) async {
     try {
-      final data =
-          await _supabase.from('events').insert(payload).select().single();
+      final data = await ApiService().create('events', payload);
       return data['id']?.toString();
     } catch (e) {
       debugPrint('Error creating event: $e');
@@ -2177,7 +2039,7 @@ class DatabaseService {
 
   Future<void> updateEvent(String id, Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('events').update(payload).eq('id', id);
+      await ApiService().patch('events', id, payload);
     } catch (e) {
       debugPrint('Error updating event: $e');
       rethrow;
@@ -2186,7 +2048,7 @@ class DatabaseService {
 
   Future<void> updateEventStatus(String id, String status) async {
     try {
-      await _supabase.from('events').update({'status': status}).eq('id', id);
+      await ApiService().patch('events', id, {'status': status});
     } catch (e) {
       debugPrint('Error updating event status: $e');
       rethrow;
@@ -2195,12 +2057,8 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventAssignments(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_assignments')
-          .select('*, users(full_name, email, phone)')
-          .eq('event_id', eventId)
-          .order('created_at');
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_assignments', filter: {'event_id': eventId}, orderBy: 'created_at', orderDir: 'ASC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(data), foreignKey: 'agent_id', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event assignments: $e');
       return <Map<String, dynamic>>[];
@@ -2209,7 +2067,7 @@ class DatabaseService {
 
   Future<void> assignAgentToEvent(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_assignments').insert(payload);
+      await ApiService().create('event_assignments', payload);
     } catch (e) {
       debugPrint('Error assigning agent to event: $e');
       rethrow;
@@ -2218,7 +2076,7 @@ class DatabaseService {
 
   Future<void> removeEventAssignment(String assignmentId) async {
     try {
-      await _supabase.from('event_assignments').delete().eq('id', assignmentId);
+      await ApiService().delete('event_assignments', assignmentId);
     } catch (e) {
       debugPrint('Error removing event assignment: $e');
       rethrow;
@@ -2227,12 +2085,8 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventCheckins(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_checkins')
-          .select('*, users(full_name, email)')
-          .eq('event_id', eventId)
-          .order('checkin_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_checkins', filter: {'event_id': eventId}, orderBy: 'checkin_at', orderDir: 'DESC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(data), foreignKey: 'agent_id', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event checkins: $e');
       return <Map<String, dynamic>>[];
@@ -2241,7 +2095,7 @@ class DatabaseService {
 
   Future<void> checkinToEvent(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_checkins').insert(payload);
+      await ApiService().create('event_checkins', payload);
     } catch (e) {
       debugPrint('Error checking in to event: $e');
       rethrow;
@@ -2250,11 +2104,7 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventTasks(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_tasks')
-          .select()
-          .eq('event_id', eventId)
-          .order('sort_order');
+      final data = await ApiService().getAll('event_tasks', filter: {'event_id': eventId}, orderBy: 'sort_order', orderDir: 'ASC', limit: 500);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('Error getting event tasks: $e');
@@ -2264,7 +2114,7 @@ class DatabaseService {
 
   Future<void> createEventTask(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_tasks').insert(payload);
+      await ApiService().create('event_tasks', payload);
     } catch (e) {
       debugPrint('Error creating event task: $e');
       rethrow;
@@ -2273,14 +2123,11 @@ class DatabaseService {
 
   Future<void> toggleEventTask(String taskId, bool completed) async {
     try {
-      await _supabase
-          .from('event_tasks')
-          .update({
+      await ApiService().patch('event_tasks', taskId, {
             'completed': completed,
             'completed_at': completed ? DateTime.now().toIso8601String() : null,
             'completed_by': completed ? getCurrentUserId() : null,
-          })
-          .eq('id', taskId);
+          });
     } catch (e) {
       debugPrint('Error toggling event task: $e');
       rethrow;
@@ -2289,12 +2136,10 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventLeads(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_leads')
-          .select('*, schools(name), users(full_name)')
-          .eq('event_id', eventId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_leads', filter: {'event_id': eventId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      final rows = List<Map<String, dynamic>>.from(data);
+      await _attachRows(rows, foreignKey: 'school_id', table: 'schools', alias: 'schools');
+      return _attachRows(rows, foreignKey: 'agent_id', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event leads: $e');
       return <Map<String, dynamic>>[];
@@ -2303,7 +2148,7 @@ class DatabaseService {
 
   Future<void> createEventLead(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_leads').insert(payload);
+      await ApiService().create('event_leads', payload);
     } catch (e) {
       debugPrint('Error creating event lead: $e');
       rethrow;
@@ -2312,12 +2157,21 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventOrders(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_orders')
-          .select('*, orders(*, order_items(*)), users(full_name)')
-          .eq('event_id', eventId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_orders', filter: {'event_id': eventId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      final rows = List<Map<String, dynamic>>.from(data);
+      final orderIds = rows.map((r) => r['order_id']?.toString() ?? '').where((id) => id.isNotEmpty).toSet().toList();
+      if (orderIds.isNotEmpty) {
+        final orders = await ApiService().getAll('orders', filter: {'id': {'in': orderIds}}, limit: 500);
+        final items = await ApiService().getAll('order_items', filter: {'order_id': {'in': orderIds}}, limit: 500);
+        final itemsByOrder = <String, List<Map<String, dynamic>>>{};
+        for (final item in items) { (itemsByOrder[item['order_id'].toString()] ??= []).add(Map<String, dynamic>.from(item)); }
+        for (final row in rows) {
+          final matches = orders.where((o) => o['id'].toString() == row['order_id']?.toString());
+          final order = matches.isEmpty ? null : matches.first;
+          if (order != null) row['orders'] = {...Map<String, dynamic>.from(order), 'order_items': itemsByOrder[order['id'].toString()] ?? []};
+        }
+      }
+      return _attachRows(rows, foreignKey: 'agent_id', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event orders: $e');
       return <Map<String, dynamic>>[];
@@ -2326,7 +2180,7 @@ class DatabaseService {
 
   Future<void> linkOrderToEvent(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_orders').insert(payload);
+      await ApiService().create('event_orders', payload);
     } catch (e) {
       debugPrint('Error linking order to event: $e');
       rethrow;
@@ -2335,12 +2189,10 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventSamples(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_samples')
-          .select('*, catalog_items(name, sku), users(full_name)')
-          .eq('event_id', eventId)
-          .order('distributed_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_samples', filter: {'event_id': eventId}, orderBy: 'distributed_at', orderDir: 'DESC', limit: 500);
+      final rows = List<Map<String, dynamic>>.from(data);
+      await _attachRows(rows, foreignKey: 'product_id', table: 'catalog_items', alias: 'catalog_items');
+      return _attachRows(rows, foreignKey: 'distributed_by', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event samples: $e');
       return <Map<String, dynamic>>[];
@@ -2349,7 +2201,7 @@ class DatabaseService {
 
   Future<void> createEventSample(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_samples').insert(payload);
+      await ApiService().create('event_samples', payload);
     } catch (e) {
       debugPrint('Error creating event sample: $e');
       rethrow;
@@ -2358,12 +2210,8 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventPhotos(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_photos')
-          .select('*, users(full_name)')
-          .eq('event_id', eventId)
-          .order('uploaded_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_photos', filter: {'event_id': eventId}, orderBy: 'uploaded_at', orderDir: 'DESC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(data), foreignKey: 'agent_id', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event photos: $e');
       return <Map<String, dynamic>>[];
@@ -2372,7 +2220,7 @@ class DatabaseService {
 
   Future<void> uploadEventPhoto(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_photos').insert(payload);
+      await ApiService().create('event_photos', payload);
     } catch (e) {
       debugPrint('Error uploading event photo: $e');
       rethrow;
@@ -2381,12 +2229,8 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getEventExpenses(String eventId) async {
     try {
-      final data = await _supabase
-          .from('event_expenses')
-          .select('*, users(full_name)')
-          .eq('event_id', eventId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final data = await ApiService().getAll('event_expenses', filter: {'event_id': eventId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      return _attachRows(List<Map<String, dynamic>>.from(data), foreignKey: 'submitted_by', table: 'users', alias: 'users');
     } catch (e) {
       debugPrint('Error getting event expenses: $e');
       return <Map<String, dynamic>>[];
@@ -2395,7 +2239,7 @@ class DatabaseService {
 
   Future<void> createEventExpense(Map<String, dynamic> payload) async {
     try {
-      await _supabase.from('event_expenses').insert(payload);
+      await ApiService().create('event_expenses', payload);
     } catch (e) {
       debugPrint('Error creating event expense: $e');
       rethrow;
@@ -2404,14 +2248,11 @@ class DatabaseService {
 
   Future<void> updateEventExpenseStatus(String expenseId, String status) async {
     try {
-      await _supabase
-          .from('event_expenses')
-          .update({
+      await ApiService().patch('event_expenses', expenseId, {
             'status': status,
             'approved_by': getCurrentUserId(),
             'approved_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', expenseId);
+          });
     } catch (e) {
       debugPrint('Error updating event expense status: $e');
       rethrow;
@@ -2420,12 +2261,8 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getEventReport(String eventId) async {
     try {
-      final data =
-          await _supabase
-              .from('event_reports')
-              .select()
-              .eq('event_id', eventId)
-              .maybeSingle();
+      final rows = await ApiService().getAll('event_reports', filter: {'event_id': eventId}, limit: 1);
+      final data = rows.isEmpty ? null : rows.first;
       return data != null ? Map<String, dynamic>.from(data) : null;
     } catch (e) {
       debugPrint('Error getting event report: $e');
@@ -2436,21 +2273,7 @@ class DatabaseService {
   Future<void> saveEventReport(Map<String, dynamic> payload) async {
     try {
       final eventId = payload['event_id'];
-      final existing =
-          await _supabase
-              .from('event_reports')
-              .select('id')
-              .eq('event_id', eventId)
-              .maybeSingle();
-
-      if (existing != null) {
-        await _supabase
-            .from('event_reports')
-            .update(payload)
-            .eq('event_id', eventId);
-      } else {
-        await _supabase.from('event_reports').insert(payload);
-      }
+      await _upsertRemote('event_reports', payload, onConflict: 'event_id');
     } catch (e) {
       debugPrint('Error saving event report: $e');
       rethrow;
@@ -2460,22 +2283,13 @@ class DatabaseService {
   Future<Map<String, dynamic>> getEventSummary(String eventId) async {
     try {
       final results = await Future.wait([
-        _supabase.from('event_checkins').select('id').eq('event_id', eventId),
-        _supabase.from('event_leads').select('id').eq('event_id', eventId),
-        _supabase.from('event_orders').select('id').eq('event_id', eventId),
-        _supabase
-            .from('event_samples')
-            .select('id, quantity')
-            .eq('event_id', eventId),
-        _supabase
-            .from('event_expenses')
-            .select('amount, status')
-            .eq('event_id', eventId),
-        _supabase.from('event_photos').select('id').eq('event_id', eventId),
-        _supabase
-            .from('event_tasks')
-            .select('id, completed')
-            .eq('event_id', eventId),
+        ApiService().getAll('event_checkins', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_leads', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_orders', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_samples', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_expenses', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_photos', filter: {'event_id': eventId}, limit: 500),
+        ApiService().getAll('event_tasks', filter: {'event_id': eventId}, limit: 500),
       ]);
 
       final checkins = (results[0] as List).length;
@@ -2525,13 +2339,8 @@ class DatabaseService {
     DateTime? endDate,
   }) async {
     try {
-      var query = _supabase.from('events').select();
-      if (region != null) query = query.eq('region', region);
-      if (startDate != null)
-        query = query.gte('start_at', startDate.toIso8601String());
-      if (endDate != null)
-        query = query.lte('start_at', endDate.toIso8601String());
-      final events = List<Map<String, dynamic>>.from(await query);
+      final dateRange = <String, dynamic>{if (startDate != null) 'gte': startDate.toIso8601String(), if (endDate != null) 'lte': endDate.toIso8601String()};
+      final events = List<Map<String, dynamic>>.from(await ApiService().getAll('events', filter: {if (region != null) 'region': region, if (dateRange.isNotEmpty) 'start_at': dateRange}, limit: 500));
 
       final activeEvents =
           events
@@ -2635,21 +2444,13 @@ class DatabaseService {
         final agentId = assignment['agent_id']?.toString();
         if (agentId == null) continue;
 
-        final leads = await _supabase
-            .from('event_leads')
-            .select('id')
-            .eq('event_id', eventId)
-            .eq('agent_id', agentId);
-        final orders = await _supabase
-            .from('event_orders')
-            .select('id')
-            .eq('event_id', eventId)
-            .eq('agent_id', agentId);
+        final leads = await ApiService().getAll('event_leads', filter: {'event_id': eventId, 'agent_id': agentId}, limit: 500);
+        final orders = await ApiService().getAll('event_orders', filter: {'event_id': eventId, 'agent_id': agentId}, limit: 500);
 
         agentsWithMetrics.add({
           ...assignment,
-          'leads_count': (leads as List).length,
-          'orders_count': (orders as List).length,
+          'leads_count': leads.length,
+          'orders_count': orders.length,
         });
       }
 

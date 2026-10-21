@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/constants/colors.dart';
+import '../../core/constants/colors.dart';
 import '../../core/widgets/map_tile_controls.dart';
 import '../database/database_service.dart';
-import '../../../models/farmer_model.dart';
-import '../../../models/task_model.dart';
-import '../../../models/user_model.dart';
+import '../../models/farmer_model.dart';
+import '../../models/task_model.dart';
+import '../../models/user_model.dart';
 import 'analytics_page.dart';
 import 'regions_page.dart';
 import 'regions_management_page.dart';
@@ -36,9 +35,10 @@ import 'role2_route_plan_page.dart';
 import '../dashboard/sample_distribution_page.dart';
 import 'school_profile_page.dart';
 import 'admin_individual_performance_page.dart';
-import '../../../core/constants/agent_dashboard_page.dart';
+import '../../core/constants/agent_dashboard_page.dart';
 import '../catalog/product_list_screen.dart';
 import '../consignments/consignment_list_screen.dart';
+import '../../services/api_service.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -100,7 +100,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
       return;
     }
-    _dashboardFuture = _loadDashboard();
+    if (mounted) {
+      setState(() {
+        _dashboardFuture = _loadDashboard();
+      });
+    }
   }
 
   Future<_AdminDashboardData> _loadDashboard() async {
@@ -109,12 +113,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final tasks = await _dbService.getAllTasks();
 
     try {
-      final salesRes = await Supabase.instance.client
-          .from('school_sales')
-          .select('school_id, sale_status');
+      final salesRes = await ApiService().getAll('school_sales', limit: 500);
 
       final Map<String, String> stageMap = {};
-      for (var row in (salesRes as List)) {
+      for (final row in salesRes) {
         final schoolId = (row['school_id'] ?? '').toString();
         final status = (row['sale_status'] ?? '').toString();
         if (schoolId.isNotEmpty) {
@@ -128,9 +130,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     List<Map<String, dynamic>> routePlansData = [];
     try {
-      final res = await Supabase.instance.client.from('route_plans').select();
+      final res = await ApiService().getAll('route_plans', limit: 500);
       routePlansData = List<Map<String, dynamic>>.from(
-        (res as List).map((x) => Map<String, dynamic>.from(x as Map)),
+        res.map((x) => Map<String, dynamic>.from(x as Map)),
       );
     } catch (e) {
       debugPrint('Error fetching route plans: $e');
@@ -138,9 +140,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     List<Map<String, dynamic>> geofencesData = [];
     try {
-      final resGeo = await Supabase.instance.client.from('geofences').select();
+      final resGeo = await ApiService().getAll('geofences', limit: 500);
       geofencesData = List<Map<String, dynamic>>.from(
-        (resGeo as List).map((x) => Map<String, dynamic>.from(x as Map)),
+        resGeo.map((x) => Map<String, dynamic>.from(x as Map)),
       );
     } catch (e) {
       debugPrint('Error fetching geofences: $e');
@@ -185,7 +187,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const DeHeusLogin()),
@@ -803,7 +805,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       _buildSectionHeader(
                         "User Access Control",
                         subtitle:
-                            "Promote or demote users directly from Supabase-backed records.",
+                            "Promote or demote users directly from the database.",
                       ),
                       const SizedBox(height: 12),
                       if (data.users.isEmpty)

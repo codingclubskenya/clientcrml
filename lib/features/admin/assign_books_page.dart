@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class AssignBooksPage extends StatefulWidget {
   const AssignBooksPage({super.key});
@@ -11,7 +11,6 @@ class AssignBooksPage extends StatefulWidget {
 }
 
 class _AssignBooksPageState extends State<AssignBooksPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   bool _isLoading = true;
   bool _isSaving = false;
@@ -43,21 +42,18 @@ class _AssignBooksPageState extends State<AssignBooksPage> {
   Future<void> _fetchData() async {
     try {
       // Fetch users with Role 5 (Grounds Person)
-      final usersResponse = await _supabase
-          .from('users')
-          .select('id, full_name, email')
-          .eq('role', 5);
+      final usersResponse = await ApiService().getAll(
+        'users', filter: {'role': 5}, limit: 500,
+      );
       // Fetch all schools
-      final schoolsResponse = await _supabase
-          .from('schools')
-          .select('id, name')
-          .order('name');
+      final schoolsResponse = await ApiService().getAll(
+        'schools', orderBy: 'name', orderDir: 'ASC', limit: 500,
+      );
       // Fetch all catalog items
-      final booksResponse = await _supabase
-          .from('catalog_items')
-          .select('id, name, category')
-          .eq('is_active', true)
-          .order('name');
+      final booksResponse = await ApiService().getAll(
+        'catalog_items', filter: {'is_active': true},
+        orderBy: 'name', orderDir: 'ASC', limit: 500,
+      );
 
       if (mounted) {
         setState(() {

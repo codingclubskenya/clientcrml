@@ -5,6 +5,8 @@ class UserModel {
   final String email;
   final String? fullName;
   final String? phone;
+  final String? idNumber;
+  final String? avatarUrl;
   final String? regionId;
   final String? region;
   final String? subRegion;
@@ -17,6 +19,8 @@ class UserModel {
     required this.email,
     this.fullName,
     this.phone,
+    this.idNumber,
+    this.avatarUrl,
     this.regionId,
     this.region,
     this.subRegion,
@@ -33,6 +37,9 @@ class UserModel {
       'role': role,
       'isSynced': isSynced,
     };
+
+    if (idNumber != null) map['id_number'] = idNumber;
+    if (avatarUrl != null) map['avatar_url'] = avatarUrl;
 
     if (regionId != null) {
       map['region_id'] = regionId;
@@ -55,11 +62,13 @@ class UserModel {
       email: map['email'],
       fullName: map['full_name'],
       phone: map['phone'],
+      idNumber: map['id_number']?.toString(),
+      avatarUrl: map['avatar_url']?.toString(),
       regionId: map['region_id']?.toString(),
       region: map['region'],
       subRegion: map['sub_region'],
       role: _parseRole(map['role']),
-      isSynced: map['isSynced'] ?? false,
+      isSynced: map['isSynced'] == true || map['isSynced'] == 1,
     );
   }
 
@@ -84,6 +93,8 @@ class UserModel {
     String? email,
     String? fullName,
     String? phone,
+    String? idNumber,
+    String? avatarUrl,
     String? regionId,
     String? region,
     String? subRegion,
@@ -95,6 +106,8 @@ class UserModel {
       email: email ?? this.email,
       fullName: fullName ?? this.fullName,
       phone: phone ?? this.phone,
+      idNumber: idNumber ?? this.idNumber,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       regionId: regionId ?? this.regionId,
       region: region ?? this.region,
       subRegion: subRegion ?? this.subRegion,

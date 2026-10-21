@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../services/api_service.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -13,7 +13,6 @@ class AnalyticsPage extends StatefulWidget {
 }
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
-  final _supabase = Supabase.instance.client;
   static const Set<String> _activePipelineStages = {
     'lead',
     'contacted',
@@ -73,7 +72,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     }
     try {
       // Fetch Tasks
-      final tasks = await _supabase.from('tasks').select('status');
+      final tasks = await ApiService().getAll('tasks', limit: 500);
       int open = 0, inProgress = 0, closed = 0;
       for (var task in tasks) {
         if (task['status'] == 'open') open++;
@@ -82,9 +81,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       }
 
       // Fetch Orders for Revenue Analysis
-      final orders = await _supabase
-          .from('orders')
-          .select('checkout_amount, status');
+      final orders = await ApiService().getAll('orders', limit: 500);
       double approved = 0, pending = 0;
       for (var order in orders) {
         final amount = (order['checkout_amount'] as num?)?.toDouble() ?? 0.0;
@@ -96,9 +93,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       }
 
       // Fetch School Sales for Pipeline Analysis
-      final sales = await _supabase
-          .from('school_sales')
-          .select('expected_value, sale_status, agent_id');
+      final sales = await ApiService().getAll('school_sales', limit: 500);
       double wonSales = 0, pipelineSales = 0;
       Map<String, int> funnel = {
         'lead': 0,
@@ -130,9 +125,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       }
 
       // Fetch Visits for Leaderboard
-      final visitsRes = await _supabase
-          .from('school_visits')
-          .select('agent_id, school_id, visited_at');
+      final visitsRes = await ApiService().getAll('school_visits', limit: 500);
       final visitsByRep = <String, int>{};
       final lastVisitBySchool = <String, DateTime>{};
 
@@ -154,12 +147,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       }
 
       // Fetch Global counts and User Growth
-      final usersRes = await _supabase
-          .from('users')
-          .select('id, full_name, email, created_at');
-      final schoolsRes = await _supabase
-          .from('schools')
-          .select('id, source, captured_by');
+      final usersRes = await ApiService().getAll('users', limit: 500);
+      final schoolsRes = await ApiService().getAll('schools', limit: 500);
 
       // Calculate User Growth
       int currentYear = DateTime.now().year;

@@ -1,3 +1,0 @@
--- schema_updates_sample_trigger.sql
--- Placeholder migration file. Intentionally empty.
--- (Sample-distribution trigger logic lives in schema.sql / other migrations.)

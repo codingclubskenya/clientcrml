@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 import 'package:fl_chart/fl_chart.dart'; // NEW DEPENDENCY — see note at bottom of file
 
 import '../../core/constants/agent_screens.dart';
@@ -116,7 +116,6 @@ class AgentDashboardPage extends StatefulWidget {
 
 class _AgentDashboardPageState extends State<AgentDashboardPage>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
   String _supervisorName = 'Supervisor';
@@ -136,7 +135,7 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
   late final TabController _tabController;
 
   // ---------------------------------------------------------------------
-  // Sales dashboard data (populated from Supabase in _fetchDashboardMetrics).
+  // Sales dashboard data (populated from the API in _fetchDashboardMetrics).
   // ---------------------------------------------------------------------
   double _teamRevenue = 0.0;
   double _revenueTargetPct = 0.0;
@@ -370,12 +369,12 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
 
   Future<void> _ensureShiftForCurrentDay() async {
     if (_midnightCheckoutInProgress) return;
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
 
     _midnightCheckoutInProgress = true;
     try {
-      final closed = await DailyShift.autoCheckoutIfNewDay(userId: user.id);
+      final closed = await DailyShift.autoCheckoutIfNewDay(userId: userId);
       if (closed && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -385,7 +384,7 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
         );
         return;
       }
-      await _scheduleMidnightAutoCheckout(user.id);
+      await _scheduleMidnightAutoCheckout(userId);
     } catch (e) {
       debugPrint('Error applying midnight auto check-out: $e');
     } finally {
@@ -396,16 +395,13 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
   Future<void> _scheduleMidnightAutoCheckout(String userId) async {
     _midnightAutoCheckoutTimer?.cancel();
     try {
-      final response =
-          await _supabase
-              .from('visit_checkins')
-              .select('checkin_at')
-              .eq('agent_id', userId)
-              .isFilter('checkout_at', null)
-              .order('checkin_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
-      if (response == null) return;
+      final openCheckins = await ApiService().getAll(
+        'visit_checkins',
+        filter: {'agent_id': userId, 'checkout_at': {'is': null}},
+        orderBy: 'checkin_at', orderDir: 'DESC', limit: 1,
+      );
+      if (openCheckins.isEmpty) return;
+      final response = openCheckins.first;
 
       final checkInTime =
           DateTime.parse(response['checkin_at'] as String).toLocal();
@@ -421,56 +417,46 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
   }
 
   Future<void> _fetchSupervisorDashboardData() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final userId = ApiService().currentUserId;
+    if (userId == null) return;
 
     try {
-      final profileResponse =
-          await _supabase
-              .from('profiles')
-              .select('full_name, region_id, regions(name)')
-              .eq('id', user.id)
-              .maybeSingle();
+      final profileResponse = await ApiService().getById('users', userId);
 
       if (profileResponse != null) {
         _supervisorName = profileResponse['full_name'] ?? 'Supervisor';
-        if (profileResponse['regions'] != null) {
-          _regionName = profileResponse['regions']['name'] ?? 'Assigned Region';
+        final regionId = profileResponse['region_id']?.toString();
+        if (regionId != null) {
+          try {
+            final region = await ApiService().getById('regions', regionId);
+            _regionName = region['region']?.toString() ?? 'Assigned Region';
+          } catch (_) {}
         }
       }
 
-      final regionId = profileResponse?['region_id'];
+      final regionId = profileResponse?['region_id']?.toString();
 
       if (regionId != null) {
-        final agentsCount = await _supabase
-            .from('profiles')
-            .select('id')
-            .eq('region_id', regionId)
-            .eq('role', 'agent');
-
-        final schoolsCount = await _supabase
-            .from('schools')
-            .select('id')
-            .eq('region_id', regionId);
-
-        _totalAgentsInRegion = (agentsCount as List).length;
-        _totalSchoolsInRegion = (schoolsCount as List).length;
+        final agentsCount = await ApiService().getAll('users', filter: {
+          'region_id': regionId, 'role': 4,
+        }, limit: 500);
+        final schoolsCount = await ApiService().getAll('schools', filter: {
+          'region_id': regionId,
+        }, limit: 500);
+        _totalAgentsInRegion = agentsCount.length;
+        _totalSchoolsInRegion = schoolsCount.length;
       }
 
-      final performanceResponse =
-          await _supabase
-              .from('agent_performance')
-              .select('target, achieved, visits_count')
-              .eq('user_id', user.id)
-              .maybeSingle();
+      final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+      final visits = await ApiService().getAll('school_visits', filter: {
+        'agent_id': userId,
+        'visited_at': {'gte': monthStart.toUtc().toIso8601String()},
+      }, limit: 500);
+      _monthlyTarget = 100;
+      _visitsCompleted = visits.length;
+      _achievedTarget = visits.length.toDouble();
 
-      if (performanceResponse != null) {
-        _monthlyTarget = (performanceResponse['target'] ?? 100).toDouble();
-        _achievedTarget = (performanceResponse['achieved'] ?? 0).toDouble();
-        _visitsCompleted = performanceResponse['visits_count'] ?? 0;
-      }
-
-      await _fetchDashboardMetrics(regionId, user.id);
+      await _fetchDashboardMetrics(regionId, userId);
     } catch (e) {
       debugPrint('Error fetching supervisor dashboard data: $e');
     } finally {
@@ -524,12 +510,11 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
       //     only so the screen still renders personal data.
       final List<String> agentIds;
       if (regionId != null) {
-        final agentsRes = await _supabase
-            .from('profiles')
-            .select('id')
-            .eq('region_id', regionId);
+        final agentsRes = await ApiService().getAll(
+          'users', filter: {'region_id': regionId}, limit: 500,
+        );
         agentIds =
-            (agentsRes as List)
+            agentsRes
                 .map((e) => e['id']?.toString())
                 .whereType<String>()
                 .where((id) => id.isNotEmpty)
@@ -547,40 +532,31 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
       // --- Run all DB reads in parallel.
       final results = await Future.wait<dynamic>([
         // School sales (pipeline, deals, revenue, trend).
-        _supabase
-            .from('school_sales')
-            .select(
-              'sale_status, expected_value, agent_id, created_at, school_id',
-            )
-            .filter('agent_id', 'in', agentIds),
+        ApiService().getAll('school_sales', filter: {
+          'agent_id': {'in': agentIds},
+        }, limit: 500),
 
         // School visits (field activity, rep performance).
-        _supabase
-            .from('school_visits')
-            .select('agent_id, school_id, visited_at')
-            .filter('agent_id', 'in', agentIds),
+        ApiService().getAll('school_visits', filter: {
+          'agent_id': {'in': agentIds},
+        }, limit: 500),
 
         // Sample distributions (field activity).
-        _supabase
-            .from('school_sample_distributions')
-            .select('agent_id, quantity, returned_qty, distributed_at')
-            .filter('agent_id', 'in', agentIds),
+        ApiService().getAll('school_sample_distributions', filter: {
+          'agent_id': {'in': agentIds},
+        }, limit: 500),
 
         // Agent-performance rows for region agents (team target).
-        _supabase
-            .from('agent_performance')
-            .select('target, achieved')
-            .filter('user_id', 'in', agentIds),
+        Future<List<dynamic>>.value(const []),
 
         // Agent names (for rep-performance chart and top-deals).
-        _supabase
-            .from('profiles')
-            .select('id, full_name')
-            .filter('id', 'in', agentIds),
+        ApiService().getAll('users', filter: {
+          'id': {'in': agentIds},
+        }, limit: 500),
 
         // Schools (dealer_type for field-stat filtering and school names
         // for top-deals).
-        _supabase.from('schools').select('id, name, dealer_type'),
+        ApiService().getAll('schools', limit: 500),
       ]);
 
       final salesData = List<Map<String, dynamic>>.from(
@@ -889,7 +865,7 @@ class _AgentDashboardPageState extends State<AgentDashboardPage>
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
-              await _supabase.auth.signOut();
+              await ApiService().logout();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                   context,

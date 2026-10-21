@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../admin/school_profile_page.dart';
 import '../database/database_service.dart';
 import 'agrovet_onboarding.dart';
+import '../../services/api_service.dart';
 
 class UserSchoolProfilesPage extends StatefulWidget {
   const UserSchoolProfilesPage({super.key});
@@ -14,7 +14,6 @@ class UserSchoolProfilesPage extends StatefulWidget {
 }
 
 class _UserSchoolProfilesPageState extends State<UserSchoolProfilesPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final _searchController = TextEditingController();
   bool _isLoading = true;
@@ -51,23 +50,20 @@ class _UserSchoolProfilesPageState extends State<UserSchoolProfilesPage> {
   Future<void> _loadSchools() async {
     setState(() => _isLoading = true);
     try {
-      final currentUserId = _supabase.auth.currentUser?.id;
+      final currentUserId = _dbService.getCurrentUserId();
       if (currentUserId == null) {
         throw StateError('Sign in to view onboarded schools.');
       }
 
-      final response = await _supabase
-          .from('schools')
-          .select(
-            'id,name,phone,county,book_category,dealer_type,shop_category,selected_product,partner_subtype,school_ownership,school_population,contact_name,contact_phone,notes,focusAreas,captured_by,captured_at,updated_at',
-          )
-          .eq('captured_by', currentUserId)
-          .order('updated_at', ascending: false);
+      final response = await ApiService().getAll(
+        'schools', filter: {'captured_by': currentUserId},
+        orderBy: 'updated_at', orderDir: 'DESC', limit: 500,
+      );
 
       if (!mounted) return;
       setState(() {
         _schools = List<Map<String, dynamic>>.from(
-          (response as List).map((item) => Map<String, dynamic>.from(item)),
+          response.map((item) => Map<String, dynamic>.from(item)),
         );
         _isLoading = false;
       });

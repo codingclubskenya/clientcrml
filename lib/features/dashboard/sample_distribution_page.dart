@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 
 import '../../core/constants/colors.dart';
@@ -10,6 +9,7 @@ import '../admin/add_sample_book_page.dart';
 import 'client_type_selector.dart';
 import '../../models/catalog_item_model.dart';
 import '../../models/farmer_model.dart';
+import '../../services/api_service.dart';
 
 class SampleDistributionPage extends StatefulWidget {
   const SampleDistributionPage({super.key});
@@ -28,6 +28,7 @@ class SampleMenuTile {
 
 class _SampleDistributionPageState extends State<SampleDistributionPage> {
   final DatabaseService _dbService = DatabaseService();
+  final ApiService _api = ApiService();
   final ImagePicker _imagePicker = ImagePicker();
 
   late Future<List<SchoolModel>> _schoolsFuture;
@@ -73,10 +74,7 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
       }
       if (payload.isEmpty) return;
 
-      await Supabase.instance.client
-          .from('catalog_items')
-          .update(payload)
-          .eq('id', sample.id);
+      await _api.patch('catalog_items', sample.id, payload);
 
       await _loadSamples();
       if (!mounted) return;
@@ -130,32 +128,17 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
   Future<void> _loadRoiSummary() async {
     setState(() => _isLoadingRoi = true);
     try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
+      final api = ApiService();
+      final userId = api.currentUserId;
       if (userId == null) {
         if (!mounted) return;
         setState(() => _isLoadingRoi = false);
         return;
       }
 
-      final receiptsRes = await supabase
-          .from('school_sample_distributions')
-          .select('school_id,quantity')
-          .eq('agent_id', userId)
-          .order('distributed_at', ascending: false)
-          .limit(2000);
-      final ordersRes = await supabase
-          .from('orders')
-          .select('checkout_amount,status')
-          .eq('agent_id', userId)
-          .order('created_at', ascending: false)
-          .limit(2000);
-      final salesRes = await supabase
-          .from('school_sales')
-          .select('expected_value,sale_status')
-          .eq('agent_id', userId)
-          .order('created_at', ascending: false)
-          .limit(2000);
+      final receiptsRes = await api.getAll('school_sample_distributions', filter: {'agent_id': userId}, orderBy: 'distributed_at', orderDir: 'DESC', limit: 500);
+      final ordersRes = await api.getAll('orders', filter: {'agent_id': userId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
+      final salesRes = await api.getAll('school_sales', filter: {'agent_id': userId}, orderBy: 'created_at', orderDir: 'DESC', limit: 500);
 
       int samplesGiven = 0;
       final schools = <String>{};
@@ -199,8 +182,7 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
   Future<void> _loadDistributions() async {
     setState(() => _isLoadingDistributions = true);
     try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
+      final userId = ApiService().currentUserId;
       final rows = await _dbService.getSampleDistributions(
         agentId: _currentRole == 1 ? null : userId,
         clientType: _selectedClientType?.value,
@@ -826,15 +808,8 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
       await _dbService.decrementCatalogStock(sample.id, quantity);
 
       // App-level CRM Automation (Fallback if SQL Trigger is not active)
-      final supabase = Supabase.instance.client;
-      final saleRes =
-          await supabase
-              .from('school_sales')
-              .select('id, sale_status')
-              .eq('school_id', school.id)
-              .order('created_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+      final saleRows = await _api.getAll('school_sales', filter: {'school_id': school.id}, orderBy: 'created_at', orderDir: 'DESC', limit: 1);
+      final saleRes = saleRows.isEmpty ? null : saleRows.first;
 
       if (saleRes != null) {
         final saleId = saleRes['id'];
@@ -843,19 +818,16 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
         if (currentStatus == 'lead' ||
             currentStatus == 'contacted' ||
             currentStatus == 'meeting_scheduled') {
-          await supabase
-              .from('school_sales')
-              .update({
+          await _api.patch('school_sales', saleId.toString(), {
                 'sale_status': 'sample_issued',
                 'stage_updated_at': DateTime.now().toIso8601String(),
-              })
-              .eq('id', saleId);
+              });
         }
 
-        await supabase.from('opportunity_activities').insert({
+        await _api.create('opportunity_activities', {
           'opportunity_id': saleId,
           'school_id': school.id,
-          'actor_id': supabase.auth.currentUser?.id,
+          'actor_id': _api.currentUserId,
           'activity_type': 'Sample Delivered',
           'activity_outcome': 'Samples left with school',
           'notes': 'Distributed $quantity x ${sample.name}',
@@ -1027,7 +999,7 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
     required String sampleName,
     required String schoolName,
   }) async {
-    final supabase = Supabase.instance.client;
+    final api = ApiService();
     final rawExt = photo.path.split('.').last.toLowerCase();
     final fileExt = rawExt.isEmpty || rawExt.length > 5 ? 'jpg' : rawExt;
     final safeSchool = schoolName.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
@@ -1042,19 +1014,11 @@ class _SampleDistributionPageState extends State<SampleDistributionPage> {
 
       for (final bucket in candidateBuckets) {
         try {
-          await supabase.storage
-              .from(bucket)
-              .uploadBinary(
-                fileName,
-                bytes,
-                fileOptions: FileOptions(
-                  upsert: true,
-                  contentType: 'image/$fileExt',
-                ),
-              );
+          final uploadedUrl = await api.uploadFile(bucket: bucket, fileName: fileName, bytes: bytes);
+          if (uploadedUrl == null) throw Exception('Upload failed');
 
           return {
-            'url': supabase.storage.from(bucket).getPublicUrl(fileName),
+            'url': uploadedUrl,
             'path': fileName,
             'error': null,
           };
@@ -2120,7 +2084,7 @@ class SampleProofGalleryPage extends StatefulWidget {
 }
 
 class _SampleProofGalleryPageState extends State<SampleProofGalleryPage> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final ApiService _api = ApiService();
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = true;
   String? _error;
@@ -2143,46 +2107,29 @@ class _SampleProofGalleryPageState extends State<SampleProofGalleryPage> {
     });
     try {
       await _dbService.syncData();
-      final receiptResponse = await _supabase
-          .from('school_sample_distributions')
-          .select(
-            'id,sample_name,distributed_at,stamped_receipt_url,stamped_receipt_path,schools(name)',
-          )
-          .not('stamped_receipt_url', 'is', null)
-          .order('distributed_at', ascending: false)
-          .limit(300);
-      final proofResponse = await _supabase
-          .from('schools')
-          .select(
-            'id,name,county,sample_proof_url,sample_proof_path,created_at',
-          )
-          .not('sample_proof_url', 'is', null)
-          .order('created_at', ascending: false)
-          .limit(300);
-      final onboardingReceiptProofResponse = await _supabase
-          .from('school_sample_distributions')
-          .select(
-            'id,sample_name,distributed_at,stamped_receipt_url,stamped_receipt_path,schools(name,county)',
-          )
-          .eq('sample_category', 'Onboarding')
-          .not('stamped_receipt_url', 'is', null)
-          .order('distributed_at', ascending: false)
-          .limit(300);
+      final receiptResponse = await _api.getAll('school_sample_distributions', filter: {'stamped_receipt_url': {'neq': null}}, orderBy: 'distributed_at', orderDir: 'DESC', limit: 300);
+      final proofResponse = await _api.getAll('schools', filter: {'sample_proof_url': {'neq': null}}, orderBy: 'created_at', orderDir: 'DESC', limit: 300);
+      final onboardingReceiptProofResponse = await _api.getAll('school_sample_distributions', filter: {'sample_category': 'Onboarding', 'stamped_receipt_url': {'neq': null}}, orderBy: 'distributed_at', orderDir: 'DESC', limit: 300);
+      final schoolRows = await _api.getAll('schools', limit: 500);
+      final schoolNames = {for (final row in schoolRows) row['id'].toString(): {'name': row['name'], 'county': row['county']}};
+      for (final row in [...receiptResponse, ...onboardingReceiptProofResponse]) {
+        row['schools'] = schoolNames[row['school_id']?.toString()];
+      }
       if (!mounted) return;
       final localSchools = await _dbService.getAllSchoolProfiles();
       setState(() {
         _receiptRows = List<Map<String, dynamic>>.from(
-          (receiptResponse as List).map(
+          receiptResponse.map(
             (e) => Map<String, dynamic>.from(e as Map),
           ),
         );
         _proofRows = List<Map<String, dynamic>>.from(
-          (proofResponse as List).map(
+          proofResponse.map(
             (e) => Map<String, dynamic>.from(e as Map),
           ),
         );
         _onboardingReceiptProofRows = List<Map<String, dynamic>>.from(
-          (onboardingReceiptProofResponse as List).map(
+          onboardingReceiptProofResponse.map(
             (e) => Map<String, dynamic>.from(e as Map),
           ),
         );
@@ -2496,10 +2443,7 @@ class _SampleProofGalleryPageState extends State<SampleProofGalleryPage> {
     if (!approved) return;
 
     try {
-      await _supabase
-          .from('schools')
-          .update({'sample_proof_url': null, 'sample_proof_path': null})
-          .eq('id', schoolId);
+      await _api.patch('schools', schoolId, {'sample_proof_url': null, 'sample_proof_path': null});
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -2519,10 +2463,7 @@ class _SampleProofGalleryPageState extends State<SampleProofGalleryPage> {
     if (!approved) return;
 
     try {
-      await _supabase
-          .from('school_sample_distributions')
-          .update({'stamped_receipt_url': null, 'stamped_receipt_path': null})
-          .eq('id', receiptId);
+      await _api.patch('school_sample_distributions', receiptId, {'stamped_receipt_url': null, 'stamped_receipt_path': null});
       await _load();
     } catch (e) {
       if (!mounted) return;

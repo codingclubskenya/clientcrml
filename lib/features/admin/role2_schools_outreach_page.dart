@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:printing/printing.dart';
 
 import '../../core/constants/colors.dart';
@@ -13,6 +12,7 @@ import '../../../models/school_sale_model.dart';
 import '../../../models/target_model.dart';
 import '../../../models/user_model.dart';
 import '../../../services/outreach_report_service.dart';
+import '../../../services/api_service.dart';
 import 'utils/csv_download_stub.dart'
     if (dart.library.html) 'utils/csv_download_web.dart'
     if (dart.library.io) 'utils/csv_download_io.dart'
@@ -28,7 +28,7 @@ class Role2SchoolsOutreachPage extends StatefulWidget {
 
 class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
   final DatabaseService _dbService = DatabaseService();
-  final _supabase = Supabase.instance.client;
+  final _api = ApiService();
 
   List<UserModel> _agents = <UserModel>[];
   List<RegionModel> _regions = <RegionModel>[];
@@ -83,12 +83,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
         filteredAgentIds.addAll(agentIds);
       }
 
-      final schoolsQuery = _supabase
-          .from('schools')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(500);
-      final schoolsAll = (await schoolsQuery) as List;
+      final schoolsAll = await _api.getAll('schools', orderBy: 'created_at', orderDir: 'DESC', limit: 500);
       final schools =
           schoolsAll
               .map((s) => SchoolModel.fromMap(Map<String, dynamic>.from(s)))
@@ -100,12 +95,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
       final schoolIds = schools.map((s) => s.id).toList();
 
-      final ordersQuery = _supabase
-          .from('orders')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(1000);
-      final ordersData = await ordersQuery;
+      final ordersData = await _api.getAll('orders', orderBy: 'created_at', orderDir: 'DESC', limit: 1000);
       final orders =
           (ordersData as List)
               .map((o) => OrderModel.fromMap(Map<String, dynamic>.from(o)))
@@ -120,8 +110,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
       final orderIds = orders.map((o) => o.id).toList();
       final orderItems = <OrderItemModel>[];
       if (orderIds.isNotEmpty) {
-        final itemsQuery = _supabase.from('order_items').select().limit(5000);
-        final items = await itemsQuery;
+        final items = await _api.getAll('order_items', limit: 5000);
         orderItems.addAll(
           (items as List)
               .map((i) => OrderItemModel.fromMap(Map<String, dynamic>.from(i)))
@@ -132,12 +121,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
       final sales = <SchoolSaleModel>[];
       if (schoolIds.isNotEmpty) {
-        final salesQuery = _supabase
-            .from('school_sales')
-            .select()
-            .order('created_at', ascending: false)
-            .limit(1000);
-        final salesData = await salesQuery;
+        final salesData = await _api.getAll('school_sales', orderBy: 'created_at', orderDir: 'DESC', limit: 1000);
         sales.addAll(
           (salesData as List)
               .map((s) => SchoolSaleModel.fromMap(Map<String, dynamic>.from(s)))
@@ -148,11 +132,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
       final visits = <Map<String, dynamic>>[];
       if (schoolIds.isNotEmpty) {
-        final visitsData = await _supabase
-            .from('school_visits')
-            .select()
-            .order('visited_at', ascending: false)
-            .limit(1000);
+        final visitsData = await _api.getAll('school_visits', orderBy: 'visited_at', orderDir: 'DESC', limit: 1000);
         visits.addAll(
           List<Map<String, dynamic>>.from(visitsData as List)
               .where(
@@ -164,11 +144,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
       final activities = <Map<String, dynamic>>[];
       if (schoolIds.isNotEmpty) {
-        final activitiesData = await _supabase
-            .from('opportunity_activities')
-            .select()
-            .order('created_at', ascending: false)
-            .limit(1000);
+        final activitiesData = await _api.getAll('opportunity_activities', orderBy: 'created_at', orderDir: 'DESC', limit: 1000);
         activities.addAll(
           List<Map<String, dynamic>>.from(activitiesData as List)
               .where(
@@ -180,10 +156,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
 
       final debts = <Map<String, dynamic>>[];
       if (schoolIds.isNotEmpty) {
-        final debtsData = await _supabase
-            .from('debt_collections')
-            .select()
-            .limit(1000);
+        final debtsData = await _api.getAll('debt_collections', limit: 1000);
         debts.addAll(
           List<Map<String, dynamic>>.from(debtsData as List)
               .where(
@@ -193,7 +166,7 @@ class _Role2SchoolsOutreachPageState extends State<Role2SchoolsOutreachPage> {
         );
       }
 
-      final targetsData = await _supabase.from('targets').select().limit(500);
+      final targetsData = await _api.getAll('targets', limit: 500);
       final targets =
           (targetsData as List)
               .map(

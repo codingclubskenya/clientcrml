@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../models/farmer_model.dart';
 import '../database/database_service.dart';
 import '../../core/widgets/map_tile_controls.dart';
+import '../../services/api_service.dart';
 
 class Role2RoutePlanPage extends StatefulWidget {
   const Role2RoutePlanPage({super.key});
@@ -16,7 +16,6 @@ class Role2RoutePlanPage extends StatefulWidget {
 }
 
 class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
-  final _supabase = Supabase.instance.client;
   final _dbService = DatabaseService();
   final _schoolSearchController = TextEditingController();
 
@@ -58,14 +57,13 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
       final role = await _dbService.getCurrentUserRole();
       _currentUserRole = role;
 
-      final usersResponse = await _supabase
-          .from('users')
-          .select('id, full_name, email, role')
-          .eq('role', 5)
-          .order('full_name', ascending: true);
+      final usersResponse = await ApiService().getAll(
+        'users', filter: {'role': 5}, orderBy: 'full_name',
+        orderDir: 'ASC', limit: 500,
+      );
 
       if (_currentUserRole == 4) {
-        _selectedAgentId = _supabase.auth.currentUser?.id;
+        _selectedAgentId = _dbService.getCurrentUserId();
       }
 
       final schoolModels = await _dbService.getAllSchools();
@@ -88,7 +86,7 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
                 (b['name'] ?? '').toString().toLowerCase(),
               ),
             );
-      final remoteSchools = await _fetchAllSchoolsFromSupabase();
+      final remoteSchools = await _fetchAllSchoolsFromApi();
       final localById = {
         for (final school in localSchools)
           (school['id'] ?? '').toString(): school,
@@ -114,10 +112,9 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
               (b['name'] ?? '').toString().toLowerCase(),
             ),
           );
-      final salesResponse = await _supabase
-          .from('school_sales')
-          .select('school_id, sale_status, stage_updated_at, created_at')
-          .order('stage_updated_at', ascending: false);
+      final salesResponse = await ApiService().getAll(
+        'school_sales', orderBy: 'stage_updated_at', orderDir: 'DESC', limit: 500,
+      );
 
       final stageMap = <String, String>{};
       final discoveredStages = <String>{};
@@ -157,26 +154,9 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchAllSchoolsFromSupabase() async {
-    const pageSize = 1000;
-    var from = 0;
-    final all = <Map<String, dynamic>>[];
-
-    while (true) {
-      final response = await _supabase
-          .from('schools')
-          .select(
-            'id, name, county, latitude, longitude, school_lifecycle_status, engagement_type',
-          )
-          .range(from, from + pageSize - 1);
-      final page = List<Map<String, dynamic>>.from(response);
-      if (page.isEmpty) break;
-      all.addAll(page);
-      if (page.length < pageSize) break;
-      from += pageSize;
-    }
-
-    return all;
+  Future<List<Map<String, dynamic>>> _fetchAllSchoolsFromApi() async {
+    final response = await ApiService().getAll('schools', limit: 500);
+    return List<Map<String, dynamic>>.from(response);
   }
 
   Future<void> _pickDate() async {
@@ -241,7 +221,7 @@ class _Role2RoutePlanPageState extends State<Role2RoutePlanPage> {
           'notes':
               'Planned stops: ${selectedSchools.map((s) => s['name']).join(', ')}',
           'status': 'assigned',
-          'created_by': _supabase.auth.currentUser?.id,
+          'created_by': _dbService.getCurrentUserId(),
         },
       );
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/colors.dart';
 import '../../models/message_model.dart';
@@ -41,26 +40,26 @@ class _MessagesPageState extends State<MessagesPage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
+      final currentUserId = _dbService.getCurrentUserId();
       final allUsers = await _dbService.getAllUsers();
       final messages = await _dbService.getMessagesForCurrentUser();
 
       List<UserModel> users;
-      if (currentUser != null) {
-        final currentUserModel = await _dbService.getUser(currentUser.id);
+      if (currentUserId != null) {
+        final currentUserModel = await _dbService.getUser(currentUserId);
         final role = currentUserModel?.role ?? 5;
         if (role <= 2) {
           users = allUsers;
         } else {
           final userRegion = (currentUserModel?.region ?? '').toLowerCase();
           if (userRegion.isEmpty) {
-            users = allUsers.where((u) => u.id != currentUser.id).toList();
+            users = allUsers.where((u) => u.id != currentUserId).toList();
           } else {
             users =
                 allUsers
                     .where(
                       (u) =>
-                          u.id != currentUser.id &&
+                      u.id != currentUserId &&
                           (u.region ?? '').toLowerCase() == userRegion,
                     )
                     .toList();
@@ -102,8 +101,8 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _sendMessage() async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return;
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) return;
     if (_selectedRecipientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select a recipient first.')),
@@ -124,7 +123,7 @@ class _MessagesPageState extends State<MessagesPage> {
     try {
       await _dbService.sendMessage(
         MessageModel(
-          senderId: currentUser.id,
+          senderId: currentUserId,
           recipientId: _selectedRecipientId!,
           subject: subject,
           body: body,
@@ -151,12 +150,12 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _openMessage(MessageModel message) async {
     if (!message.isRead &&
-        message.recipientId == Supabase.instance.client.auth.currentUser?.id) {
+        message.recipientId == _dbService.getCurrentUserId()) {
       await _dbService.markMessageRead(message.id);
       await _loadData();
     }
 
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final currentUserId = _dbService.getCurrentUserId();
     final senderLabel =
         message.senderId == currentUserId
             ? 'You'
@@ -370,9 +369,9 @@ class _MessagesPageState extends State<MessagesPage> {
             ..._messages.map((message) {
               final isIncoming =
                   message.recipientId ==
-                  Supabase.instance.client.auth.currentUser?.id;
+                  _dbService.getCurrentUserId();
               final currentUserId =
-                  Supabase.instance.client.auth.currentUser?.id;
+                  _dbService.getCurrentUserId();
               final senderLabel =
                   message.senderId == currentUserId
                       ? 'You'

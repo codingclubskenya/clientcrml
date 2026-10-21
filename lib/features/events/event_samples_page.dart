@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 import 'event_date_format.dart';
 
 class EventSamplesPage extends StatefulWidget {
@@ -11,10 +11,13 @@ class EventSamplesPage extends StatefulWidget {
 }
 
 class _EventSamplesPageState extends State<EventSamplesPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _samples = [];
   bool _loading = true;
+
+  String _productName(Map<String, dynamic> sample) =>
+      (sample['catalog_items'] as Map<String, dynamic>?)?['name']?.toString() ??
+      'Unknown product';
 
   String? get _eventId =>
       ModalRoute.of(context)?.settings.arguments is Map
@@ -62,11 +65,19 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
     }
 
     try {
-      final currentUser = _supabase.auth.currentUser;
+      final products = await ApiService().getAll('catalog_items', limit: 500);
+      final product = products.cast<Map>().cast<Map<String, dynamic>>().firstWhere(
+        (item) => (item['name'] ?? '').toString().trim().toLowerCase() ==
+            _productNameController.text.trim().toLowerCase(),
+        orElse: () => <String, dynamic>{},
+      );
+      if (product['id'] == null) {
+        throw Exception('Select a product name that exists in the catalog');
+      }
       await _dbService.createEventSample({
         'event_id': id,
-        'distributed_by': currentUser?.id,
-        'product_name': _productNameController.text.trim(),
+        'distributed_by': _dbService.getCurrentUserId(),
+        'product_id': product['id'],
         'quantity': int.tryParse(_quantityController.text.trim()) ?? 0,
         'recipient': _recipientNameController.text.trim(),
         'notes': _notesController.text.trim(),
@@ -87,7 +98,7 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
   }
 
   Future<void> _editSample(Map<String, dynamic> sample) async {
-    _productNameController.text = sample['product_name']?.toString() ?? '';
+    _productNameController.text = _productName(sample);
     _quantityController.text = sample['quantity']?.toString() ?? '';
     _recipientNameController.text = sample['recipient']?.toString() ?? '';
     _notesController.text = sample['notes']?.toString() ?? '';
@@ -150,15 +161,21 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
 
     if (result == true && _productNameController.text.isNotEmpty) {
       try {
-        await _supabase
-            .from('event_samples')
-            .update({
-              'product_name': _productNameController.text.trim(),
+        final products = await ApiService().getAll('catalog_items', limit: 500);
+        final product = products.cast<Map>().cast<Map<String, dynamic>>().firstWhere(
+          (item) => (item['name'] ?? '').toString().trim().toLowerCase() ==
+              _productNameController.text.trim().toLowerCase(),
+          orElse: () => <String, dynamic>{},
+        );
+        if (product['id'] == null) {
+          throw Exception('Select a product name that exists in the catalog');
+        }
+        await ApiService().patch('event_samples', sample['id'].toString(), {
+              'product_id': product['id'],
               'quantity': int.tryParse(_quantityController.text.trim()) ?? 0,
               'recipient': _recipientNameController.text.trim(),
               'notes': _notesController.text.trim(),
-            })
-            .eq('id', sample['id']);
+            });
         _productNameController.clear();
         _quantityController.clear();
         _recipientNameController.clear();
@@ -179,7 +196,7 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
           (ctx) => AlertDialog(
             title: const Text('Delete Sample'),
             content: Text(
-              'Delete ${sample['quantity']}x ${sample['product_name']}?',
+              'Delete ${sample['quantity']}x ${_productName(sample)}?',
             ),
             actions: [
               TextButton(
@@ -197,7 +214,7 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
 
     if (confirmed == true) {
       try {
-        await _supabase.from('event_samples').delete().eq('id', sample['id']);
+        await ApiService().delete('event_samples', sample['id'].toString());
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Sample deleted')));
@@ -348,7 +365,7 @@ class _EventSamplesPageState extends State<EventSamplesPage> {
                               color: Colors.orange,
                             ),
                           ),
-                          title: Text('${s['quantity']}x ${s['product_name']}'),
+                          title: Text('${s['quantity']}x ${_productName(s)}'),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

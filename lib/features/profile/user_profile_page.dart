@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../../features/database/database_service.dart';
 import '../../models/region_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -43,10 +43,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     try {
       final users = await _dbService.getAllUsers();
       final regions = await _dbService.getAllRegions();
-      final currentUser = Supabase.instance.client.auth.currentUser;
+      final currentUserId = _dbService.getCurrentUserId();
       UserModel? user;
-      if (currentUser != null) {
-        user = await _dbService.getUser(currentUser.id);
+      if (currentUserId != null) {
+        user = await _dbService.getUser(currentUserId);
       }
       if (!mounted) return;
       setState(() {
@@ -99,9 +99,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if (agentId == null) return;
     try {
       final agent = _agents.firstWhere((u) => u.id == agentId);
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (agent.id.isEmpty || currentUser == null) return;
-      final user = await _dbService.getUser(currentUser.id);
+      final currentUserId = _dbService.getCurrentUserId();
+      if (agent.id.isEmpty || currentUserId == null) return;
+      final user = await _dbService.getUser(currentUserId);
       if (user == null) return;
       final region = agent.region?.trim().isEmpty ?? true ? null : agent.region;
       final subRegion =
@@ -156,9 +156,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _onSubRegionChanged(String? subRegion) async {
     if (subRegion == null) return;
     setState(() => _userSubRegion = subRegion);
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return;
-    final user = await _dbService.getUser(currentUser.id);
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) return;
+    final user = await _dbService.getUser(currentUserId);
     if (user == null) return;
     final updated = user.copyWith(
       regionId: _userRegionId,
@@ -180,9 +180,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
     String? subRegion,
     String? regionId,
   ) async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return;
-    final user = await _dbService.getUser(currentUser.id);
+    final currentUserId = _dbService.getCurrentUserId();
+    if (currentUserId == null) return;
+    final user = await _dbService.getUser(currentUserId);
     if (user == null) return;
     final updated = user.copyWith(
       regionId: regionId,
@@ -199,15 +199,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  void _loadCurrentData() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      final meta = user.userMetadata ?? {};
-      _nameController.text = meta['full_name'] ?? '';
-      _phoneController.text = meta['phone'] ?? '';
-      _idController.text = meta['id_number'] ?? '';
-      _existingPhotoUrl = meta['avatar_url'];
-    }
+  Future<void> _loadCurrentData() async {
+    final userId = _dbService.getCurrentUserId();
+    if (userId == null) return;
+    final user = await _dbService.getUser(userId);
+    if (user == null || !mounted) return;
+    setState(() {
+      _nameController.text = user.fullName ?? '';
+      _phoneController.text = user.phone ?? '';
+      _idController.text = user.idNumber ?? '';
+      _existingPhotoUrl = user.avatarUrl;
+    });
   }
 
   @override
@@ -231,9 +233,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _saveProfile() async {
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) {
+      final userId = _dbService.getCurrentUserId();
+      if (userId == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No signed-in user found.')),
@@ -244,52 +245,33 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
       String? photoUrl = _existingPhotoUrl;
 
-      // If a new photo was picked, upload it to Supabase Storage
+      // Store profile photos with the API upload service.
       if (_photoFile != null) {
         try {
           final fileExt = _photoFile!.path.split('.').last;
-          final fileName = '${user.id}_avatar.$fileExt';
-
-          await supabase.storage
-              .from('profiles')
-              .upload(
-                fileName,
-                _photoFile!,
-                fileOptions: const FileOptions(upsert: true),
-              );
-          photoUrl = supabase.storage.from('profiles').getPublicUrl(fileName);
-        } catch (e) {
-          debugPrint('Photo upload failed (does the bucket exist?): $e');
-        }
-      }
-
-      // Prepare metadata updates
-      final updates = {
-        'full_name': _nameController.text.trim(),
-        'phone': _phoneController.text.trim(),
-        'id_number': _idController.text.trim(),
-      };
-      if (photoUrl != null) {
-        updates['avatar_url'] = photoUrl;
-      }
-
-      // Save to Supabase Auth metadata
-      await supabase.auth.updateUser(UserAttributes(data: updates));
-
-      // Save region/subregion to users table
-      try {
-        final existing = await _dbService.getUser(user.id);
-        if (existing != null) {
-          final updatedUser = existing.copyWith(
-            fullName: _nameController.text.trim(),
-            region: _userRegion,
-            subRegion: _userSubRegion,
+          final fileName = '${userId}_avatar.$fileExt';
+          photoUrl = await ApiService().uploadFile(
+            bucket: 'profiles',
+            fileName: fileName,
+            bytes: await _photoFile!.readAsBytes(),
           );
-          await _dbService.saveUser(updatedUser);
+          if (photoUrl == null) throw Exception('Photo upload failed');
+        } catch (e) {
+          debugPrint('Photo upload failed: $e');
         }
-      } catch (e) {
-        debugPrint('Error saving user region: $e');
       }
+
+      final existing = await _dbService.getUser(userId);
+      if (existing == null) throw StateError('User profile not found');
+      final updatedUser = existing.copyWith(
+        fullName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        idNumber: _idController.text.trim(),
+        avatarUrl: photoUrl,
+        region: _userRegion,
+        subRegion: _userSubRegion,
+      );
+      await _dbService.saveUser(updatedUser);
 
       if (mounted) {
         Navigator.pop(context);

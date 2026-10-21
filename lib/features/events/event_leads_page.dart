@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
+import '../../services/api_service.dart';
 
 class EventLeadsPage extends StatefulWidget {
   const EventLeadsPage({super.key});
@@ -10,7 +10,6 @@ class EventLeadsPage extends StatefulWidget {
 }
 
 class _EventLeadsPageState extends State<EventLeadsPage> {
-  final _supabase = Supabase.instance.client;
   final DatabaseService _dbService = DatabaseService();
 
   List<Map<String, dynamic>> _leads = [];
@@ -55,11 +54,7 @@ class _EventLeadsPageState extends State<EventLeadsPage> {
 
   Future<void> _loadSchools() async {
     try {
-      final data = await _supabase
-          .from('schools')
-          .select('id, name, county, region')
-          .order('name')
-          .limit(500);
+      final data = await ApiService().getAll('schools', orderBy: 'name', orderDir: 'ASC', limit: 500);
 
       setState(() {
         _schools = List<Map<String, dynamic>>.from(data);
@@ -80,10 +75,9 @@ class _EventLeadsPageState extends State<EventLeadsPage> {
     }
 
     try {
-      final currentUser = _supabase.auth.currentUser;
       await _dbService.createEventLead({
         'event_id': id,
-        'agent_id': currentUser?.id,
+        'agent_id': _dbService.getCurrentUserId(),
         'lead_name': _name.text.trim(),
         'school_id': _selectedSchoolId,
         'phone': _phone.text.trim(),

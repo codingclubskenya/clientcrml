@@ -4,7 +4,7 @@ import 'admin_create_route_screen.dart';
 import 'admin_geofence_map_screen.dart';
 import 'admin_agent_tracker_screen.dart';
 import '../welcome/auth/login_page.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/api_service.dart';
 
 class SuperadminDashboardScreen extends StatefulWidget {
   const SuperadminDashboardScreen({super.key});
@@ -15,7 +15,6 @@ class SuperadminDashboardScreen extends StatefulWidget {
 }
 
 class _SuperadminDashboardScreenState extends State<SuperadminDashboardScreen> {
-  final _supabase = Supabase.instance.client;
   int _totalTasks = 0;
   int _totalGeofences = 0;
   bool _isLoading = true;
@@ -29,20 +28,31 @@ class _SuperadminDashboardScreenState extends State<SuperadminDashboardScreen> {
   Future<void> _refreshData() async {
     setState(() => _isLoading = true);
     try {
-      final taskCount = await _supabase.from('tasks').count(CountOption.exact);
-      final geofenceCount = await _supabase
-          .from('geofences')
-          .count(CountOption.exact);
+      final counts = await Future.wait([
+        _countRows('tasks'),
+        _countRows('geofences'),
+      ]);
       if (mounted) {
         setState(() {
-          _totalTasks = taskCount;
-          _totalGeofences = geofenceCount;
+          _totalTasks = counts[0];
+          _totalGeofences = counts[1];
         });
       }
     } catch (e) {
       debugPrint('Error fetching dashboard counts: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<int> _countRows(String table) async {
+    var count = 0;
+    var offset = 0;
+    while (true) {
+      final page = await ApiService().getAll(table, limit: 500, offset: offset);
+      count += page.length;
+      if (page.length < 500) return count;
+      offset += page.length;
     }
   }
 
@@ -57,7 +67,7 @@ class _SuperadminDashboardScreenState extends State<SuperadminDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
+              await ApiService().logout();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
